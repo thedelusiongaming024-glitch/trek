@@ -164,17 +164,34 @@ export default function App() {
   const fetchData = useCallback(async () => {
     setIsLoadingData(true);
     try {
+      // Each endpoint's failure is logged with its real status/body instead
+      // of being silently converted to an empty array — that masking is
+      // exactly what hid the original "DB connected but no data shows" bug,
+      // just on the frontend side of the same anti-pattern we fixed in the
+      // API layer.
+      const safeFetch = async (url: string, fallback: any) => {
+        const res = await fetch(url);
+        if (!res.ok) {
+          const body = await res.text().catch(() => '');
+          console.error(`[fetchData] ${url} failed with ${res.status}: ${body}`);
+          return fallback;
+        }
+        return res.json();
+      };
+
       const [topicsRes, blogsRes, inquiriesRes, usersRes, logsRes, settingsRes] = await Promise.allSettled([
-        fetch('/api/topics').then(r => r.ok ? r.json() : []),
-        fetch('/api/blogs').then(r => r.ok ? r.json() : []),
-        fetch('/api/consultancy').then(r => r.ok ? r.json() : []),
-        fetch('/api/users').then(r => r.ok ? r.json() : []),
-        fetch('/api/activity-logs').then(r => r.ok ? r.json() : []),
-        fetch('/api/settings').then(r => r.ok ? r.json() : null)
+        safeFetch('/api/topics', []),
+        safeFetch('/api/blogs', []),
+        safeFetch('/api/consultancy', []),
+        safeFetch('/api/users', []),
+        safeFetch('/api/activity-logs', []),
+        safeFetch('/api/settings', null)
       ]);
 
       if (topicsRes.status === 'fulfilled' && Array.isArray(topicsRes.value)) {
         setTopics(topicsRes.value);
+      } else if (topicsRes.status === 'rejected') {
+        console.error('[fetchData] /api/topics threw:', topicsRes.reason);
       }
       if (blogsRes.status === 'fulfilled' && Array.isArray(blogsRes.value)) {
         setBlogPosts(blogsRes.value);
