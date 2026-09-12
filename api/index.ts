@@ -401,7 +401,7 @@ export async function initDb() {
 }
 
 import express from 'express';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Type } from '@google/genai';
 
 // ---------------------------------------------------------------------------
 // AI support chat performance helpers
@@ -1492,6 +1492,53 @@ export async function createApp() {
     }
   });
 
+  // Support Tickets Helper Function
+  async function createSupportTicket({
+    userEmail,
+    subject,
+    question,
+    priority,
+    sessionId = 'default-session',
+    userId,
+    source = 'Manual'
+  }: {
+    userEmail?: string;
+    subject?: string;
+    question: string;
+    priority?: string;
+    sessionId?: string;
+    userId?: string;
+    source?: 'Manual' | 'AI_Auto';
+  }) {
+    const ticketNum = `TKT-${Math.floor(1000 + Math.random() * 9000)}`;
+    const id = `tkt-${Date.now()}`;
+    const cleanEmail = (userEmail || '').trim() || 'guest@amacommunity.io';
+    const cleanSubj = (subject || '').trim() || (question.trim().slice(0, 60) + '...');
+    const cleanPriority = priority || 'Normal';
+    const cleanSession = sessionId || 'default-session';
+
+    const insertRes = await pool.query(`
+      INSERT INTO support_tickets (id, ticket_number, user_id, user_email, session_id, subject, question, priority, status, assigned_to)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'OPEN', 'Community Support Specialist')
+      RETURNING id, ticket_number as "ticketNumber", user_id as "userId", user_email as "userEmail", session_id as "sessionId",
+                subject, question, priority, status, admin_answer as "adminAnswer", assigned_to as "assignedTo", created_at as "createdAt"
+    `, [id, ticketNum, userId || null, cleanEmail, cleanSession, cleanSubj, question.trim(), cleanPriority]);
+
+    const createdTicket = insertRes.rows[0];
+
+    // Activity log
+    try {
+      await pool.query(`
+        INSERT INTO activity_logs (id, action, actor, target, time_ago, type)
+        VALUES ($1, $2, $3, $4, 'Just now', 'support')
+      `, [`act-${Date.now()}`, source === 'AI_Auto' ? 'AI Auto-Raised Support Ticket' : 'Opened Support Ticket', cleanEmail, `#${ticketNum}`]);
+    } catch (logErr) {
+      console.warn('Failed to log ticket creation activity:', logErr);
+    }
+
+    return createdTicket;
+  }
+
   // Support Tickets: Create
   app.post('/api/support/tickets', async (req, res) => {
     try {
@@ -1500,31 +1547,17 @@ export async function createApp() {
         return res.status(400).json({ error: 'Question content is required to create a ticket.' });
       }
 
-      const ticketNum = `TKT-${Math.floor(1000 + Math.random() * 9000)}`;
-      const id = `tkt-${Date.now()}`;
-      const cleanEmail = (userEmail || '').trim() || 'guest@amacommunity.io';
-      const cleanSubj = (subject || '').trim() || question.trim().slice(0, 60) + '...';
-      const cleanPriority = priority || 'Normal';
-      const cleanSession = sessionId || 'default-session';
+      const ticket = await createSupportTicket({
+        userEmail,
+        subject,
+        question,
+        priority,
+        sessionId,
+        userId,
+        source: 'Manual'
+      });
 
-      const insertRes = await pool.query(`
-        INSERT INTO support_tickets (id, ticket_number, user_id, user_email, session_id, subject, question, priority, status, assigned_to)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'OPEN', 'Community Staff')
-        RETURNING id, ticket_number as "ticketNumber", user_id as "userId", user_email as "userEmail", session_id as "sessionId",
-                  subject, question, priority, status, admin_answer as "adminAnswer", assigned_to as "assignedTo", created_at as "createdAt"
-      `, [id, ticketNum, userId || null, cleanEmail, cleanSession, cleanSubj, question.trim(), cleanPriority]);
-
-      // Activity log
-      try {
-        await pool.query(`
-          INSERT INTO activity_logs (id, action, actor, target, time_ago, type)
-          VALUES ($1, $2, $3, $4, 'Just now', 'support')
-        `, [`act-${Date.now()}`, 'Opened Support Ticket', cleanEmail, `#${ticketNum}`,]);
-      } catch (logErr) {
-        console.warn('Failed to log ticket creation activity:', logErr);
-      }
-
-      res.status(201).json(insertRes.rows[0]);
+      res.status(201).json(ticket);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -1624,27 +1657,76 @@ export async function createApp() {
 
       let botReply = '';
       let replySource = 'AI';
+      let createdTicket: any = null;
 
       // 3. Try generating with Gemini API if GEMINI_API_KEY is configured.
-      // Only the two fastest models are tried, each capped with a timeout,
-      // and there's no artificial retry delay — if a model is slow or
-      // unavailable we move on immediately instead of waiting it out.
       if (process.env.GEMINI_API_KEY) {
         const candidateModels = [
           'gemini-3.8-flash',
           'gemini-3.1-flash-lite'
         ];
-        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-        const systemInstruction = `You are the support assistant for Ama Community, a discussion forum and knowledge base platform.
+        const ai = new GoogleGenAI({
+          apiKey: process.env.GEMINI_API_KEY,
+          httpOptions: {
+            headers: {
+              'User-Agent': 'aistudio-build',
+            }
+          }
+        });
 
+        const systemInstruction = `You are the obedient, polite, respectful, and fully cooperative AI Support Assistant for Ama Community.
+Your goal is to faithfully assist the user and represent Ama Community with the highest standard of helpfulness, professionalism, and brand excellence.
+
+============================================================
+COMPANY & PLATFORM KNOWLEDGE BASE (LIVE DATABASE CONTEXT):
 ${ragContext}
+============================================================
 
-Guidelines:
-- Ground your answers in the knowledge documents, FAQs, and recent discussions above. When a question matches something in that context, answer directly from it — don't invent details that aren't there.
-- You can also speak generally about how the platform works: posting and replying, author/admin delete permissions, the Docly theme's bbPress integration, the Neon Postgres-backed persistence, and Enterprise Consultancy retainers.
-- If a question falls outside this platform's scope (general trivia, unrelated topics, etc.), say so plainly, then point the user to the "Submit Ticket" tab or ${supportEmail} for a human to help.
+YOUR 4 STRICT BEHAVIORAL PROTOCOLS:
+
+1. NORMAL CONVERSATION & CASUAL GREETINGS (e.g., "hi", "hello", "hey", "assalamu alaikum", "good morning", "good evening", "how are you", "who are you", "what can you do", "thanks", "thank you", "bye"):
+   - CLASSIFICATION: "GREETING"
+   - TONE: Obedient, polite, warm, welcoming, and eager to help.
+   - ACTION: Greet the user respectfully, introduce yourself as the official AI Assistant of Ama Community, and ask how you can help them navigate forum discussions, documentation, account guidance, or enterprise consultancy.
+   - STRICT CONSTRAINT: NEVER mention support tickets, NEVER suggest creating or submitting tickets, and NEVER output errors or say you cannot answer. Simply offer your obedient assistance with a welcoming demeanor.
+
+2. COMPANY & PLATFORM QUESTIONS (Information available in the Database or Platform Mechanics):
+   - CLASSIFICATION: "COMPANY_ANSWER_FROM_DB"
+   - TONE: Professional, obedient, helpful, and grounded.
+   - ACTION: Answer the user's question accurately and thoroughly based on the Knowledge Documents, FAQs, Recent Discussions, Platform Identity, and platform mechanics provided in the context above:
+     * Community forum posting and replying
+     * Author and admin permissions (only the original author or system admin can delete a post)
+     * Modern bbPress & Docly theme integration
+     * Real-time serverless Neon PostgreSQL persistence across all topics and messages
+     * Enterprise Consultancy retainers (custom architecture, ${slaHours}-hour SLA, priority support at ${supportEmail})
+   - Ground all factual statements in the provided database context. Do not invent unverified facts.
+
+3. COMPANY-SPECIFIC QUESTIONS OR ISSUES WHERE DATABASE HAS NO DATA / SPECIFIC INFO:
+   - CLASSIFICATION: "COMPANY_SPECIFIC_NEEDS_TICKET"
+   - TONE: Empathetic, polite, obedient, and action-oriented.
+   - OCCURS WHEN: The user asks a question or reports an issue specifically about Ama Community, their user account, platform errors, billing/payment questions, custom enterprise agreements, feature roadmaps, or technical troubleshooting, BUT the database/knowledge base above DOES NOT contain the specific data or requires human staff intervention.
+   - ACTION: You MUST automatically raise an official support ticket for the user!
+   - In your reply:
+     a) Explain politely and obediently that because this specific matter is not documented in the public database or requires direct team investigation, you have automatically created an official support ticket: {{TICKET_NUMBER}}.
+     b) Reassure the user that our dedicated engineering and support specialists have received their ticket and will investigate under our official ${slaHours}-hour SLA.
+     c) Mention they can track the status under the "My Tickets" tab or contact ${supportEmail} for further assistance.
+   - Set ticketSubject to a clear, concise 3-8 word summary of the user's inquiry.
+   - Set ticketPriority to "Normal", "High", or "Urgent" based on severity.
+
+4. TOPICS OUTSIDE THE DATABASE OR NOT RELATED TO THE COMPANY:
+   - CLASSIFICATION: "OUTSIDE_SCOPE_UNRELATED"
+   - OCCURS WHEN: The user asks about topics completely unrelated to Ama Community (such as general trivia, recipes, cooking, weather, celebrity gossip, movies, sports, history, general homework, or non-company subjects).
+   - TONE: Extremely humble, courteous, and respectful.
+   - ACTION:
+     a) HUMBLY APOLOGIZE: Express genuine, humble apologies (e.g., "I humbly apologize, but as the dedicated assistant for Ama Community, I am unable to assist with topics outside of our platform and software services...").
+     b) BRAND THE COMPANY: Proudly highlight Ama Community's mission and core offerings:
+        "**Ama Community** is the premier developer and digital nomad platform featuring modern Docly bbPress forum discussions, extensive technical knowledge base documentation, real-time serverless Neon PostgreSQL persistence, and custom enterprise software consultancy."
+     c) RE-ENGAGE: Politely invite the user to ask about our community discussions, platform guides, technical stack, or consultancy services.
+   - STRICT CONSTRAINT: DO NOT raise a ticket, and DO NOT ask or suggest the user to submit a ticket for unrelated topics!
+
+LANGUAGE RULE:
 - Reply in Bengali if the user wrote in Bengali or requested it; otherwise use clear, professional English.
-- Keep formatting simple: short paragraphs, bold for emphasis, bullet points where they help. No headings, no emoji.`;
+- Use clean Markdown with bolding and bullet points where helpful. No headings, no excessive emojis.`;
 
         for (const modelName of candidateModels) {
           try {
@@ -1654,17 +1736,71 @@ Guidelines:
                 contents: cleanMsg,
                 config: {
                   systemInstruction,
-                  temperature: 0.3,
-                  maxOutputTokens: 500
+                  responseMimeType: 'application/json',
+                  responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                      classification: {
+                        type: Type.STRING,
+                        description: 'One of: GREETING, COMPANY_ANSWER_FROM_DB, COMPANY_SPECIFIC_NEEDS_TICKET, OUTSIDE_SCOPE_UNRELATED'
+                      },
+                      reply: {
+                        type: Type.STRING,
+                        description: "The assistant's markdown response to the user"
+                      },
+                      ticketSubject: {
+                        type: Type.STRING,
+                        description: 'Short concise subject for the ticket if COMPANY_SPECIFIC_NEEDS_TICKET, else empty string'
+                      },
+                      ticketPriority: {
+                        type: Type.STRING,
+                        description: 'Priority: Normal, High, or Urgent if COMPANY_SPECIFIC_NEEDS_TICKET, else Normal'
+                      }
+                    },
+                    required: ['classification', 'reply']
+                  },
+                  temperature: 0.2,
+                  maxOutputTokens: 800
                 }
               }),
               7000
             );
 
             if (response.text) {
-              botReply = response.text.trim();
-              replySource = 'AI';
-              break;
+              try {
+                const parsedAi = JSON.parse(response.text.trim());
+                if (parsedAi && parsedAi.reply) {
+                  if (parsedAi.classification === 'COMPANY_SPECIFIC_NEEDS_TICKET') {
+                    const autoTicket = await createSupportTicket({
+                      userEmail: userEmail || undefined,
+                      subject: parsedAi.ticketSubject || cleanMsg.slice(0, 60),
+                      question: cleanMsg,
+                      priority: parsedAi.ticketPriority || 'Normal',
+                      sessionId: cleanSession,
+                      source: 'AI_Auto'
+                    });
+                    createdTicket = autoTicket;
+
+                    let finalReply = parsedAi.reply;
+                    if (finalReply.includes('{{TICKET_NUMBER}}')) {
+                      finalReply = finalReply.replace(/\{\{TICKET_NUMBER\}\}/g, `#${autoTicket.ticketNumber}`);
+                    } else if (!finalReply.includes(autoTicket.ticketNumber)) {
+                      finalReply += `\n\n**Support Ticket Created**: #${autoTicket.ticketNumber}`;
+                    }
+                    botReply = finalReply;
+                    replySource = 'AI_AUTO_TICKET';
+                  } else {
+                    botReply = parsedAi.reply;
+                    replySource = 'AI';
+                  }
+                  break;
+                }
+              } catch (parseErr) {
+                // If model returned plain text instead of JSON
+                botReply = response.text.trim();
+                replySource = 'AI';
+                break;
+              }
             }
           } catch (aiErr: any) {
             // Move on to the next candidate model immediately — no sleep/retry.
@@ -1675,11 +1811,35 @@ Guidelines:
 
       // Fallback: Intelligent heuristic matching with RAG context
       if (!botReply) {
-        const lower = cleanMsg.toLowerCase();
-        const cleanWords = lower.replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter((w: string) => w.length > 2);
+        const lower = cleanMsg.toLowerCase().trim();
+        const STOP_WORDS = new Set([
+          'what', 'when', 'where', 'which', 'who', 'whom', 'whose', 'why', 'how',
+          'this', 'that', 'these', 'those', 'there', 'here',
+          'the', 'and', 'for', 'with', 'about', 'against', 'between', 'into', 'through',
+          'during', 'before', 'after', 'above', 'below', 'from', 'up', 'down', 'in', 'out', 'on', 'off', 'over', 'under',
+          'again', 'further', 'then', 'once',
+          'any', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such',
+          'no', 'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very',
+          'can', 'will', 'just', 'should', 'now', 'have', 'has', 'had', 'having',
+          'does', 'did', 'doing', 'would', 'could', 'tell', 'give', 'know', 'want', 'need', 'please'
+        ]);
+        const cleanWords = lower
+          .replace(/[^a-z0-9\s]/g, ' ')
+          .split(/\s+/)
+          .filter((w: string) => w.length >= 4 && !STOP_WORDS.has(w));
 
-        // 1. Check knowledge docs scoring
-        let bestDoc: any = null;
+        // 1. Check if greeting / polite casual conversation
+        const isGreeting = /^(hi|hello|hey|greetings|hola|assalamu\s*alaikum|salam|good\s*(morning|afternoon|evening|day)|howdy|who\s*are\s*you|what\s*can\s*you\s*do|what\s*are\s*you|thanks|thank\s*you|bye|goodbye)\b/i.test(lower) ||
+          ['hi', 'hello', 'hey', 'salam', 'hola', 'namaste', 'test', 'হ্যালো', 'হাই', 'সালাম', 'কেমন আছেন', 'নমস্কার'].some(g => lower.includes(g));
+
+        if (isGreeting) {
+          botReply = userLang === 'bn'
+            ? `হ্যালো! **আমা কমিউনিটি**-তে আপনাকে স্বাগতম। আমি আপনার অনুগত এআই অ্যাসিস্ট্যান্ট।\n\nআমাদের ফোরামের আলোচনা অনুসন্ধান, টেকনিক্যাল নলেজ বেস ডকুমেন্টেশন, প্ল্যাটফর্মের ফিচারসমূহ অথবা এন্টারপ্রাইজ কনসালটেন্সি সার্ভিস সম্পর্কে যেকোনো সহায়তার জন্য আমি সর্বদা প্রস্তুত। আজ আপনাকে কীভাবে সহায়তা করতে পারি?`
+            : `Hello! Welcome to **Ama Community**. I am your dedicated AI Assistant, obediently at your service.\n\nI can help you search community discussions, explore technical documentation, explain Docly-inspired bbPress features, or guide you through our Enterprise Consultancy retainers. How may I assist you today?`;
+          replySource = 'AI';
+        } else {
+          // 2. Check knowledge docs scoring
+          let bestDoc: any = null;
         let bestDocScore = 0;
 
         for (const d of docsData.rows) {
@@ -1730,49 +1890,78 @@ Guidelines:
           }
         }
 
-        if (bestDoc && bestDocScore >= 6) {
+        if (bestDoc && bestDocScore >= 14) {
           botReply = userLang === 'bn'
             ? `নলেজ বেস থেকে তথ্য (${bestDoc.title}):\n\n${bestDoc.content}`
             : `**From Knowledge Base (${bestDoc.title}):**\n\n${bestDoc.content}`;
           replySource = 'RAG';
-        } else if (bestFaq && bestFaqScore >= 6) {
+        } else if (bestFaq && bestFaqScore >= 14) {
           botReply = userLang === 'bn' && bestFaq.answer_bn ? bestFaq.answer_bn : bestFaq.answer;
           replySource = 'FAQ';
-        } else if (lower.includes('demo') || lower.includes('import') || lower.includes('theme') || lower.includes('docly') || lower.includes('wordpress')) {
+        } else if (/\b(demo|import|theme|docly|bbpress|wordpress)\b/i.test(lower)) {
           botReply = userLang === 'bn'
-            ? 'Docly থিমে ডেমো ইম্পোর্ট করতে WordPress ড্যাশবোর্ডে Appearance > Import Demo Data অপশনে যান। কোনো ত্রুটি হলে সাপোর্ট টিকিট ওপেন করুন।'
+            ? 'Docly থিমে ডেমো ইম্পোর্ট করতে WordPress ড্যাশবোর্ডে Appearance > Import Demo Data অপশনে যান। bbPress প্লাগইন সক্রিয় থাকা নিশ্চিত করুন।'
             : 'To import demo content in the Docly theme, navigate to Appearance > Import Demo Data in your WordPress dashboard. Make sure bbPress is enabled!';
           replySource = 'RAG';
-        } else if (lower.includes('delete') || lower.includes('remove') || lower.includes('permission')) {
+        } else if (/\b(delete|deleted|deleting|remove|removed|removing|permission|permissions|author|authors)\b/i.test(lower)) {
           botReply = userLang === 'bn'
             ? 'ফোরামের পোস্ট শুধুমাত্র পোস্টটির মূল লেখক (অথর) অথবা সিস্টেম অ্যাডমিনিস্ট্রেটর ডিলিট করতে পারবেন।'
             : 'Only the verified author who created the post or an authorized System Administrator has permission to delete that discussion post.';
           replySource = 'RAG';
-        } else if (lower.includes('database') || lower.includes('postgres') || lower.includes('neon') || lower.includes('sql') || lower.includes('persist')) {
+        } else if (/\b(database|databases|postgres|postgresql|neon|sql|persist|persistence)\b/i.test(lower)) {
           botReply = userLang === 'bn'
             ? 'প্ল্যাটফর্মটি Neon PostgreSQL ডাটাবেজে রিয়েল-টাইমে সব আলোচনা, বার্তা ও সাপোর্ট টিকিট সংরক্ষণ করে।'
             : 'Our platform is securely connected to a serverless Neon PostgreSQL database with instant persistence across topics, replies, tickets, and messages.';
           replySource = 'RAG';
-        } else if (lower.includes('consultancy') || lower.includes('retainer') || lower.includes('pricing') || lower.includes('price') || lower.includes('quote')) {
+        } else if (/\b(consultancy|retainer|retainers|pricing|quote|quotation)\b/i.test(lower)) {
           botReply = userLang === 'bn'
             ? 'আমাদের এন্টারপ্রাইজ কনসালটেন্সি প্যাকেজে ফুলস্ট্যাক আর্কিটেকচার, কাস্টম ফোরাম ইন্টিগ্রেশন ও ডেডিকেটেড প্রায়োরিটি সাপোর্ট রয়েছে। সাইডবারের "Enterprise Consultancy" বাটনে ক্লিক করে প্রজেক্ট রিকোয়েস্ট পাঠাতে পারেন।'
             : 'Our Enterprise Retainers include custom fullstack architecture, forum optimizations, and dedicated SLA response. You can submit an inquiry through the Enterprise Consultancy modal in the sidebar!';
           replySource = 'RAG';
-        } else if (lower.includes('ticket') || lower.includes('human') || lower.includes('specialist') || lower.includes('agent') || lower.includes('support')) {
-          botReply = userLang === 'bn'
-            ? 'আপনি এই সাপোর্ট উইন্ডোর "Submit Ticket" ট্যাবে গিয়ে আমাদের বিশেষজ্ঞ দলের কাছে সরাসরি অফিশিয়াল সাপোর্ট টিকিট জমা দিতে পারেন অথবা support@amacommunity.io এ ইমেইল করতে পারেন।'
-            : 'You can submit an official support ticket directly via the "Submit Ticket" tab right here in this assistant window, or email our engineering specialists at support@amacommunity.io!';
-          replySource = 'FAQ';
         } else {
-          // Out-of-scope question: acknowledge the gap and point to human support.
-          if (userLang === 'bn') {
-            botReply = `এই প্রশ্নটি আমাদের নলেজ বেসের আওতার বাইরে। আপনি এই সাপোর্ট উইন্ডোর **"Submit Ticket"** ট্যাবে গিয়ে একটি টিকিট জমা দিতে পারেন, অথবা সরাসরি **${supportEmail}** এ ইমেইল করতে পারেন — আমাদের টিম সাহায্য করবে।`;
+          // 3. Company-specific questions or issues with no specific database record -> Auto-raise ticket
+          const companyKeywords = [
+            'account', 'login', 'signin', 'sign in', 'password', 'email', 'profile', 'username',
+            'billing', 'invoice', 'payment', 'charge', 'refund', 'card', 'checkout', 'subscription', 'credit',
+            'error', 'bug', 'glitch', 'crash', 'fail', 'broken', 'issue', 'problem', 'stuck', 'not working',
+            'ticket', 'tickets', 'human', 'specialist', 'agent', 'support', 'help desk',
+            'enterprise', 'contract', 'nda', 'security', 'audit', 'compliance',
+            'sla', 'custom', 'feature', 'roadmap', 'api', 'webhook', 'integration',
+            'ama', 'community', 'forum', 'moderator', 'banned', 'suspend', 'thread', 'reply'
+          ];
+
+          const isCompanySpecific = companyKeywords.some(k => {
+            if (k.includes(' ')) {
+              return lower.includes(k);
+            }
+            return new RegExp(`\\b${k}\\b`, 'i').test(lower);
+          });
+
+          if (isCompanySpecific) {
+            const autoTicket = await createSupportTicket({
+              userEmail: userEmail,
+              subject: cleanMsg.slice(0, 60),
+              question: cleanMsg,
+              priority: lower.includes('urgent') || lower.includes('critical') || lower.includes('payment') ? 'High' : 'Normal',
+              sessionId: cleanSession,
+              source: 'AI_Auto'
+            });
+            createdTicket = autoTicket;
+
+            botReply = userLang === 'bn'
+              ? `যেহেতু এই নির্দিষ্ট বিষয়টি আমাদের বর্তমান নলেজ বেসে নথিভুক্ত নেই এবং এর জন্য সরাসরি বিশেষজ্ঞ অনুসন্ধান প্রয়োজন, তাই আমি আপনার জন্য স্বয়ংক্রিয়ভাবে একটি অফিশিয়াল সাপোর্ট টিকিট খুলেছি: **#${autoTicket.ticketNumber}**।\n\nআমাদের সাপোর্ট টিম আমাদের অফিশিয়াল ${slaHours} ঘণ্টার এসএলএ-এর মধ্যে এটি পর্যালোচনা করবে। আপনি "My Tickets" ট্যাবে এটি পর্যবেক্ষণ করতে পারেন অথবা সরাসরি **${supportEmail}**-এ ইমেইল করতে পারেন।`
+              : `Because this specific inquiry is not available in our public knowledge base and requires direct investigation by our specialists, I have automatically raised an official support ticket for you: **#${autoTicket.ticketNumber}**.\n\nOur specialized engineering and support team has received your inquiry and will review it under our official ${slaHours}-hour SLA. You can track this anytime in the **"My Tickets"** tab, or email us directly at **${supportEmail}**.`;
+            replySource = 'AI_AUTO_TICKET';
           } else {
-            botReply = `That's outside what I can answer from our knowledge base. You can open the **"Submit Ticket"** tab in this window, or email **${supportEmail}** directly and our team will help.`;
+            // 4. Topics outside the database or NOT related to the company -> Humbly apologize and brand the company
+            botReply = userLang === 'bn'
+              ? `আমি বিনীতভাবে ক্ষমা প্রার্থনা করছি, কিন্তু **আমা কমিউনিটি**-র অফিসিয়াল অ্যাসিস্ট্যান্ট হিসেবে আমি আমাদের প্ল্যাটফর্ম এবং সফটওয়্যার সার্ভিসের বাইরের বিষয়ে সহায়তা করতে অপারগ।\n\n**আমা কমিউনিটি** হলো ডেভেলপার ও ডিজিটাল নোম্যাডদের জন্য একটি আধুনিক প্ল্যাটফর্ম—যেখানে রয়েছে রিয়েল-টাইম নিয়ন পোস্টগ্রেসকিউএল ডেটাবেজ পারসিস্টেন্স, ডকলি বিবিপ্রেস ডিসকাশন ফোরাম এবং এন্টারপ্রাইজ কনসালটেন্সি সল্যুশন।\n\nআমাদের ফোরামের টপিক, টেকনিক্যাল গাইড কিংবা কনসালটেন্সি সম্পর্কিত যেকোনো বিষয়ে সহায়তা করতে আমি সর্বদা প্রস্তুত আছি!`
+              : `I humbly apologize, but as the dedicated assistant for **Ama Community**, I am unable to assist with topics outside of our platform, developer discussions, and software services.\n\n**Ama Community** is a modern forum and knowledge hub built for developers and digital nomads—featuring real-time Neon PostgreSQL database persistence, seamless Docly bbPress community discussions, and comprehensive Enterprise Full-Stack Consultancy.\n\nPlease let me know how I can assist you with our community discussions, platform guides, technical stack, or consultancy services!`;
+            replySource = 'AI';
           }
-          replySource = 'AI';
         }
       }
+    }
 
       // 4. Save bot response.
       const botMsgId = `msg-${Date.now()}-b`;
@@ -1783,7 +1972,8 @@ Guidelines:
 
       res.status(201).json({
         userMessage: { id: userMsgId, sender: 'user', message: cleanMsg, source: 'USER', time: 'Just now' },
-        botReply: { id: botMsgId, sender: 'bot', message: botReply, source: replySource, time: 'Just now' }
+        botReply: { id: botMsgId, sender: 'bot', message: botReply, source: replySource, time: 'Just now' },
+        createdTicket: createdTicket || null
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
