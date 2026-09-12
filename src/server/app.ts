@@ -78,8 +78,20 @@ export async function createApp() {
   app.use(express.json({ limit: '25mb' }));
   app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
-  // Initialize DB tables
-  await initDb();
+  // Trigger DB schema initialization without blocking cold-start HTTP responses
+  initDb().catch((err) => {
+    console.warn('[Database] Schema initialization background warning:', err?.message);
+  });
+
+  // Root API route
+  app.get(['/api', '/api/'], (_req, res) => {
+    res.json({
+      status: 'ok',
+      service: 'Ama Community API',
+      healthUrl: '/api/health',
+      timestamp: new Date().toISOString()
+    });
+  });
 
   // Invalidate the cached RAG context (used by the AI support chat) whenever
   // an admin mutates FAQs, knowledge docs, or platform settings, so changes
@@ -1976,6 +1988,14 @@ Output MUST be valid JSON in this exact structure:
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
+  });
+
+  // Catch-all 404 handler for unhandled API routes so responses never hang
+  app.all('/api/*', (req, res) => {
+    res.status(404).json({
+      error: 'Not Found',
+      message: `API endpoint ${req.method} ${req.originalUrl || req.url} was not found`
+    });
   });
 
   return app;

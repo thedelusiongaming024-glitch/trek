@@ -1,6 +1,14 @@
+import dotenv from 'dotenv';
+import fs from 'fs';
 import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
+
+dotenv.config();
+if (!process.env.DATABASE_URL && fs.existsSync('env.txt')) {
+  dotenv.config({ path: 'env.txt' });
+}
+
 import { createApp } from './src/server/app';
 
 async function startServer() {
