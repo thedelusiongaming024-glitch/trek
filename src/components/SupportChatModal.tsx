@@ -44,6 +44,14 @@ interface MessageItem {
   text: string;
   source?: string;
   time: string;
+  autoTicket?: {
+    id: string;
+    ticketNumber: string;
+    subject: string;
+    priority: string;
+    status: string;
+    assignedTo?: string;
+  };
 }
 
 interface FaqItem {
@@ -294,9 +302,14 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
             sender: 'bot',
             source: data.botReply.source || 'AI',
             text: data.botReply.message,
-            time: data.botReply.time
+            time: data.botReply.time,
+            autoTicket: data.autoTicket || undefined
           }
         ]);
+
+        if (data.autoTicket) {
+          loadTickets();
+        }
       } else {
         const errData = await res.json().catch(() => ({}));
         if (res.status === 403 && errData.requiresAuth) {
@@ -588,8 +601,46 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
                           </Markdown>
                         </div>
 
-                        {/* 1-Click Raise Human Support Action Button */}
-                        {(m.text.includes('Submit Ticket') ||
+                        {/* Auto-Raised Ticket Notification Card */}
+                        {m.autoTicket && (
+                          <div className="mt-3 p-3 rounded-xl bg-teal-50/90 border border-teal-200/90 text-left flex flex-col gap-2 shadow-xs animate-in fade-in slide-in-from-top-1 duration-200">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <span className="px-2 py-0.5 rounded-md bg-teal-800 text-white font-mono text-[11px] font-bold">
+                                  #{m.autoTicket.ticketNumber}
+                                </span>
+                                <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-semibold uppercase tracking-wider">
+                                  {m.autoTicket.status || 'OPEN'}
+                                </span>
+                              </div>
+                              <span className="text-[11px] text-teal-900 font-medium">
+                                Priority: <strong className="text-teal-950 font-bold">{m.autoTicket.priority || 'Normal'}</strong>
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-800 font-medium line-clamp-2">
+                              {m.autoTicket.subject}
+                            </p>
+                            <div className="flex items-center justify-between pt-2 border-t border-teal-200/70 text-[11px]">
+                              <span className="text-slate-600">
+                                Assigned: <strong className="text-slate-900">{m.autoTicket.assignedTo || 'Community Specialist'}</strong>
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveTab('my-tickets');
+                                  loadTickets();
+                                }}
+                                className="inline-flex items-center gap-1 font-semibold text-teal-700 hover:text-teal-900 underline cursor-pointer"
+                              >
+                                <span>{language === 'bn' ? 'টিকিট ট্র্যাক করুন' : 'Track in My Tickets'}</span>
+                                <ArrowRight className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 1-Click Raise Human Support Action Button (shown only when manual submission is indicated and not already auto-created) */}
+                        {!m.autoTicket && (m.text.includes('Submit Ticket') ||
                           m.text.includes('সাপোর্ট টিকিট') ||
                           m.text.includes('support ticket') ||
                           m.text.includes('হিউম্যান সাপোর্ট') ||
@@ -623,8 +674,14 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
                     {m.sender === 'bot' && (
                       <>
                         {m.source && (
-                          <span className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 font-medium border border-slate-200/50">
-                            {m.source === 'FAQ'
+                          <span className={`px-1.5 py-0.2 rounded font-medium border ${
+                            m.source === 'AI_AUTO_TICKET'
+                              ? 'bg-teal-100 text-teal-800 border-teal-300'
+                              : 'bg-slate-100 text-slate-600 border-slate-200/50'
+                          }`}>
+                            {m.source === 'AI_AUTO_TICKET'
+                              ? (language === 'bn' ? 'স্বয়ংক্রিয় টিকিট' : 'Auto-Raised Ticket')
+                              : m.source === 'FAQ'
                               ? t('FAQ Match')
                               : m.source === 'RAG'
                               ? t('Knowledge Base')
