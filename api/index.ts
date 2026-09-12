@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import dotenv from 'dotenv';
 import fs from 'fs';
-import { createApp } from '../src/server/app';
+import { createApp } from '../src/server/app.ts';
 
 dotenv.config();
 if (!process.env.DATABASE_URL && fs.existsSync('env.txt')) {
@@ -31,10 +31,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ? req.query.path.join('/')
         : String(req.query.path);
 
-      // Extract existing query string if any
-      const qIndex = targetUrl.indexOf('?');
-      const queryString = qIndex !== -1 ? targetUrl.slice(qIndex) : '';
-      targetUrl = `/api/${subPath.replace(/^\/+/, '')}${queryString}`;
+      try {
+        const urlObj = new URL(targetUrl, 'http://localhost');
+        urlObj.searchParams.delete('path');
+        const search = urlObj.search;
+        targetUrl = `/api/${subPath.replace(/^\/+/, '')}${search}`;
+      } catch {
+        targetUrl = `/api/${subPath.replace(/^\/+/, '')}`;
+      }
     } else if (typeof req.headers['x-matched-path'] === 'string' && req.headers['x-matched-path'].startsWith('/api/')) {
       targetUrl = req.headers['x-matched-path'];
     }
@@ -46,7 +50,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     req.url = targetUrl;
 
-    return app(req, res);
+    return await new Promise<void>((resolve, reject) => {
+      res.on('finish', () => resolve());
+      res.on('close', () => resolve());
+      res.on('error', (err) => reject(err));
+
+      app(req, res);
+    });
   } catch (err: any) {
     // Reset appPromise so subsequent invocations can recover if a transient error occurred
     appPromise = null;

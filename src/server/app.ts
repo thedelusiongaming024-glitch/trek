@@ -1,6 +1,6 @@
 import express from 'express';
 import { GoogleGenAI } from '@google/genai';
-import { pool, initDb } from './db';
+import { pool, initDb } from './db.ts';
 
 // ---------------------------------------------------------------------------
 // AI support chat performance helpers
