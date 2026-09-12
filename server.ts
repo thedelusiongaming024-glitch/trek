@@ -9,7 +9,7 @@ if (!process.env.DATABASE_URL && fs.existsSync('env.txt')) {
   dotenv.config({ path: 'env.txt' });
 }
 
-import { createApp } from './src/server/app.ts';
+import { createApp } from './src/server/app';
 
 async function startServer() {
   const app = await createApp();

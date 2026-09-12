@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import dotenv from 'dotenv';
 import fs from 'fs';
-import { createApp } from '../src/server/app.ts';
+import { createApp } from '../src/server/app';
 
 dotenv.config();
 if (!process.env.DATABASE_URL && fs.existsSync('env.txt')) {
