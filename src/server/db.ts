@@ -58,38 +58,34 @@ if (connectionString) {
 export const pool = {
   query: async (text: string | any, params?: any[]): Promise<{ rows: any[]; rowCount?: number }> => {
     if (realPool) {
+      // Let errors propagate. Silently swallowing DB errors and returning an
+      // empty result set makes real failures (missing tables, bad SSL config,
+      // exhausted connections, etc.) look identical to "no data found",
+      // which is exactly what was hiding the previous production bug.
+      // The one deliberate exception is the very first settings bootstrap
+      // read, which callers rely on to have sane defaults before initDb()
+      // has necessarily finished — everything else must throw on failure.
       try {
         return await realPool.query(text, params);
       } catch (err: any) {
-        console.warn('[Database] Query failed, using fallback:', err?.message);
+        console.error('[Database] Query failed:', err?.message, '\nQuery:', typeof text === 'string' ? text.slice(0, 200) : text);
         if (typeof text === 'string' && text.includes('FROM settings')) {
+          console.warn('[Database] Falling back to default settings after query failure.');
           return { rows: [{ key: 'platform', value: defaultSettings }], rowCount: 1 };
         }
-        return { rows: [], rowCount: 0 };
+        throw err;
       }
     }
     if (typeof text === 'string' && text.includes('FROM settings')) {
       return { rows: [{ key: 'platform', value: defaultSettings }], rowCount: 1 };
     }
-    return { rows: [], rowCount: 0 };
+    throw new Error('DATABASE_URL is not configured — no database connection is available.');
   },
   connect: async () => {
     if (realPool) {
-      try {
-        return await realPool.connect();
-      } catch (err: any) {
-        console.warn('[Database] Connect failed:', err?.message);
-      }
+      return await realPool.connect();
     }
-    return {
-      query: async (text: string | any, _params?: any[]) => {
-        if (typeof text === 'string' && text.includes('FROM settings')) {
-          return { rows: [{ key: 'platform', value: defaultSettings }], rowCount: 1 };
-        }
-        return { rows: [], rowCount: 0 };
-      },
-      release: () => {}
-    };
+    throw new Error('DATABASE_URL is not configured — no database connection is available.');
   }
 };
 
@@ -381,6 +377,9 @@ export async function initDb() {
   } catch (err) {
     initDbPromise = null;
     console.error('[Database] Initialization error:', err);
+    // Re-throw so callers (the Express init middleware) know schema setup
+    // failed instead of silently proceeding as if the DB were ready.
+    throw err;
   } finally {
     client?.release?.();
   }

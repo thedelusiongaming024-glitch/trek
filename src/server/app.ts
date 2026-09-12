@@ -78,9 +78,24 @@ export async function createApp() {
   app.use(express.json({ limit: '25mb' }));
   app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
-  // Trigger DB schema initialization without blocking cold-start HTTP responses
-  initDb().catch((err) => {
-    console.warn('[Database] Schema initialization background warning:', err?.message);
+  // Ensure the schema exists before any request is allowed to hit a data
+  // route. Previously this ran in the background (fire-and-forget), which
+  // meant early requests on a cold start could query tables that didn't
+  // exist yet. Combined with the old pool.query() error-swallowing, that
+  // produced empty-but-"successful" responses instead of a visible error.
+  // initDb() itself caches its promise, so this only pays the cost once per
+  // warm serverless instance.
+  app.use(async (_req, res, next) => {
+    try {
+      await initDb();
+      next();
+    } catch (err: any) {
+      console.error('[Database] Schema initialization failed:', err?.message);
+      res.status(503).json({
+        error: 'Database Unavailable',
+        message: err?.message || 'Database schema initialization failed'
+      });
+    }
   });
 
   // Root API route

@@ -21,10 +21,22 @@ export default async function handler(_req: VercelRequest, res: VercelResponse) 
     try {
       pool = new Pool({ connectionString });
       const dbStart = Date.now();
-      await pool.query('SELECT 1');
+      // SELECT 1 only proves TCP/WebSocket connectivity — it says nothing
+      // about whether the actual application schema exists or is queryable.
+      // That gap is exactly what let this endpoint report "connected" while
+      // /api/topics, /api/blogs, etc. were silently returning no data.
+      // Check real tables the app depends on instead.
+      const tableCheck = await pool.query(`
+        SELECT
+          (SELECT COUNT(*) FROM topics)::int AS topics,
+          (SELECT COUNT(*) FROM users)::int AS users,
+          (SELECT COUNT(*) FROM blogs)::int AS blogs,
+          (SELECT COUNT(*) FROM settings)::int AS settings
+      `);
       responseTimeMs = Date.now() - dbStart;
       dbStatus = 'connected';
-      dbMessage = 'PostgreSQL connection operational';
+      const counts = tableCheck.rows[0];
+      dbMessage = `PostgreSQL connection operational (topics=${counts.topics}, users=${counts.users}, blogs=${counts.blogs}, settings=${counts.settings})`;
     } catch (err: any) {
       dbStatus = 'error';
       dbMessage = err?.message || 'Database connection error';
