@@ -10,6 +10,7 @@ import {
   Search
 } from 'lucide-react';
 import { BlogPost } from '../../types';
+import { DEFAULT_BLOG_IMAGE, getResolvedBlogImage, getRandomBlogAvatar } from '../BlogSection';
 
 interface AdminBlogsTabProps {
   blogs: BlogPost[];
@@ -79,8 +80,15 @@ export const AdminBlogsTab: React.FC<AdminBlogsTabProps> = ({
               {/* Image Banner */}
               <div className="relative h-44 w-full overflow-hidden bg-slate-100">
                 <img
-                  src={blog.imageUrl}
+                  src={getResolvedBlogImage(blog.imageUrl, blog.id || blog.title)}
                   alt={blog.title}
+                  onError={(e) => {
+                    const target = e.currentTarget;
+                    const fallback = getRandomBlogAvatar(blog.id || blog.title);
+                    if (target.src !== fallback) {
+                      target.src = fallback;
+                    }
+                  }}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
                 <span className="absolute top-3 left-3 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-white/90 text-teal-700 shadow-xs backdrop-blur-md">

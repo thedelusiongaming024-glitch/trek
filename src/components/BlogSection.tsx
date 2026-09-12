@@ -2,6 +2,74 @@ import React from 'react';
 import { Calendar, Tag, ArrowUpRight, Heart, MessageSquare, Lock } from 'lucide-react';
 import { BlogPost } from '../types';
 
+export const DEFAULT_BLOG_IMAGE = 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=900&auto=format&fit=crop&q=80';
+
+export const RANDOM_BLOG_AVATARS = [
+  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=900&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=900&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=900&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=900&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=900&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=900&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=900&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=900&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=900&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=900&auto=format&fit=crop&q=80'
+];
+
+export const getRandomBlogAvatar = (seed: string, index?: number): string => {
+  if (typeof index === 'number' && index >= 0) {
+    return RANDOM_BLOG_AVATARS[index % RANDOM_BLOG_AVATARS.length];
+  }
+  if (!seed) return RANDOM_BLOG_AVATARS[0];
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = seed.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return RANDOM_BLOG_AVATARS[Math.abs(hash) % RANDOM_BLOG_AVATARS.length];
+};
+
+export const getResolvedBlogImage = (imageUrl: string | undefined, seed: string, index?: number): string => {
+  if (!imageUrl || imageUrl.includes('trekconsultancy.com')) {
+    return getRandomBlogAvatar(seed, index);
+  }
+  return imageUrl;
+};
+
+export const AVATAR_GRADIENTS = [
+  'from-teal-500 to-emerald-600',
+  'from-blue-500 to-indigo-600',
+  'from-violet-500 to-purple-600',
+  'from-rose-500 to-pink-600',
+  'from-amber-500 to-orange-600',
+  'from-cyan-500 to-blue-600',
+  'from-fuchsia-500 to-rose-600',
+  'from-emerald-500 to-teal-700'
+];
+
+export const getAvatarGradient = (name: string): string => {
+  if (!name) return AVATAR_GRADIENTS[0];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % AVATAR_GRADIENTS.length;
+  return AVATAR_GRADIENTS[index];
+};
+
+export const getInitials = (name: string): string => {
+  if (!name) return 'A';
+  const clean = name.replace(/[^\w\s]/gi, '').trim();
+  const parts = clean.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  if (parts.length === 1 && parts[0].length >= 2) {
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+  return (name[0] || 'A').toUpperCase();
+};
+
 interface BlogSectionProps {
   posts: BlogPost[];
   onSelectPost: (post: BlogPost) => void;
@@ -61,20 +129,29 @@ export const BlogSection: React.FC<BlogSectionProps> = ({
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-          {posts.map((post) => (
-            <article
-              key={post.id}
-              onClick={() => handleCardClick(post)}
-              className="group rounded-3xl bg-white/75 dark:bg-white/10 backdrop-blur-xl border border-white/80 dark:border-white/20 overflow-hidden hover:bg-white/90 dark:hover:bg-white/15 hover:border-white shadow-[0_8px_30px_rgb(31,38,135,0.06)] hover:shadow-[0_16px_36px_rgb(31,38,135,0.12)] transition-all duration-300 cursor-pointer flex flex-col h-full relative"
-            >
-              {/* Image Container with high quality photography */}
-              <div className="relative aspect-[16/10] overflow-hidden bg-slate-100 dark:bg-slate-800">
-                <img
-                  src={post.imageUrl}
-                  alt={post.title}
-                  referrerPolicy="no-referrer"
-                  className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300"
-                />
+          {posts.map((post, index) => {
+            const resolvedImg = getResolvedBlogImage(post.imageUrl, post.id || post.title, index);
+            const fallbackAvatar = getRandomBlogAvatar(post.id || post.title, index);
+            return (
+              <article
+                key={post.id}
+                onClick={() => handleCardClick(post)}
+                className="group rounded-3xl bg-white/75 dark:bg-white/10 backdrop-blur-xl border border-white/80 dark:border-white/20 overflow-hidden hover:bg-white/90 dark:hover:bg-white/15 hover:border-white shadow-[0_8px_30px_rgb(31,38,135,0.06)] hover:shadow-[0_16px_36px_rgb(31,38,135,0.12)] transition-all duration-300 cursor-pointer flex flex-col h-full relative"
+              >
+                {/* Image Container with high quality photography / random avatar */}
+                <div className="relative aspect-[16/10] overflow-hidden bg-slate-100 dark:bg-slate-800">
+                  <img
+                    src={resolvedImg}
+                    alt={post.title}
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      if (target.src !== fallbackAvatar) {
+                        target.src = fallbackAvatar;
+                      }
+                    }}
+                    className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300"
+                  />
                 <div className="absolute inset-0 bg-gradient-to-t from-white/60 dark:from-slate-950/60 via-transparent to-transparent opacity-70" />
                 
                 {/* Blog Activity Metrics Badge */}
@@ -89,13 +166,6 @@ export const BlogSection: React.FC<BlogSectionProps> = ({
                     <span>{post.commentsCount || 0}</span>
                   </span>
                 </div>
-
-                {!currentUser && (
-                  <div className="absolute top-3 left-3 flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-900/75 backdrop-blur-md text-amber-300 text-[10px] font-semibold border border-amber-400/30 shadow-xs">
-                    <Lock className="w-2.5 h-2.5" />
-                    <span>Login to Read & React</span>
-                  </div>
-                )}
               </div>
 
               {/* Card Body */}
@@ -127,12 +197,13 @@ export const BlogSection: React.FC<BlogSectionProps> = ({
                 {/* Author Footer */}
                 <div className="pt-4 border-t border-slate-200/70 dark:border-white/10 flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
-                    <img
-                      src={post.authorAvatar}
-                      alt={post.author}
-                      referrerPolicy="no-referrer"
-                      className="w-8 h-8 rounded-full object-cover border border-white/60 dark:border-white/20 shadow-xs"
-                    />
+                    <div
+                      className={`w-8 h-8 rounded-full bg-gradient-to-tr ${getAvatarGradient(post.author)} flex items-center justify-center font-bold text-white text-xs shadow-xs border border-white/60 dark:border-white/20 shrink-0 select-none`}
+                      title={post.author}
+                      aria-label={post.author}
+                    >
+                      {getInitials(post.author)}
+                    </div>
                     <div>
                       <h5 className="text-xs font-semibold text-slate-800 dark:text-slate-200">
                         {post.author}
@@ -147,7 +218,8 @@ export const BlogSection: React.FC<BlogSectionProps> = ({
                 </div>
               </div>
             </article>
-          ))}
+            );
+          })}
         </div>
       )}
 

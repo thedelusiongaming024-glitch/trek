@@ -17,6 +17,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { BlogPost, BlogComment } from '../types';
+import { DEFAULT_BLOG_IMAGE, getAvatarGradient, getInitials, getResolvedBlogImage, getRandomBlogAvatar } from './BlogSection';
 
 interface BlogModalProps {
   post: BlogPost | null;
@@ -181,9 +182,16 @@ export const BlogModal: React.FC<BlogModalProps> = ({
         <div className="p-4 sm:p-6 overflow-y-auto space-y-5">
           <div className="aspect-[16/9] w-full rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-white/10 shadow-xs">
             <img
-              src={post.imageUrl}
+              src={getResolvedBlogImage(post.imageUrl, post.id || post.title)}
               alt={post.title}
               referrerPolicy="no-referrer"
+              onError={(e) => {
+                const target = e.currentTarget;
+                const fallback = getRandomBlogAvatar(post.id || post.title);
+                if (target.src !== fallback) {
+                  target.src = fallback;
+                }
+              }}
               className="w-full h-full object-cover"
             />
           </div>
@@ -205,12 +213,13 @@ export const BlogModal: React.FC<BlogModalProps> = ({
 
           <div className="flex items-center justify-between gap-3 py-3 border-y border-slate-200/80 dark:border-white/10">
             <div className="flex items-center gap-3">
-              <img
-                src={post.authorAvatar}
-                alt={post.author}
-                referrerPolicy="no-referrer"
-                className="w-9 h-9 rounded-full object-cover border border-slate-200 dark:border-white/20"
-              />
+              <div
+                className={`w-9 h-9 rounded-full bg-gradient-to-tr ${getAvatarGradient(post.author)} flex items-center justify-center font-bold text-white text-xs shadow-xs border border-slate-200 dark:border-white/20 shrink-0 select-none`}
+                title={post.author}
+                aria-label={post.author}
+              >
+                {getInitials(post.author)}
+              </div>
               <div>
                 <p className="text-xs font-semibold text-slate-900 dark:text-white">{post.author}</p>
                 <p className="text-[11px] text-slate-400">Core Community Author</p>
@@ -342,11 +351,13 @@ export const BlogModal: React.FC<BlogModalProps> = ({
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <img
-                          src={comment.authorAvatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80'}
-                          alt={comment.author}
-                          className="w-6 h-6 rounded-full object-cover border border-slate-200 dark:border-white/20"
-                        />
+                        <div
+                          className={`w-6 h-6 rounded-full bg-gradient-to-tr ${getAvatarGradient(comment.author)} flex items-center justify-center font-bold text-white text-[10px] shadow-xs border border-white/40 dark:border-white/20 shrink-0 select-none`}
+                          title={comment.author}
+                          aria-label={comment.author}
+                        >
+                          {getInitials(comment.author)}
+                        </div>
                         <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
                           {comment.author}
                         </span>
