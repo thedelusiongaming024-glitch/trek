@@ -13,9 +13,7 @@
     }
   },
   "rewrites": [
-    { "source": "/api/health", "destination": "/api/health" },
-    { "source": "/api/(.*)", "destination": "/api?path=$1" },
-    { "source": "/api", "destination": "/api" },
+    { "source": "/api/(.*)", "destination": "/api" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

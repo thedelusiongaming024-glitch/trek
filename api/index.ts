@@ -46,28 +46,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     req.url = targetUrl;
 
-    // Wrap Express in a Promise that waits until the response has finished streaming
-    // to prevent Vercel from prematurely terminating the serverless lambda before the response is sent.
-    return await new Promise<void>((resolve, reject) => {
-      res.on('finish', () => resolve());
-      res.on('close', () => resolve());
-      res.on('error', (err) => reject(err));
-
-      (app as any)(req, res, (err?: any) => {
-        if (err) {
-          reject(err);
-        } else if (!res.headersSent) {
-          // Never leave the response un-ended, otherwise Vercel produces a 500 error
-          res.status(404).json({
-            error: 'Not Found',
-            message: `API endpoint ${req.method || 'GET'} ${req.url} was not found`
-          });
-          resolve();
-        } else {
-          resolve();
-        }
-      });
-    });
+    return app(req, res);
   } catch (err: any) {
     // Reset appPromise so subsequent invocations can recover if a transient error occurred
     appPromise = null;
