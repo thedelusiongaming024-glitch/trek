@@ -14,6 +14,7 @@ import { neonConfig, Pool } from '@neondatabase/serverless';
 import ws from 'ws';
 import dotenv from 'dotenv';
 import fs from 'fs';
+import zlib from 'zlib';
 
 dotenv.config();
 if (!process.env.DATABASE_URL && fs.existsSync('env.txt')) {
@@ -461,35 +462,101 @@ async function extractRawTextFromUpload(
       return { text: extracted, unsupported: false };
     }
 
-    // 2. Pure JS stream text fallback for PDF without canvas or native binaries
+    // 2. Pure JS stream text extraction with zlib decompression for PDF without canvas or native binaries
     try {
       const rawPdf = buffer.toString('latin1');
       const textMatches: string[] = [];
-      const textBlocks = rawPdf.match(/BT[\s\S]*?ET/g) || [];
-      for (const block of textBlocks) {
-        const stringMatches = block.match(/\((.*?)\)|<([0-9a-fA-F]+)>/g) || [];
-        for (const sm of stringMatches) {
-          if (sm.startsWith('(') && sm.endsWith(')')) {
-            const inner = sm.slice(1, -1)
-              .replace(/\\n/g, '\n')
-              .replace(/\\r/g, '\r')
-              .replace(/\\t/g, '\t')
-              .replace(/\\\(/g, '(')
-              .replace(/\\\)/g, ')')
-              .replace(/\\\\/g, '\\');
-            if (inner.trim()) textMatches.push(inner);
+
+      // Find all stream ... endstream blocks and decompress them if FlateDecode
+      const streamRegex = /stream[\r\n]+([\s\S]*?)[\r\n]+endstream/g;
+      let streamMatch;
+
+      while ((streamMatch = streamRegex.exec(rawPdf)) !== null) {
+        const streamData = streamMatch[1];
+        let decompressed = '';
+        try {
+          const streamBuf = Buffer.from(streamData, 'latin1');
+          decompressed = zlib.inflateSync(streamBuf).toString('latin1');
+        } catch {
+          try {
+            const streamBuf = Buffer.from(streamData, 'latin1');
+            decompressed = zlib.inflateRawSync(streamBuf).toString('latin1');
+          } catch {
+            decompressed = streamData;
+          }
+        }
+
+        if (decompressed) {
+          // Extract text from TJ arrays and Tj operators
+          const btBlocks = decompressed.match(/BT[\s\S]*?ET/g) || [];
+          for (const block of btBlocks) {
+            const stringMatches = block.match(/\(([\s\S]*?)\)|<([0-9a-fA-F]+)>/g) || [];
+            for (const sm of stringMatches) {
+              if (sm.startsWith('(') && sm.endsWith(')')) {
+                const inner = sm.slice(1, -1)
+                  .replace(/\\([0-7]{1,3})/g, (_, oct) => String.fromCharCode(parseInt(oct, 8)))
+                  .replace(/\\n/g, '\n')
+                  .replace(/\\r/g, '\r')
+                  .replace(/\\t/g, '\t')
+                  .replace(/\\\(/g, '(')
+                  .replace(/\\\)/g, ')')
+                  .replace(/\\\\/g, '\\');
+                if (inner.trim()) textMatches.push(inner);
+              } else if (sm.startsWith('<') && sm.endsWith('>')) {
+                const hex = sm.slice(1, -1);
+                let hexDecoded = '';
+                for (let i = 0; i < hex.length; i += 2) {
+                  const code = parseInt(hex.substr(i, 2), 16);
+                  if (code >= 32 && code <= 126) hexDecoded += String.fromCharCode(code);
+                }
+                if (hexDecoded.trim()) textMatches.push(hexDecoded);
+              }
+            }
           }
         }
       }
+
+      // Also check uncompressed text in the entire document
+      if (textMatches.length === 0) {
+        const textBlocks = rawPdf.match(/BT[\s\S]*?ET/g) || [];
+        for (const block of textBlocks) {
+          const stringMatches = block.match(/\(([\s\S]*?)\)|<([0-9a-fA-F]+)>/g) || [];
+          for (const sm of stringMatches) {
+            if (sm.startsWith('(') && sm.endsWith(')')) {
+              const inner = sm.slice(1, -1)
+                .replace(/\\([0-7]{1,3})/g, (_, oct) => String.fromCharCode(parseInt(oct, 8)))
+                .replace(/\\n/g, '\n')
+                .replace(/\\r/g, '\r')
+                .replace(/\\t/g, '\t')
+                .replace(/\\\(/g, '(')
+                .replace(/\\\)/g, ')')
+                .replace(/\\\\/g, '\\');
+              if (inner.trim()) textMatches.push(inner);
+            }
+          }
+        }
+      }
+
       const streamText = textMatches.join(' ').replace(/\s+/g, ' ').trim();
       if (streamText.length > 20) {
         return { text: streamText, unsupported: false };
+      }
+
+      // Fallback: extract legible printable words from ASCII sequences
+      const asciiMatches = rawPdf.match(/[A-Za-z0-9 ,.;:!?'"()\-–—]{10,}/g) || [];
+      const filteredAscii = asciiMatches
+        .filter(s => !s.startsWith('/') && !s.includes('obj') && !s.includes('endobj') && !s.includes('stream') && !s.includes('Filter') && !s.includes('Length'))
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (filteredAscii.length > 30) {
+        return { text: filteredAscii, unsupported: false };
       }
     } catch (fallbackErr) {
       console.warn('[knowledge-extract] Stream fallback failed:', fallbackErr);
     }
 
-    return { text: '', unsupported: true };
+    return { text: '', unsupported: false };
   }
 
   if (isDocx && buffer) {
@@ -705,7 +772,12 @@ async function runAIKnowledgeExtraction(
         const chunks = await callGeminiForChunks(model, systemPrompt, geminiUserContent);
         if (chunks && chunks.length > 0) return chunks;
       } catch (err: any) {
-        console.warn(`[knowledge-extract] Gemini model "${model}" extraction attempt failed:`, err?.message || err);
+        const msg = err?.message || String(err);
+        if (err?.status === 401 || msg.includes('UNAUTHENTICATED') || msg.includes('ACCESS_TOKEN_TYPE_UNSUPPORTED') || msg.includes('API_KEY_INVALID')) {
+          console.warn('[knowledge-extract] GEMINI_API_KEY is unauthenticated or invalid. Bypassing Gemini models.');
+          break;
+        }
+        console.warn(`[knowledge-extract] Gemini model "${model}" extraction attempt failed:`, msg.slice(0, 120));
       }
     }
   }
@@ -720,7 +792,7 @@ async function runAIKnowledgeExtraction(
       'gpt-4o-mini'
     ]));
 
-    for (const model of openAiCandidates) {
+    openAiLoop: for (const model of openAiCandidates) {
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
           const chunks = await callOpenAIForChunks(model, systemPrompt, openAiUserContent);
@@ -728,15 +800,17 @@ async function runAIKnowledgeExtraction(
           break;
         } catch (err: any) {
           const msg = err?.message || String(err);
-          console.error(`[knowledge-extract] OpenAI model "${model}" attempt ${attempt + 1} failed:`, msg);
-          if (err?.status === 401 || msg.includes('invalid_api_key') || msg.includes('Incorrect API key')) {
-            console.error('[knowledge-extract] OPENAI_API_KEY looks invalid or missing.');
+          const isAuthError = err?.status === 401 || msg.includes('invalid_api_key') || msg.includes('token_invalidated') || msg.includes('Incorrect API key') || msg.includes('invalidated');
+          if (isAuthError) {
+            console.warn('[knowledge-extract] OPENAI_API_KEY is invalid or invalidated. Skipping OpenAI model calls.');
+            break openAiLoop;
           }
           const isTransient = err?.status === 429 || err?.status === 503 || msg.includes('rate_limit') || msg.includes('overloaded');
           if (isTransient && attempt === 0) {
             await new Promise(r => setTimeout(r, 500));
             continue;
           }
+          console.warn(`[knowledge-extract] OpenAI model "${model}" attempt ${attempt + 1} failed:`, msg.slice(0, 120));
           break;
         }
       }
@@ -751,7 +825,12 @@ async function runAIKnowledgeExtraction(
         const chunks = await callGeminiForChunks(model, systemPrompt, geminiUserContent);
         if (chunks && chunks.length > 0) return chunks;
       } catch (err: any) {
-        console.warn(`[knowledge-extract] Gemini fallback model "${model}" failed:`, err?.message || err);
+        const msg = err?.message || String(err);
+        if (err?.status === 401 || msg.includes('UNAUTHENTICATED') || msg.includes('ACCESS_TOKEN_TYPE_UNSUPPORTED') || msg.includes('API_KEY_INVALID')) {
+          console.warn('[knowledge-extract] GEMINI_API_KEY is unauthenticated or invalid. Bypassing Gemini fallback.');
+          break;
+        }
+        console.warn(`[knowledge-extract] Gemini fallback model "${model}" failed:`, msg.slice(0, 120));
       }
     }
   }
