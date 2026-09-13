@@ -12,6 +12,207 @@ import {
 } from './pipeline';
 
 // ---------------------------------------------------------------------------
+// Non-AI text extraction for the knowledge-ingestion fallback path.
+// Only ever returns text for formats it can genuinely parse — never decodes
+// arbitrary binary as UTF-8. Plain-text formats are used as-is; PDF and DOCX
+// get real parsers; anything else (images, legacy .doc) is reported as
+// unsupported so the caller can surface a real error instead of fabricating
+// a "chunk" out of raw binary file structure.
+// ---------------------------------------------------------------------------
+async function extractRawTextFromUpload(
+  fileData: string,
+  fileName: string,
+  mimeType: string
+): Promise<{ text: string; unsupported: boolean }> {
+  const lowerName = (fileName || '').toLowerCase();
+  const isDataUrl = typeof fileData === 'string' && fileData.startsWith('data:');
+  const base64Payload = isDataUrl ? (fileData.split('base64,')[1] || '') : null;
+  const buffer = base64Payload ? Buffer.from(base64Payload, 'base64') : null;
+
+  const isPlainText = mimeType.startsWith('text/') || mimeType === 'application/json' ||
+    lowerName.endsWith('.md') || lowerName.endsWith('.txt') || lowerName.endsWith('.csv') || lowerName.endsWith('.json');
+
+  if (isPlainText && !isDataUrl) {
+    return { text: fileData, unsupported: false };
+  }
+
+  const isPdf = mimeType === 'application/pdf' || lowerName.endsWith('.pdf');
+  const isDocx = mimeType.includes('wordprocessingml') || lowerName.endsWith('.docx');
+
+  if (isPdf && buffer) {
+    try {
+      const { PDFParse } = await import('pdf-parse');
+      const parser = new PDFParse({ data: buffer });
+      const result = await parser.getText();
+      const text = result?.text || '';
+      return { text, unsupported: text.trim().length === 0 };
+    } catch (err: any) {
+      console.error('[knowledge-extract] pdf-parse failed:', err?.message || err);
+      return { text: '', unsupported: true };
+    }
+  }
+
+  if (isDocx && buffer) {
+    try {
+      const mammoth = await import('mammoth');
+      const result = await mammoth.extractRawText({ buffer });
+      const text = result?.value || '';
+      return { text, unsupported: text.trim().length === 0 };
+    } catch (err: any) {
+      console.error('[knowledge-extract] mammoth (docx) parsing failed:', err?.message || err);
+      return { text: '', unsupported: true };
+    }
+  }
+
+  // Legacy binary .doc, images, and anything else we can't safely parse as text.
+  return { text: '', unsupported: true };
+}
+
+// ---------------------------------------------------------------------------
+// OpenAI-powered knowledge chunk extraction for the admin "extract-from-file"
+// endpoint. PDFs/DOCX are converted to plain text first (via extractRawTextFromUpload)
+// and sent as text — OpenAI's chat completions API doesn't take raw PDF/DOCX bytes
+// the way Gemini's inlineData did, but it takes text and images natively, which
+// covers every format this endpoint supports.
+// ---------------------------------------------------------------------------
+const OPENAI_CHUNK_JSON_SCHEMA = {
+  name: 'knowledge_chunks',
+  strict: true,
+  schema: {
+    type: 'object',
+    properties: {
+      chunks: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            title: { type: 'string' },
+            category: { type: 'string' },
+            content: { type: 'string' }
+          },
+          required: ['title', 'category', 'content'],
+          additionalProperties: false
+        }
+      }
+    },
+    required: ['chunks'],
+    additionalProperties: false
+  }
+} as const;
+
+function buildKnowledgeExtractionSystemPrompt(categoryHint: string): string {
+  return `You are an expert technical documentation analyzer and knowledge chunking engine for the Ama Community platform.
+Your task is to analyze the ENTIRE provided file/document exhaustively and extract clean, highly factual, self-contained Knowledge Chunks suitable for real-time RAG (Retrieval-Augmented Generation).
+
+Guidelines:
+1. Read and use the FULL document. Do not skip sections, tables, footnotes, or examples. Extract the maximum amount of distinct, useful information — do not stop at a small handful of chunks just because the document is short; do not merge unrelated topics into one chunk just to keep the count low.
+2. Break the document into as many coherent, self-contained knowledge chunks as the content genuinely supports (this can be anywhere from 1 chunk for a trivial document to 30+ for a long, dense one). Each chunk should cover exactly one topic, procedure, policy, or fact cluster so it can be retrieved independently.
+3. Each chunk MUST have:
+   - "title": A concise, descriptive, search-friendly title.
+   - "category": A clear category tag (e.g. "${categoryHint}", "WordPress & Themes", "PostgreSQL Database", "Forum Rules", "Consultancy", "Security").
+   - "content": A well-structured, factual, DETAILED explanation of that topic — preserve concrete specifics (numbers, steps, names, conditions, exceptions) rather than vague summaries. Use bullet points for steps/lists and full sentences for explanations. Do not compress away specifics for the sake of brevity.
+4. Remove only true redundant filler or formatting noise (page headers/footers, repeated boilerplate) — never remove substantive content.`;
+}
+
+async function callOpenAIForChunks(
+  model: string,
+  systemPrompt: string,
+  userContent: any
+): Promise<{ title: string; category: string; content: string }[] | null> {
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userContent }
+      ],
+      response_format: { type: 'json_schema', json_schema: OPENAI_CHUNK_JSON_SCHEMA },
+      max_completion_tokens: 16000
+    })
+  });
+
+  if (!response.ok) {
+    const errBody = await response.text().catch(() => '');
+    const err: any = new Error(`OpenAI ${response.status}: ${errBody.slice(0, 500)}`);
+    err.status = response.status;
+    throw err;
+  }
+
+  const data: any = await response.json();
+  const raw = data?.choices?.[0]?.message?.content;
+  if (!raw) return null;
+
+  const parsed = JSON.parse(raw);
+  if (!parsed?.chunks || !Array.isArray(parsed.chunks) || parsed.chunks.length === 0) return null;
+
+  return parsed.chunks
+    .map((c: any) => ({
+      title: String(c.title || 'Untitled Chunk'),
+      category: String(c.category || ''),
+      content: String(c.content || '')
+    }))
+    .filter((c: { content: string }) => c.content.trim().length > 0);
+}
+
+async function runOpenAIKnowledgeExtraction(
+  fileData: string,
+  fileName: string,
+  mimeType: string,
+  categoryHint: string
+): Promise<{ title: string; category: string; content: string }[]> {
+  const candidateModels = ['gpt-5-mini', 'gpt-4o', 'gpt-4.1-mini'];
+  const systemPrompt = buildKnowledgeExtractionSystemPrompt(categoryHint);
+  const isImage = mimeType.startsWith('image/');
+
+  let userContent: any;
+  if (isImage) {
+    // Vision input: fileData is already a data: URL for non-text uploads.
+    const imageUrl = fileData.startsWith('data:') ? fileData : `data:${mimeType};base64,${fileData}`;
+    userContent = [
+      { type: 'text', text: `File Name: ${fileName}\nPreferred Category: ${categoryHint}\nPlease analyze this image and extract the structured knowledge chunks.` },
+      { type: 'image_url', image_url: { url: imageUrl } }
+    ];
+  } else {
+    const { text, unsupported } = await extractRawTextFromUpload(fileData, fileName, mimeType);
+    if (unsupported || !text.trim()) {
+      // Nothing we can hand to a text model — let the caller's fallback/error path handle it.
+      return [];
+    }
+    userContent = `File Name: ${fileName}\nFile Type: ${mimeType}\nPreferred Category: ${categoryHint}\n\nDocument Content:\n${text}`;
+  }
+
+  for (const model of candidateModels) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const chunks = await callOpenAIForChunks(model, systemPrompt, userContent);
+        if (chunks && chunks.length > 0) return chunks;
+        break; // valid response but no chunks — no point retrying this model
+      } catch (err: any) {
+        const msg = err?.message || String(err);
+        console.error(`[knowledge-extract] OpenAI model "${model}" attempt ${attempt + 1} failed:`, msg);
+        if (err?.status === 401 || msg.includes('invalid_api_key') || msg.includes('Incorrect API key')) {
+          console.error('[knowledge-extract] OPENAI_API_KEY looks invalid or missing. Generate one at https://platform.openai.com/api-keys and set it in your deployment\'s environment variables.');
+        }
+        const isTransient = err?.status === 429 || err?.status === 503 || msg.includes('rate_limit') || msg.includes('overloaded');
+        if (isTransient && attempt === 0) {
+          await new Promise(r => setTimeout(r, 500));
+          continue;
+        }
+        break;
+      }
+    }
+  }
+
+  console.warn(`[knowledge-extract] All OpenAI models failed for "${fileName}" — falling back to non-AI chunker. Check the logged model errors above.`);
+  return [];
+}
+
+// ---------------------------------------------------------------------------
 // AI support chat performance helpers
 // ---------------------------------------------------------------------------
 // The RAG context (FAQs, knowledge docs, recent topics, settings) used to be
@@ -2045,152 +2246,30 @@ export async function createApp() {
 
       let extractedChunks: { title: string; category: string; content: string }[] = [];
 
-      // 1. If Gemini API Key is present, use multi-model AI extraction with failover & retry
-      if (process.env.GEMINI_API_KEY) {
-        const candidateModels = [
-          'gemini-3.8-flash',
-          'gemini-3.1-flash-lite',
-          'gemini-flash-latest',
-          'gemini-3.1-pro-preview'
-        ];
-        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
-        const systemInstruction = `You are an expert technical documentation analyzer and knowledge chunking engine for the Ama Community platform.
-Your task is to analyze the ENTIRE provided file/document exhaustively and extract clean, highly factual, self-contained Knowledge Chunks suitable for real-time RAG (Retrieval-Augmented Generation).
-
-Guidelines:
-1. Read and use the FULL document. Do not skip sections, tables, footnotes, or examples. Extract the maximum amount of distinct, useful information — do not stop at a small handful of chunks just because the document is short; do not merge unrelated topics into one chunk just to keep the count low.
-2. Break the document into as many coherent, self-contained knowledge chunks as the content genuinely supports (this can be anywhere from 1 chunk for a trivial document to 30+ for a long, dense one). Each chunk should cover exactly one topic, procedure, policy, or fact cluster so it can be retrieved independently.
-3. Each chunk MUST have:
-   - "title": A concise, descriptive, search-friendly title (e.g. "Docly Demo Import Steps", "Author Delete Permissions", "Enterprise Consultancy Retainer Scope").
-   - "category": A clear category tag (e.g. "${cleanCategory}", "WordPress & Themes", "PostgreSQL Database", "Forum Rules", "Consultancy", "Security").
-   - "content": A well-structured, factual, DETAILED explanation of that topic — preserve concrete specifics (numbers, steps, names, conditions, exceptions) rather than vague summaries. Use bullet points for steps/lists and full sentences for explanations. Do not compress away specifics for the sake of brevity.
-4. Remove only true redundant filler or formatting noise (page headers/footers, repeated boilerplate) — never remove substantive content.
-
-Output MUST be valid JSON matching the provided response schema.`;
-
-        // Prepare contents based on mimeType
-        let contentsPayload: any[];
-        const isTextBased = cleanMime.startsWith('text/') || cleanMime === 'application/json' || cleanFileName.endsWith('.md') || cleanFileName.endsWith('.txt') || cleanFileName.endsWith('.csv') || cleanFileName.endsWith('.json');
-
-        if (isTextBased && !fileData.startsWith('data:')) {
-          contentsPayload = [
-            `File Name: ${cleanFileName}\nFile Type: ${cleanMime}\nPreferred Category: ${cleanCategory}\n\nDocument Content:\n${fileData}`
-          ];
-        } else {
-          // Base64 data (PDF, Images, Word documents, binary formats)
-          let base64Pure = fileData;
-          if (fileData.includes('base64,')) {
-            base64Pure = fileData.split('base64,')[1];
-          }
-          contentsPayload = [
-            {
-              inlineData: {
-                data: base64Pure,
-                mimeType: cleanMime
-              }
-            },
-            `File Name: ${cleanFileName}\nPreferred Category: ${cleanCategory}\nPlease analyze this document and extract the structured knowledge chunks.`
-          ];
-        }
-
-        const chunkResponseSchema = {
-          type: Type.OBJECT,
-          properties: {
-            chunks: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  title: { type: Type.STRING },
-                  category: { type: Type.STRING },
-                  content: { type: Type.STRING }
-                },
-                required: ['title', 'category', 'content']
-              }
-            }
-          },
-          required: ['chunks']
-        };
-
-        for (const modelName of candidateModels) {
-          let modelExtracted = false;
-          for (let attempt = 0; attempt < 2; attempt++) {
-            try {
-              const response = await ai.models.generateContent({
-                model: modelName,
-                contents: contentsPayload,
-                config: {
-                  systemInstruction,
-                  responseMimeType: 'application/json',
-                  responseSchema: chunkResponseSchema,
-                  temperature: 0.2,
-                  // Large enough that dense/long source documents don't get their
-                  // extraction silently truncated mid-JSON (which previously caused
-                  // JSON.parse to fail and made every upload fall through to the
-                  // crude non-AI fallback chunker below).
-                  maxOutputTokens: 32768
-                }
-              });
-
-              if (response.text) {
-                let cleanJson = response.text.trim();
-                if (cleanJson.startsWith('```json')) {
-                  cleanJson = cleanJson.replace(/^```json\s*/, '').replace(/```\s*$/, '');
-                } else if (cleanJson.startsWith('```')) {
-                  cleanJson = cleanJson.replace(/^```\s*/, '').replace(/```\s*$/, '');
-                }
-
-                const parsed = JSON.parse(cleanJson);
-                if (parsed.chunks && Array.isArray(parsed.chunks) && parsed.chunks.length > 0) {
-                  extractedChunks = parsed.chunks.map((c: any) => ({
-                    title: String(c.title || `${cleanFileName} Section`),
-                    category: String(c.category || cleanCategory),
-                    content: String(c.content || '')
-                  })).filter((c: any) => c.content.trim().length > 0);
-
-                  if (extractedChunks.length > 0) {
-                    modelExtracted = true;
-                    break;
-                  }
-                }
-              }
-            } catch (modelErr: any) {
-              const msg = modelErr?.message || '';
-              // Surface the real failure instead of silently swallowing it — this was
-              // previously invisible, so a bad API key, a retired model name, or a
-              // quota error looked identical to "AI just isn't smart enough".
-              console.error(`[knowledge-extract] model "${modelName}" attempt ${attempt + 1} failed:`, msg || modelErr);
-              const isTransient = msg.includes('503') || msg.includes('UNAVAILABLE') || msg.includes('429') || msg.includes('high demand');
-              if (isTransient && attempt === 0) {
-                await new Promise(r => setTimeout(r, 500));
-                continue;
-              }
-              break;
-            }
-          }
-          if (modelExtracted) break;
-        }
-
-        if (extractedChunks.length === 0) {
-          console.warn(`[knowledge-extract] All Gemini models failed for "${cleanFileName}" — falling back to non-AI chunker. Check the logged model errors above (common causes: invalid/retired model name, bad GEMINI_API_KEY, quota exceeded, or unsupported mimeType for inlineData).`);
-        }
+      // 1. If an OpenAI API key is present, use it for AI-powered chunk extraction
+      // (with model failover/retry). This replaced the previous Gemini-based
+      // extraction for this endpoint because Google's "AQ." auth-key rollout
+      // currently breaks simple API-key auth against generativelanguage.googleapis.com
+      // — see https://discuss.ai.google.dev for the ongoing issue. Gemini is still
+      // used elsewhere in this app (the support chat pipeline) and is untouched.
+      if (process.env.OPENAI_API_KEY) {
+        extractedChunks = await runOpenAIKnowledgeExtraction(fileData, cleanFileName, cleanMime, cleanCategory);
       }
 
-      // 2. High-quality intelligent fallback extraction if Gemini is unavailable
+      // 2. High-quality intelligent fallback extraction if Gemini is unavailable/failed.
+      // IMPORTANT: this must never decode arbitrary binary (PDF, DOCX, images) as UTF-8 —
+      // that previously produced "chunks" made of raw PDF/DOCX file structure bytes
+      // (e.g. "%PDF-1.4", "1 0 obj") instead of an error, which looked like a working
+      // but very dumb extraction rather than a failure.
       if (extractedChunks.length === 0) {
-        let textToChunk = '';
-        if (typeof fileData === 'string' && !fileData.startsWith('data:')) {
-          textToChunk = fileData;
-        } else if (typeof fileData === 'string' && fileData.includes('base64,')) {
-          try {
-            textToChunk = Buffer.from(fileData.split('base64,')[1], 'base64').toString('utf-8');
-          } catch {
-            textToChunk = '';
-          }
-        }
-
+        const { text: textToChunk, unsupported } = await extractRawTextFromUpload(fileData, cleanFileName, cleanMime);
         const baseTitle = cleanFileName.replace(/\.[^/.]+$/, '');
+
+        if (unsupported) {
+          return res.status(422).json({
+            error: `AI extraction failed for "${cleanFileName}" and this file type has no offline fallback (scanned images and legacy .doc files need working AI extraction). Check the server logs for the AI extraction error (invalid OPENAI_API_KEY, retired model, or quota), or re-save the file as PDF/DOCX/TXT/MD and try again.`
+          });
+        }
 
         if (textToChunk.trim()) {
           // Check if JSON format
@@ -2250,11 +2329,9 @@ Output MUST be valid JSON matching the provided response schema.`;
             }];
           }
         } else {
-          extractedChunks = [{
-            title: `${baseTitle} Document`,
-            category: cleanCategory,
-            content: `Extracted content from ${cleanFileName} (${cleanMime}). Added into PostgreSQL knowledge base.`
-          }];
+          return res.status(422).json({
+            error: `Could not extract any readable text from "${cleanFileName}". AI extraction failed (check server logs) and the file appears to contain no extractable text.`
+          });
         }
       }
 

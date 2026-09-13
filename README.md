@@ -22,7 +22,8 @@ a single Express app shared between local dev and Vercel serverless functions.
    ```
 2. Copy `.env.example` to `.env` and fill in:
    - `DATABASE_URL` — your Neon connection string
-   - `GEMINI_API_KEY` — for the AI support assistant and knowledge extraction
+   - `GEMINI_API_KEY` — for the AI support chat assistant (`src/server/pipeline.ts`)
+   - `OPENAI_API_KEY` — for the admin "AI Document & Knowledge Ingestion" file-extraction feature (`knowledge-docs/extract-from-file`)
 3. Run the app:
    ```
    npm run dev
