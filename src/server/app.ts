@@ -2030,6 +2030,19 @@ export async function createApp() {
       const cleanMime = mimeType || 'text/plain';
       const cleanCategory = (categoryHint || 'General').trim();
 
+      // Enforce a 2 MB source-file limit. Base64 (used for non-text files) inflates
+      // size by ~4/3, so measure the actual decoded byte length, not the raw string length.
+      const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
+      const isDataUrl = typeof fileData === 'string' && fileData.startsWith('data:') && fileData.includes('base64,');
+      const approxByteLength = typeof fileData === 'string'
+        ? (isDataUrl ? Math.floor((fileData.split('base64,')[1] || '').length * 0.75) : Buffer.byteLength(fileData, 'utf-8'))
+        : 0;
+      if (approxByteLength > MAX_UPLOAD_BYTES) {
+        return res.status(413).json({
+          error: `File is too large (${(approxByteLength / (1024 * 1024)).toFixed(2)} MB). The maximum allowed upload size is 2 MB.`
+        });
+      }
+
       let extractedChunks: { title: string; category: string; content: string }[] = [];
 
       // 1. If Gemini API Key is present, use multi-model AI extraction with failover & retry
@@ -2043,26 +2056,18 @@ export async function createApp() {
         const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
         const systemInstruction = `You are an expert technical documentation analyzer and knowledge chunking engine for the Ama Community platform.
-Your task is to analyze the provided file/document and extract clean, highly factual, self-contained Knowledge Chunks suitable for real-time RAG (Retrieval-Augmented Generation).
+Your task is to analyze the ENTIRE provided file/document exhaustively and extract clean, highly factual, self-contained Knowledge Chunks suitable for real-time RAG (Retrieval-Augmented Generation).
 
 Guidelines:
-1. Break down the document into 1 to 8 coherent, meaningful knowledge chunks (depending on document length and topics covered).
-2. Each chunk MUST have:
+1. Read and use the FULL document. Do not skip sections, tables, footnotes, or examples. Extract the maximum amount of distinct, useful information — do not stop at a small handful of chunks just because the document is short; do not merge unrelated topics into one chunk just to keep the count low.
+2. Break the document into as many coherent, self-contained knowledge chunks as the content genuinely supports (this can be anywhere from 1 chunk for a trivial document to 30+ for a long, dense one). Each chunk should cover exactly one topic, procedure, policy, or fact cluster so it can be retrieved independently.
+3. Each chunk MUST have:
    - "title": A concise, descriptive, search-friendly title (e.g. "Docly Demo Import Steps", "Author Delete Permissions", "Enterprise Consultancy Retainer Scope").
    - "category": A clear category tag (e.g. "${cleanCategory}", "WordPress & Themes", "PostgreSQL Database", "Forum Rules", "Consultancy", "Security").
-   - "content": A well-structured, factual summary or guide explaining the information clearly in 1-4 concise paragraphs or bullet points.
-3. Remove redundant filler or formatting noise.
+   - "content": A well-structured, factual, DETAILED explanation of that topic — preserve concrete specifics (numbers, steps, names, conditions, exceptions) rather than vague summaries. Use bullet points for steps/lists and full sentences for explanations. Do not compress away specifics for the sake of brevity.
+4. Remove only true redundant filler or formatting noise (page headers/footers, repeated boilerplate) — never remove substantive content.
 
-Output MUST be valid JSON in this exact structure:
-{
-  "chunks": [
-    {
-      "title": "...",
-      "category": "...",
-      "content": "..."
-    }
-  ]
-}`;
+Output MUST be valid JSON matching the provided response schema.`;
 
         // Prepare contents based on mimeType
         let contentsPayload: any[];
@@ -2089,6 +2094,25 @@ Output MUST be valid JSON in this exact structure:
           ];
         }
 
+        const chunkResponseSchema = {
+          type: Type.OBJECT,
+          properties: {
+            chunks: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  title: { type: Type.STRING },
+                  category: { type: Type.STRING },
+                  content: { type: Type.STRING }
+                },
+                required: ['title', 'category', 'content']
+              }
+            }
+          },
+          required: ['chunks']
+        };
+
         for (const modelName of candidateModels) {
           let modelExtracted = false;
           for (let attempt = 0; attempt < 2; attempt++) {
@@ -2099,8 +2123,13 @@ Output MUST be valid JSON in this exact structure:
                 config: {
                   systemInstruction,
                   responseMimeType: 'application/json',
+                  responseSchema: chunkResponseSchema,
                   temperature: 0.2,
-                  maxOutputTokens: 2000
+                  // Large enough that dense/long source documents don't get their
+                  // extraction silently truncated mid-JSON (which previously caused
+                  // JSON.parse to fail and made every upload fall through to the
+                  // crude non-AI fallback chunker below).
+                  maxOutputTokens: 32768
                 }
               });
 
@@ -2128,15 +2157,23 @@ Output MUST be valid JSON in this exact structure:
               }
             } catch (modelErr: any) {
               const msg = modelErr?.message || '';
+              // Surface the real failure instead of silently swallowing it — this was
+              // previously invisible, so a bad API key, a retired model name, or a
+              // quota error looked identical to "AI just isn't smart enough".
+              console.error(`[knowledge-extract] model "${modelName}" attempt ${attempt + 1} failed:`, msg || modelErr);
               const isTransient = msg.includes('503') || msg.includes('UNAVAILABLE') || msg.includes('429') || msg.includes('high demand');
               if (isTransient && attempt === 0) {
-                await new Promise(r => setTimeout(r, 300));
+                await new Promise(r => setTimeout(r, 500));
                 continue;
               }
               break;
             }
           }
           if (modelExtracted) break;
+        }
+
+        if (extractedChunks.length === 0) {
+          console.warn(`[knowledge-extract] All Gemini models failed for "${cleanFileName}" — falling back to non-AI chunker. Check the logged model errors above (common causes: invalid/retired model name, bad GEMINI_API_KEY, quota exceeded, or unsupported mimeType for inlineData).`);
         }
       }
 

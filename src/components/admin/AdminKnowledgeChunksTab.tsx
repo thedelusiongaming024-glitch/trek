@@ -233,15 +233,25 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
     e.stopPropagation();
     setDragActive(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setSelectedFile(e.dataTransfer.files[0]);
-      setAnalysisError(null);
+      acceptFileIfWithinLimit(e.dataTransfer.files[0]);
     }
+  };
+
+  const MAX_UPLOAD_BYTES = 2 * 1024 * 1024; // 2 MB
+
+  const acceptFileIfWithinLimit = (file: File) => {
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setSelectedFile(null);
+      setAnalysisError(`"${file.name}" is ${(file.size / (1024 * 1024)).toFixed(2)} MB. The maximum allowed upload size is 2 MB.`);
+      return;
+    }
+    setSelectedFile(file);
+    setAnalysisError(null);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
-      setAnalysisError(null);
+      acceptFileIfWithinLimit(e.target.files[0]);
     }
   };
 
@@ -828,7 +838,7 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
                         Drag and drop your file here, or <span className="text-indigo-600 underline">browse files</span>
                       </p>
                       <p className="text-[11px] text-slate-400 mt-1">
-                        Supports PDF, Markdown (.md), TXT, JSON, CSV, Word (.doc/.docx), and Screenshots/Images
+                        Supports PDF, Markdown (.md), TXT, JSON, CSV, Word (.doc/.docx), and Screenshots/Images — max 2 MB per file
                       </p>
                     </div>
                   )}
