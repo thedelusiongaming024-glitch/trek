@@ -40,16 +40,58 @@ async function extractRawTextFromUpload(
   const isDocx = mimeType.includes('wordprocessingml') || lowerName.endsWith('.docx');
 
   if (isPdf && buffer) {
+    let extracted = '';
+    // 1. Try pdf-parse library
     try {
-      const { PDFParse } = await import('pdf-parse');
-      const parser = new PDFParse({ data: buffer });
-      const result = await parser.getText();
-      const text = result?.text || '';
-      return { text, unsupported: text.trim().length === 0 };
+      const pdfModule: any = await import('pdf-parse');
+      if (typeof pdfModule === 'function') {
+        const data = await pdfModule(buffer);
+        extracted = data?.text || '';
+      } else if (typeof pdfModule?.default === 'function') {
+        const data = await pdfModule.default(buffer);
+        extracted = data?.text || '';
+      } else if (pdfModule?.PDFParse) {
+        const parser = new pdfModule.PDFParse({ data: buffer });
+        const res = await parser.getText();
+        extracted = res?.text || '';
+      }
     } catch (err: any) {
-      console.error('[knowledge-extract] pdf-parse failed:', err?.message || err);
-      return { text: '', unsupported: true };
+      console.warn('[knowledge-extract] pdf-parse library failed, attempting pure-JS stream parser:', err?.message || err);
     }
+
+    if (extracted.trim().length > 0) {
+      return { text: extracted, unsupported: false };
+    }
+
+    // 2. Pure JS stream text fallback for PDF without canvas or native binaries
+    try {
+      const rawPdf = buffer.toString('latin1');
+      const textMatches: string[] = [];
+      const textBlocks = rawPdf.match(/BT[\s\S]*?ET/g) || [];
+      for (const block of textBlocks) {
+        const stringMatches = block.match(/\((.*?)\)|<([0-9a-fA-F]+)>/g) || [];
+        for (const sm of stringMatches) {
+          if (sm.startsWith('(') && sm.endsWith(')')) {
+            const inner = sm.slice(1, -1)
+              .replace(/\\n/g, '\n')
+              .replace(/\\r/g, '\r')
+              .replace(/\\t/g, '\t')
+              .replace(/\\\(/g, '(')
+              .replace(/\\\)/g, ')')
+              .replace(/\\\\/g, '\\');
+            if (inner.trim()) textMatches.push(inner);
+          }
+        }
+      }
+      const streamText = textMatches.join(' ').replace(/\s+/g, ' ').trim();
+      if (streamText.length > 20) {
+        return { text: streamText, unsupported: false };
+      }
+    } catch (fallbackErr) {
+      console.warn('[knowledge-extract] Stream fallback failed:', fallbackErr);
+    }
+
+    return { text: '', unsupported: true };
   }
 
   if (isDocx && buffer) {
@@ -222,10 +264,12 @@ async function runAIKnowledgeExtraction(
   const activeModel = (preferredModel || 'gpt-4.1-mini').trim();
   const isGeminiModel = activeModel.startsWith('gemini-');
   const systemPrompt = buildKnowledgeExtractionSystemPrompt(categoryHint);
+  const lowerName = (fileName || '').toLowerCase();
   const isImage = mimeType.startsWith('image/');
+  const isPdf = mimeType === 'application/pdf' || lowerName.endsWith('.pdf');
 
-  let openAiUserContent: any;
-  let geminiUserContent: any;
+  let openAiUserContent: any = null;
+  let geminiUserContent: any = null;
 
   if (isImage) {
     const imageUrl = fileData.startsWith('data:') ? fileData : `data:${mimeType};base64,${fileData}`;
@@ -238,6 +282,19 @@ async function runAIKnowledgeExtraction(
       `File Name: ${fileName}\nPreferred Category: ${categoryHint}\nPlease analyze this image and extract the structured knowledge chunks.`,
       { inlineData: { mimeType, data: base64Data } }
     ];
+  } else if (isPdf) {
+    const base64Data = fileData.includes('base64,') ? fileData.split('base64,')[1] : fileData;
+    // Gemini supports native multimodal PDF understanding directly via inlineData!
+    geminiUserContent = [
+      `File Name: ${fileName}\nPreferred Category: ${categoryHint}\nPlease analyze this entire PDF document thoroughly and extract structured knowledge chunks.`,
+      { inlineData: { mimeType: 'application/pdf', data: base64Data } }
+    ];
+
+    // For OpenAI (which does not accept raw PDF binary in chat completions), extract text first
+    const { text } = await extractRawTextFromUpload(fileData, fileName, mimeType);
+    if (text && text.trim()) {
+      openAiUserContent = `File Name: ${fileName}\nFile Type: ${mimeType}\nPreferred Category: ${categoryHint}\n\nDocument Content:\n${text}`;
+    }
   } else {
     const { text, unsupported } = await extractRawTextFromUpload(fileData, fileName, mimeType);
     if (unsupported || !text.trim()) {
@@ -249,7 +306,7 @@ async function runAIKnowledgeExtraction(
   }
 
   // 1. If Gemini model is preferred and key is present
-  if (isGeminiModel && process.env.GEMINI_API_KEY) {
+  if (isGeminiModel && process.env.GEMINI_API_KEY && geminiUserContent) {
     const geminiCandidates = Array.from(new Set([activeModel, 'gemini-2.5-flash', 'gemini-3.8-flash', 'gemini-3.1-flash-lite']));
     for (const model of geminiCandidates) {
       try {
@@ -261,8 +318,8 @@ async function runAIKnowledgeExtraction(
     }
   }
 
-  // 2. If OpenAI model is preferred (or Gemini fallback) and OpenAI key is present
-  if (process.env.OPENAI_API_KEY) {
+  // 2. If OpenAI model is preferred (or Gemini fallback) and OpenAI key is present and content is available
+  if (process.env.OPENAI_API_KEY && openAiUserContent) {
     const openAiCandidates = Array.from(new Set([
       isGeminiModel ? 'gpt-4.1-mini' : activeModel,
       'gpt-4.1-mini',
@@ -294,8 +351,8 @@ async function runAIKnowledgeExtraction(
     }
   }
 
-  // 3. If OpenAI was preferred but failed, try Gemini as secondary AI fallback
-  if (!isGeminiModel && process.env.GEMINI_API_KEY) {
+  // 3. If OpenAI was preferred but failed (or skipped for PDF), try Gemini as secondary AI fallback
+  if (!isGeminiModel && process.env.GEMINI_API_KEY && geminiUserContent) {
     const geminiCandidates = ['gemini-2.5-flash', 'gemini-3.8-flash', 'gemini-3.1-flash-lite'];
     for (const model of geminiCandidates) {
       try {

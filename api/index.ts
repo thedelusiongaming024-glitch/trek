@@ -438,16 +438,58 @@ async function extractRawTextFromUpload(
   const isDocx = mimeType.includes('wordprocessingml') || lowerName.endsWith('.docx');
 
   if (isPdf && buffer) {
+    let extracted = '';
+    // 1. Try pdf-parse library
     try {
-      const { PDFParse } = await import('pdf-parse');
-      const parser = new PDFParse({ data: buffer });
-      const result = await parser.getText();
-      const text = result?.text || '';
-      return { text, unsupported: text.trim().length === 0 };
+      const pdfModule: any = await import('pdf-parse');
+      if (typeof pdfModule === 'function') {
+        const data = await pdfModule(buffer);
+        extracted = data?.text || '';
+      } else if (typeof pdfModule?.default === 'function') {
+        const data = await pdfModule.default(buffer);
+        extracted = data?.text || '';
+      } else if (pdfModule?.PDFParse) {
+        const parser = new pdfModule.PDFParse({ data: buffer });
+        const res = await parser.getText();
+        extracted = res?.text || '';
+      }
     } catch (err: any) {
-      console.error('[knowledge-extract] pdf-parse failed:', err?.message || err);
-      return { text: '', unsupported: true };
+      console.warn('[knowledge-extract] pdf-parse library failed, attempting pure-JS stream parser:', err?.message || err);
     }
+
+    if (extracted.trim().length > 0) {
+      return { text: extracted, unsupported: false };
+    }
+
+    // 2. Pure JS stream text fallback for PDF without canvas or native binaries
+    try {
+      const rawPdf = buffer.toString('latin1');
+      const textMatches: string[] = [];
+      const textBlocks = rawPdf.match(/BT[\s\S]*?ET/g) || [];
+      for (const block of textBlocks) {
+        const stringMatches = block.match(/\((.*?)\)|<([0-9a-fA-F]+)>/g) || [];
+        for (const sm of stringMatches) {
+          if (sm.startsWith('(') && sm.endsWith(')')) {
+            const inner = sm.slice(1, -1)
+              .replace(/\\n/g, '\n')
+              .replace(/\\r/g, '\r')
+              .replace(/\\t/g, '\t')
+              .replace(/\\\(/g, '(')
+              .replace(/\\\)/g, ')')
+              .replace(/\\\\/g, '\\');
+            if (inner.trim()) textMatches.push(inner);
+          }
+        }
+      }
+      const streamText = textMatches.join(' ').replace(/\s+/g, ' ').trim();
+      if (streamText.length > 20) {
+        return { text: streamText, unsupported: false };
+      }
+    } catch (fallbackErr) {
+      console.warn('[knowledge-extract] Stream fallback failed:', fallbackErr);
+    }
+
+    return { text: '', unsupported: true };
   }
 
   if (isDocx && buffer) {
@@ -467,11 +509,7 @@ async function extractRawTextFromUpload(
 }
 
 // ---------------------------------------------------------------------------
-// OpenAI-powered knowledge chunk extraction for the admin "extract-from-file"
-// endpoint. PDFs/DOCX are converted to plain text first (via extractRawTextFromUpload)
-// and sent as text — OpenAI's chat completions API doesn't take raw PDF/DOCX bytes
-// the way Gemini's inlineData did, but it takes text and images natively, which
-// covers every format this endpoint supports.
+// OpenAI & Gemini-powered knowledge chunk extraction for admin "extract-from-file"
 // ---------------------------------------------------------------------------
 const OPENAI_CHUNK_JSON_SCHEMA = {
   name: 'knowledge_chunks',
@@ -557,56 +595,168 @@ async function callOpenAIForChunks(
     .filter((c: { content: string }) => c.content.trim().length > 0);
 }
 
-async function runOpenAIKnowledgeExtraction(
+async function callGeminiForChunks(
+  model: string,
+  systemPrompt: string,
+  userContent: any
+): Promise<{ title: string; category: string; content: string }[] | null> {
+  if (!process.env.GEMINI_API_KEY) return null;
+
+  const ai = new GoogleGenAI({
+    apiKey: process.env.GEMINI_API_KEY,
+    httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+  });
+
+  const response = await ai.models.generateContent({
+    model,
+    contents: userContent,
+    config: {
+      systemInstruction: systemPrompt,
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          chunks: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                title: { type: Type.STRING },
+                category: { type: Type.STRING },
+                content: { type: Type.STRING }
+              },
+              required: ['title', 'category', 'content']
+            }
+          }
+        },
+        required: ['chunks']
+      },
+      temperature: 0.2
+    }
+  });
+
+  if (!response.text) return null;
+  const parsed = JSON.parse(response.text.trim());
+  if (!parsed?.chunks || !Array.isArray(parsed.chunks) || parsed.chunks.length === 0) return null;
+
+  return parsed.chunks
+    .map((c: any) => ({
+      title: String(c.title || 'Untitled Chunk'),
+      category: String(c.category || ''),
+      content: String(c.content || '')
+    }))
+    .filter((c: { content: string }) => c.content.trim().length > 0);
+}
+
+async function runAIKnowledgeExtraction(
   fileData: string,
   fileName: string,
   mimeType: string,
-  categoryHint: string
+  categoryHint: string,
+  preferredModel?: string
 ): Promise<{ title: string; category: string; content: string }[]> {
-  const candidateModels = ['gpt-5-mini', 'gpt-4o', 'gpt-4.1-mini'];
+  const activeModel = (preferredModel || 'gpt-4.1-mini').trim();
+  const isGeminiModel = activeModel.startsWith('gemini-');
   const systemPrompt = buildKnowledgeExtractionSystemPrompt(categoryHint);
+  const lowerName = (fileName || '').toLowerCase();
   const isImage = mimeType.startsWith('image/');
+  const isPdf = mimeType === 'application/pdf' || lowerName.endsWith('.pdf');
 
-  let userContent: any;
+  let openAiUserContent: any = null;
+  let geminiUserContent: any = null;
+
   if (isImage) {
-    // Vision input: fileData is already a data: URL for non-text uploads.
     const imageUrl = fileData.startsWith('data:') ? fileData : `data:${mimeType};base64,${fileData}`;
-    userContent = [
+    openAiUserContent = [
       { type: 'text', text: `File Name: ${fileName}\nPreferred Category: ${categoryHint}\nPlease analyze this image and extract the structured knowledge chunks.` },
       { type: 'image_url', image_url: { url: imageUrl } }
     ];
+    const base64Data = fileData.includes('base64,') ? fileData.split('base64,')[1] : fileData;
+    geminiUserContent = [
+      `File Name: ${fileName}\nPreferred Category: ${categoryHint}\nPlease analyze this image and extract the structured knowledge chunks.`,
+      { inlineData: { mimeType, data: base64Data } }
+    ];
+  } else if (isPdf) {
+    const base64Data = fileData.includes('base64,') ? fileData.split('base64,')[1] : fileData;
+    geminiUserContent = [
+      `File Name: ${fileName}\nPreferred Category: ${categoryHint}\nPlease analyze this entire PDF document thoroughly and extract structured knowledge chunks.`,
+      { inlineData: { mimeType: 'application/pdf', data: base64Data } }
+    ];
+
+    const { text } = await extractRawTextFromUpload(fileData, fileName, mimeType);
+    if (text && text.trim()) {
+      openAiUserContent = `File Name: ${fileName}\nFile Type: ${mimeType}\nPreferred Category: ${categoryHint}\n\nDocument Content:\n${text}`;
+    }
   } else {
     const { text, unsupported } = await extractRawTextFromUpload(fileData, fileName, mimeType);
     if (unsupported || !text.trim()) {
-      // Nothing we can hand to a text model — let the caller's fallback/error path handle it.
       return [];
     }
-    userContent = `File Name: ${fileName}\nFile Type: ${mimeType}\nPreferred Category: ${categoryHint}\n\nDocument Content:\n${text}`;
+    const textPrompt = `File Name: ${fileName}\nFile Type: ${mimeType}\nPreferred Category: ${categoryHint}\n\nDocument Content:\n${text}`;
+    openAiUserContent = textPrompt;
+    geminiUserContent = textPrompt;
   }
 
-  for (const model of candidateModels) {
-    for (let attempt = 0; attempt < 2; attempt++) {
+  // 1. If Gemini model is preferred and key is present
+  if (isGeminiModel && process.env.GEMINI_API_KEY && geminiUserContent) {
+    const geminiCandidates = Array.from(new Set([activeModel, 'gemini-2.5-flash', 'gemini-3.8-flash', 'gemini-3.1-flash-lite']));
+    for (const model of geminiCandidates) {
       try {
-        const chunks = await callOpenAIForChunks(model, systemPrompt, userContent);
+        const chunks = await callGeminiForChunks(model, systemPrompt, geminiUserContent);
         if (chunks && chunks.length > 0) return chunks;
-        break; // valid response but no chunks — no point retrying this model
       } catch (err: any) {
-        const msg = err?.message || String(err);
-        console.error(`[knowledge-extract] OpenAI model "${model}" attempt ${attempt + 1} failed:`, msg);
-        if (err?.status === 401 || msg.includes('invalid_api_key') || msg.includes('Incorrect API key')) {
-          console.error('[knowledge-extract] OPENAI_API_KEY looks invalid or missing. Generate one at https://platform.openai.com/api-keys and set it in your deployment\'s environment variables.');
-        }
-        const isTransient = err?.status === 429 || err?.status === 503 || msg.includes('rate_limit') || msg.includes('overloaded');
-        if (isTransient && attempt === 0) {
-          await new Promise(r => setTimeout(r, 500));
-          continue;
-        }
-        break;
+        console.warn(`[knowledge-extract] Gemini model "${model}" extraction attempt failed:`, err?.message || err);
       }
     }
   }
 
-  console.warn(`[knowledge-extract] All OpenAI models failed for "${fileName}" — falling back to non-AI chunker. Check the logged model errors above.`);
+  // 2. If OpenAI model is preferred (or Gemini fallback) and OpenAI key is present
+  if (process.env.OPENAI_API_KEY && openAiUserContent) {
+    const openAiCandidates = Array.from(new Set([
+      isGeminiModel ? 'gpt-4.1-mini' : activeModel,
+      'gpt-4.1-mini',
+      'gpt-4o',
+      'gpt-5-mini',
+      'gpt-4o-mini'
+    ]));
+
+    for (const model of openAiCandidates) {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const chunks = await callOpenAIForChunks(model, systemPrompt, openAiUserContent);
+          if (chunks && chunks.length > 0) return chunks;
+          break;
+        } catch (err: any) {
+          const msg = err?.message || String(err);
+          console.error(`[knowledge-extract] OpenAI model "${model}" attempt ${attempt + 1} failed:`, msg);
+          if (err?.status === 401 || msg.includes('invalid_api_key') || msg.includes('Incorrect API key')) {
+            console.error('[knowledge-extract] OPENAI_API_KEY looks invalid or missing.');
+          }
+          const isTransient = err?.status === 429 || err?.status === 503 || msg.includes('rate_limit') || msg.includes('overloaded');
+          if (isTransient && attempt === 0) {
+            await new Promise(r => setTimeout(r, 500));
+            continue;
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  // 3. If OpenAI was preferred but failed (or skipped for PDF), try Gemini as secondary AI fallback
+  if (!isGeminiModel && process.env.GEMINI_API_KEY && geminiUserContent) {
+    const geminiCandidates = ['gemini-2.5-flash', 'gemini-3.8-flash', 'gemini-3.1-flash-lite'];
+    for (const model of geminiCandidates) {
+      try {
+        const chunks = await callGeminiForChunks(model, systemPrompt, geminiUserContent);
+        if (chunks && chunks.length > 0) return chunks;
+      } catch (err: any) {
+        console.warn(`[knowledge-extract] Gemini fallback model "${model}" failed:`, err?.message || err);
+      }
+    }
+  }
+
+  console.warn(`[knowledge-extract] All AI models failed for "${fileName}" — falling back to non-AI chunker.`);
   return [];
 }
 
@@ -2591,27 +2741,30 @@ LANGUAGE RULE:
 
       let extractedChunks: { title: string; category: string; content: string }[] = [];
 
-      // 1. If an OpenAI API key is present, use it for AI-powered chunk extraction
-      // (with model failover/retry). This replaced the previous Gemini-based
-      // extraction for this endpoint because Google's "AQ." auth-key rollout
-      // currently breaks simple API-key auth against generativelanguage.googleapis.com
-      // — see https://discuss.ai.google.dev for the ongoing issue. Gemini is still
-      // used elsewhere in this app (the support chat pipeline) and is untouched.
-      if (process.env.OPENAI_API_KEY) {
-        extractedChunks = await runOpenAIKnowledgeExtraction(fileData, cleanFileName, cleanMime, cleanCategory);
+      // 1. Fetch current platform settings to get active AI model
+      let targetModel = req.body.preferredModel;
+      if (!targetModel) {
+        try {
+          const settingsRes = await pool.query("SELECT value FROM settings WHERE key = 'platform'");
+          const platform = settingsRes.rows[0]?.value || {};
+          targetModel = platform.activeAiModel || 'gemini-2.5-flash';
+        } catch {
+          targetModel = 'gemini-2.5-flash';
+        }
       }
-      // 2. High-quality intelligent fallback extraction if Gemini is unavailable/failed.
-      // IMPORTANT: this must never decode arbitrary binary (PDF, DOCX, images) as UTF-8 —
-      // that previously produced "chunks" made of raw PDF/DOCX file structure bytes
-      // (e.g. "%PDF-1.4", "1 0 obj") instead of an error, which looked like a working
-      // but very dumb extraction rather than a failure.
+
+      // 2. Perform AI-powered multi-model extraction with intelligent fallback
+      extractedChunks = await runAIKnowledgeExtraction(fileData, cleanFileName, cleanMime, cleanCategory, targetModel);
+
+      // 3. High-quality intelligent non-AI fallback extraction if AI models were unavailable/failed.
+      // IMPORTANT: this must never decode arbitrary binary (PDF, DOCX, images) as UTF-8.
       if (extractedChunks.length === 0) {
         const { text: textToChunk, unsupported } = await extractRawTextFromUpload(fileData, cleanFileName, cleanMime);
         const baseTitle = cleanFileName.replace(/\.[^/.]+$/, '');
 
         if (unsupported) {
           return res.status(422).json({
-            error: `AI extraction failed for "${cleanFileName}" and this file type has no offline fallback (scanned images and legacy .doc files need working AI extraction). Check the server logs for the AI extraction error (invalid OPENAI_API_KEY, retired model, or quota), or re-save the file as PDF/DOCX/TXT/MD and try again.`
+            error: `AI extraction failed for "${cleanFileName}" and this file type has no offline fallback (scanned images and legacy .doc files need working AI extraction). Check the server logs or try switching the active AI model in Admin Settings.`
           });
         }
 
