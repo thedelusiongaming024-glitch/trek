@@ -1,0 +1,7 @@
+{
+  "name": "Ama Community",
+  "description": "A community discussion forum with an admin panel, knowledge base, and Gemini-powered support assistant.",
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
