@@ -1,6 +1,14 @@
 import express from 'express';
 import { GoogleGenAI, Type } from '@google/genai';
 import { pool, initDb } from './db';
+import {
+  matchDirectKB,
+  matchFuzzyFAQ,
+  generateGroundedLLM,
+  matchKeywordFallback,
+  createHumanTicketFallback,
+  PipelineSettings
+} from './pipeline';
 
 // ---------------------------------------------------------------------------
 // AI support chat performance helpers
@@ -201,6 +209,8 @@ export async function createApp() {
         repliesByTopic[reply.topic_id].push({
           id: reply.id,
           author: reply.author,
+          authorEmail: reply.author_email,
+          authorId: reply.author_id,
           authorRole: reply.author_role,
           authorAvatar: reply.author_avatar,
           timeAgo: reply.time_ago,
@@ -417,15 +427,17 @@ export async function createApp() {
   app.post('/api/topics/:id/replies', async (req, res) => {
     try {
       const { id: topicId } = req.params;
-      const { author, content, authorAvatar, authorRole } = req.body;
+      const { author, content, authorAvatar, authorRole, authorEmail, authorId } = req.body;
       const replyId = `rep-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
       const avatar = authorAvatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80';
+      const cleanEmail = (authorEmail || (req.headers['x-user-email'] as string) || '').trim().toLowerCase() || null;
+      const cleanUserId = (authorId || (req.headers['x-user-id'] as string) || '').trim() || null;
 
       const replyRes = await pool.query(`
-        INSERT INTO replies (id, topic_id, author, author_role, author_avatar, time_ago, content, likes)
-        VALUES ($1, $2, $3, $4, $5, 'Just now', $6, 0)
+        INSERT INTO replies (id, topic_id, author, author_email, author_id, author_role, author_avatar, time_ago, content, likes)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, 'Just now', $8, 0)
         RETURNING *
-      `, [replyId, topicId, author || 'Community Member', authorRole || 'Member', avatar, content]);
+      `, [replyId, topicId, author || 'Community Member', cleanEmail, cleanUserId, authorRole || 'Member', avatar, content]);
 
       // Update topic replies count
       await pool.query('UPDATE topics SET replies = replies + 1 WHERE id = $1', [topicId]);
@@ -433,6 +445,8 @@ export async function createApp() {
       const reply = {
         id: replyRes.rows[0].id,
         author: replyRes.rows[0].author,
+        authorEmail: replyRes.rows[0].author_email,
+        authorId: replyRes.rows[0].author_id,
         authorRole: replyRes.rows[0].author_role,
         authorAvatar: replyRes.rows[0].author_avatar,
         timeAgo: replyRes.rows[0].time_ago,
@@ -1063,7 +1077,7 @@ export async function createApp() {
       const userEmail = (req.query.email as string) || '';
 
       let query = `
-        SELECT id, ticket_number as "ticketNumber", user_id as "userId", user_email as "userEmail", session_id as "sessionId",
+        SELECT id, ticket_number as "ticketNumber", user_id as "userId", user_email as "userEmail", user_whatsapp as "userWhatsapp", session_id as "sessionId",
                subject, question, priority, status, admin_answer as "adminAnswer", assigned_to as "assignedTo",
                created_at as "createdAt", answered_at as "answeredAt"
         FROM support_tickets
@@ -1094,6 +1108,7 @@ export async function createApp() {
   // Helper function to create support tickets with persistence and audit logging
   async function createSupportTicket({
     userEmail,
+    userWhatsapp,
     subject,
     question,
     priority = 'Normal',
@@ -1102,6 +1117,7 @@ export async function createApp() {
     source = 'Manual'
   }: {
     userEmail?: string;
+    userWhatsapp?: string;
     subject?: string;
     question: string;
     priority?: string;
@@ -1112,16 +1128,17 @@ export async function createApp() {
     const ticketNum = `TKT-${Math.floor(1000 + Math.random() * 9000)}`;
     const id = `tkt-${Date.now()}`;
     const cleanEmail = (userEmail || '').trim() || 'guest@amacommunity.io';
+    const cleanWhatsapp = (userWhatsapp || '').trim() || null;
     const cleanSubj = (subject || '').trim() || (question.trim().slice(0, 60) + '...');
     const cleanPriority = priority || 'Normal';
     const cleanSession = sessionId || 'default-session';
 
     const insertRes = await pool.query(`
-      INSERT INTO support_tickets (id, ticket_number, user_id, user_email, session_id, subject, question, priority, status, assigned_to)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'OPEN', 'Community Support Specialist')
-      RETURNING id, ticket_number as "ticketNumber", user_id as "userId", user_email as "userEmail", session_id as "sessionId",
+      INSERT INTO support_tickets (id, ticket_number, user_id, user_email, user_whatsapp, session_id, subject, question, priority, status, assigned_to)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'OPEN', 'Community Support Specialist')
+      RETURNING id, ticket_number as "ticketNumber", user_id as "userId", user_email as "userEmail", user_whatsapp as "userWhatsapp", session_id as "sessionId",
                 subject, question, priority, status, admin_answer as "adminAnswer", assigned_to as "assignedTo", created_at as "createdAt"
-    `, [id, ticketNum, userId || null, cleanEmail, cleanSession, cleanSubj, question.trim(), cleanPriority]);
+    `, [id, ticketNum, userId || null, cleanEmail, cleanWhatsapp, cleanSession, cleanSubj, question.trim(), cleanPriority]);
 
     const createdTicket = insertRes.rows[0];
 
@@ -1141,13 +1158,14 @@ export async function createApp() {
   // Support Tickets: Create
   app.post('/api/support/tickets', async (req, res) => {
     try {
-      const { userEmail, subject, question, priority, sessionId, userId } = req.body;
+      const { userEmail, userWhatsapp, subject, question, priority, sessionId, userId } = req.body;
       if (!question || !question.trim()) {
         return res.status(400).json({ error: 'Question content is required to create a ticket.' });
       }
 
       const ticket = await createSupportTicket({
         userEmail,
+        userWhatsapp,
         subject,
         question,
         priority,
@@ -1162,17 +1180,177 @@ export async function createApp() {
     }
   });
 
-  // Support Chat Messages: List
+  // Helper to maintain unified conversations table
+  async function upsertConversation({
+    sessionId,
+    userId,
+    userEmail,
+    userWhatsapp
+  }: {
+    sessionId: string;
+    userId?: string | null;
+    userEmail?: string | null;
+    userWhatsapp?: string | null;
+  }) {
+    const cleanSession = (sessionId || 'default').trim();
+    const convId = `conv_${cleanSession}`;
+    const cleanEmail = userEmail ? userEmail.trim().toLowerCase() : null;
+    const cleanUserId = userId ? userId.trim() : null;
+    const cleanWhatsapp = userWhatsapp ? userWhatsapp.trim() : null;
+
+    try {
+      await pool.query(`
+        INSERT INTO conversations (id, session_id, user_id, user_email, user_whatsapp, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+        ON CONFLICT (id) DO UPDATE
+        SET 
+          updated_at = NOW(),
+          user_id = COALESCE(EXCLUDED.user_id, conversations.user_id),
+          user_email = COALESCE(EXCLUDED.user_email, conversations.user_email),
+          user_whatsapp = COALESCE(EXCLUDED.user_whatsapp, conversations.user_whatsapp)
+      `, [convId, cleanSession, cleanUserId, cleanEmail, cleanWhatsapp]);
+    } catch (err) {
+      console.error('[Database] Failed to upsert conversation:', err);
+    }
+  }
+
+  // Update conversation contact details (e.g. WhatsApp, Email)
+  app.post('/api/support/conversation/contact', async (req, res) => {
+    try {
+      const { sessionId, userWhatsapp, userEmail, userId } = req.body;
+      const cleanSession = (sessionId || '').trim();
+      if (!cleanSession) {
+        return res.status(400).json({ error: 'Session ID is required.' });
+      }
+      const cleanEmail = (userEmail || '').trim().toLowerCase() || null;
+      const cleanUserId = (userId || '').trim() || null;
+      const cleanWhatsapp = (userWhatsapp || '').trim() || null;
+
+      await upsertConversation({
+        sessionId: cleanSession,
+        userId: cleanUserId,
+        userEmail: cleanEmail,
+        userWhatsapp: cleanWhatsapp
+      });
+
+      if (cleanEmail && cleanWhatsapp) {
+        await pool.query('UPDATE users SET whatsapp = $1 WHERE LOWER(email) = $2', [cleanWhatsapp, cleanEmail]);
+      }
+
+      res.json({ success: true, message: 'Contact details saved to conversation record.' });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Support Chat Messages: List (Loaded for Authenticated Users or Migrated Sessions)
   app.get('/api/support/messages', async (req, res) => {
     try {
       const sessionId = (req.query.sessionId as string) || 'default';
-      const result = await pool.query(`
-        SELECT id, sender, message, source, created_at as "createdAt"
-        FROM support_messages
-        WHERE session_id = $1
-        ORDER BY created_at ASC
-      `, [sessionId]);
+      const userEmail = ((req.query.userEmail as string) || (req.query.email as string) || (req.headers['x-user-email'] as string) || '').trim().toLowerCase();
+      const userId = ((req.query.userId as string) || (req.headers['x-user-id'] as string) || '').trim();
+
+      let result;
+      if (userEmail || userId) {
+        if (userEmail && userId) {
+          result = await pool.query(`
+            SELECT id, session_id as "sessionId", conversation_id as "conversationId", sender, message, source, created_at as "createdAt", user_email as "userEmail", user_id as "userId"
+            FROM support_messages
+            WHERE LOWER(user_email) = $1 OR user_id = $2
+            ORDER BY created_at ASC
+          `, [userEmail, userId]);
+        } else if (userEmail) {
+          result = await pool.query(`
+            SELECT id, session_id as "sessionId", conversation_id as "conversationId", sender, message, source, created_at as "createdAt", user_email as "userEmail", user_id as "userId"
+            FROM support_messages
+            WHERE LOWER(user_email) = $1
+            ORDER BY created_at ASC
+          `, [userEmail]);
+        } else {
+          result = await pool.query(`
+            SELECT id, session_id as "sessionId", conversation_id as "conversationId", sender, message, source, created_at as "createdAt", user_email as "userEmail", user_id as "userId"
+            FROM support_messages
+            WHERE user_id = $1
+            ORDER BY created_at ASC
+          `, [userId]);
+        }
+      } else {
+        result = await pool.query(`
+          SELECT id, session_id as "sessionId", conversation_id as "conversationId", sender, message, source, created_at as "createdAt"
+          FROM support_messages
+          WHERE session_id = $1 AND (user_email IS NULL OR user_email = '')
+          ORDER BY created_at ASC
+        `, [sessionId]);
+      }
       res.json(result.rows);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Support Chat Messages: Sync Guest Conversation when User Creates an Account
+  app.post('/api/support/sync-conversation', async (req, res) => {
+    try {
+      const { sessionId, userEmail, userId, userWhatsapp, messages } = req.body;
+      const cleanEmail = ((userEmail as string) || (req.headers['x-user-email'] as string) || '').trim().toLowerCase();
+      const cleanUserId = ((userId as string) || (req.headers['x-user-id'] as string) || '').trim() || null;
+      const cleanWhatsapp = ((userWhatsapp as string) || '').trim() || null;
+      const cleanSession = sessionId || 'default';
+      const convId = `conv_${cleanSession}`;
+
+      if (!cleanEmail) {
+        return res.status(400).json({ error: 'User email is required to sync conversation.' });
+      }
+
+      // Upsert conversation metadata
+      await upsertConversation({
+        sessionId: cleanSession,
+        userId: cleanUserId,
+        userEmail: cleanEmail,
+        userWhatsapp: cleanWhatsapp
+      });
+
+      if (!Array.isArray(messages) || messages.length === 0) {
+        return res.json({ success: true, syncedCount: 0, message: 'No messages to sync.' });
+      }
+
+      let syncedCount = 0;
+      for (const msg of messages) {
+        const text = (msg.text || msg.message || '').trim();
+        if (!text) continue;
+        const sender = msg.sender === 'bot' ? 'bot' : 'user';
+        const source = msg.source || (sender === 'bot' ? 'AI' : 'USER');
+        const id = (msg.id && typeof msg.id === 'string' && msg.id.startsWith('msg-'))
+          ? msg.id
+          : `msg-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+        const createdAt = msg.createdAt ? new Date(msg.createdAt) : new Date();
+
+        // Check if already stored for this exact user
+        const dupCheck = await pool.query(
+          `SELECT id FROM support_messages WHERE id = $1 OR (LOWER(user_email) = $2 AND sender = $3 AND message = $4)`,
+          [id, cleanEmail, sender, text]
+        );
+
+        if (dupCheck.rows.length === 0) {
+          await pool.query(`
+            INSERT INTO support_messages (id, session_id, conversation_id, user_email, user_id, sender, message, source, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          `, [id, cleanSession, convId, cleanEmail, cleanUserId, sender, text, source, createdAt]);
+          syncedCount++;
+        } else {
+          await pool.query(`
+            UPDATE support_messages 
+            SET user_email = $1, user_id = COALESCE($2, user_id), conversation_id = COALESCE(conversation_id, $3)
+            WHERE id = $4 AND (user_email IS NULL OR user_email = '')
+          `, [cleanEmail, cleanUserId, convId, dupCheck.rows[0].id]);
+        }
+      }
+
+      res.json({
+        success: true,
+        syncedCount,
+        message: `Successfully saved ${syncedCount} message(s) to the database for ${cleanEmail}.`
+      });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -1181,57 +1359,95 @@ export async function createApp() {
   // Support Chat Messages: Send & AI Response (RAG + Gemini / Knowledge Base)
   app.post('/api/support/messages', async (req, res) => {
     try {
-      const { sessionId, message, language, userEmail } = req.body;
+      const { sessionId, message, language, guestMessageCount } = req.body;
       const cleanSession = sessionId || 'default';
       const cleanMsg = (message || '').trim();
       const userLang = language === 'bn' ? 'bn' : 'en';
+      const cleanEmail = ((req.body.userEmail as string) || (req.headers['x-user-email'] as string) || '').trim().toLowerCase() || null;
+      const cleanUserId = ((req.body.userId as string) || (req.headers['x-user-id'] as string) || '').trim() || null;
+      const cleanWhatsapp = ((req.body.userWhatsapp as string) || '').trim() || null;
+      const isGuest = !cleanEmail;
+      const convId = `conv_${cleanSession}`;
 
       if (!cleanMsg) {
         return res.status(400).json({ error: 'Message cannot be empty.' });
       }
 
       // Guest message preview limit check (allow up to 3 guest messages before requiring account)
-      if (!userEmail) {
-        const countRes = await pool.query(
-          `SELECT COUNT(*) FROM support_messages WHERE session_id = $1 AND sender = 'user'`,
-          [cleanSession]
-        );
-        const existingCount = parseInt(countRes.rows[0].count, 10);
-        if (existingCount >= 3) {
-          return res.status(403).json({
-            error: 'Free conversation preview limit reached. Please sign in or create an account to continue.',
-            requiresAuth: true
-          });
-        }
+      if (isGuest && typeof guestMessageCount === 'number' && guestMessageCount >= 3) {
+        return res.status(403).json({
+          error: 'Free conversation preview limit reached. Please sign in or create an account to continue.',
+          requiresAuth: true
+        });
       }
 
-      // 1. Save the user's message and fetch RAG context in parallel — this
-      // alone removes several sequential DB round-trips from the hot path.
+      // If authenticated or whatsapp provided, ensure conversation entry exists and update timestamp
+      if (!isGuest || cleanWhatsapp) {
+        await upsertConversation({
+          sessionId: cleanSession,
+          userId: cleanUserId,
+          userEmail: cleanEmail,
+          userWhatsapp: cleanWhatsapp
+        });
+      }
+
+      // 1. If authenticated user, save user message to DB. If GUEST, do NOT save to database!
       const userMsgId = `msg-${Date.now()}-u`;
+      const dbSavePromise = !isGuest
+        ? pool.query(`
+            INSERT INTO support_messages (id, session_id, conversation_id, user_email, user_id, sender, message, source, created_at)
+            VALUES ($1, $2, $3, $4, $5, 'user', $6, 'USER', NOW())
+          `, [userMsgId, cleanSession, convId, cleanEmail, cleanUserId, cleanMsg])
+        : Promise.resolve(null);
+
       const [, { faqsData, docsData, topicsData, settingsData }] = await Promise.all([
-        pool.query(`
-          INSERT INTO support_messages (id, session_id, sender, message, source)
-          VALUES ($1, $2, 'user', $3, 'USER')
-        `, [userMsgId, cleanSession, cleanMsg]),
+        dbSavePromise,
         getRagData()
       ]);
 
       const platformSettings = settingsData.rows[0]?.value || {};
-      const supportEmail = platformSettings.primarySupportEmail || 'support@amacommunity.io';
-      const forumName = platformSettings.forumName || 'Ama Community';
-      const slaHours = platformSettings.slaHours || 2;
+      const supportEmail = platformSettings.primarySupportEmail || 'contact@trekconsultancy.com';
+      const forumName = platformSettings.forumName || 'Trek Consultancy';
+      const slaHours = platformSettings.slaHours || 48;
+      const phone = platformSettings.phone || '+966 55 363 8960';
+      const whatsapp = platformSettings.whatsapp || '+966 50 241 1744';
 
       let ragContext = `============================================================\n`;
-      ragContext += `PROJECT KNOWLEDGE BASE, RAG CHUNKS & LIVE DATABASE CONTEXT:\n`;
+      ragContext += `TREK CONSULTANCY KNOWLEDGE BASE, SERVICE PILLARS & OFFICIAL CONTEXT:\n`;
       ragContext += `============================================================\n\n`;
       
-      ragContext += `PLATFORM IDENTITY & SETTINGS:\n`;
-      ragContext += `- Brand: ${forumName}\n`;
-      ragContext += `- Support Email: ${supportEmail}\n`;
-      ragContext += `- Official Ticket SLA: ${slaHours} Hours\n`;
-      ragContext += `- Description: Modern bbPress & Docly-inspired community platform connecting developers and digital nomads, powered by Neon Serverless PostgreSQL persistence, role-based topic management, and enterprise full-stack development consultancy.\n\n`;
+      ragContext += `BUSINESS IDENTITY & GLOBAL PROFILE:\n`;
+      ragContext += `- Firm Name: ${forumName} (Trek Consultancy)\n`;
+      ragContext += `- Core Purpose: Helps foreign investors and international companies set up and grow businesses in Saudi Arabia with confidence under Vision 2030.\n`;
+      ragContext += `- Global Offices: Saudi Arabia (Riyadh, Madinah — Jeddah upcoming), USA (Montana), Bangladesh (Dhaka).\n`;
+      ragContext += `- Official Contact Channels:\n`;
+      ragContext += `  * WhatsApp: ${whatsapp} (Direct: https://wa.me/966502411744)\n`;
+      ragContext += `  * Telephone Call: ${phone}\n`;
+      ragContext += `  * Official Email: ${supportEmail}\n`;
+      ragContext += `  * Free Consultation: Book a session with one of our advisors — response guaranteed within ${slaHours} hours.\n`;
+      ragContext += `- Brand Tenets & Tone: Professional, reassurance-oriented ("with Confidence", "trusted partner", "all services under one roof"), speaks directly to foreign investors, uses Islamic greeting conventions ("Assalamu Alaikum").\n\n`;
 
-      ragContext += `CHUNK KNOWLEDGE DOCUMENTS (RAG CHUNKS FROM ADMIN & AI EXTRACTION):\n`;
+      ragContext += `THE 6 SERVICE PILLARS (ALL UNDER ONE ROOF):\n`;
+      ragContext += `1. Saudi Business Setup: MISA Foreign Investment License, 100% Foreign-Owned Company Formation, Commercial Registration (CR), Business Bank Account, ZATCA Registration, GOSI Registration, Saudi National Address (SPL), Business Documentation, Government Portal Activation (Qiwa, Muqeem, Balady), Business Compliance Support, Office Space Assistance, Turnkey Business Consultation.\n`;
+      ragContext += `2. Software & Digital Solutions: Custom Software Development, ERP Development, Website Development, Mobile App Development, AI Automation, Technical Documentation, Digital Marketing, SEO, Graphics Design, Video Editing.\n`;
+      ragContext += `3. Visa & PRO Services: Investor Visa, Work Permit Processing, Iqama Services, Muqeem Services, Qiwa Services, Chamber Services, Document Attestation, Saudi PRO Services, Employee File Processing.\n`;
+      ragContext += `4. Real Estate Investment: Property Buying Support, Property Leasing, Commercial Real Estate, Residential Investment, Industrial Property, Foreign Investor Guidance, Property Documentation, Real Estate Consultation.\n`;
+      ragContext += `5. Business Support Services: Accounting Services, External Audit, Internal Audit, HR & Payroll, Tax & VAT Services.\n`;
+      ragContext += `6. International Business Services: USA/UK/Canada Company Formation, International Bank Account Support, Amazon Seller Account, eBay Seller Setup, Dropshipping Support, Import & Export Support, China Product Sourcing.\n\n`;
+
+      ragContext += `KNOWN PUBLISHED FAQS & VERIFIED POLICIES:\n`;
+      ragContext += `• MISA License basics: Ministry of Investment license allowing up to 100% foreign ownership in services, trading, industrial, consulting, and real estate.\n`;
+      ragContext += `• How foreigners open a company: MISA license -> Articles of Association (AOA) -> CR -> Chamber & National Address -> ZATCA & GOSI -> Qiwa & Muqeem -> Corporate Bank Account.\n`;
+      ragContext += `• Setup timeline: Typically completed within 2 to 4 weeks end-to-end with pre-attested documents.\n`;
+      ragContext += `• Required documents: Parent company CR/Certificate of Incorporation, audited financial statements (past 1-2 years), Board Resolution approving Saudi entity & appointing GM, Power of Attorney (POA) for Trek, and GM passport copy (attested by Saudi Embassy or apostilled).\n`;
+      ragContext += `• Foreign property ownership rules: MISA licensed companies can own commercial, industrial, and administrative real estate. Individuals with Premium Residency or approved investor status can buy residential and commercial properties in designated zones.\n`;
+      ragContext += `• End-to-end turnkey capability: Trek handles everything "under one roof"—legal licensing, CR, tax, government portals, office space, corporate bank account, and employee visas/PRO.\n`;
+      ragContext += `• Software development capability: Dedicated in-house team building custom software, ERPs, mobile apps, modern web platforms, and AI automation.\n`;
+      ragContext += `• PRO services list: Investor visas, work permits, Iqama issuance/renewals, Muqeem exit/re-entry, Qiwa contracts, and Chamber/MOFA attestations.\n`;
+      ragContext += `• International formation: USA LLCs (Delaware, Wyoming, Montana), UK Ltd, Canada, global bank accounts (Mercury, Wise), and Amazon/eBay seller setup.\n`;
+      ragContext += `• Why choose Trek: Global presence in Riyadh, Madinah, Montana, and Dhaka; true all-in-one ecosystem under one roof; dedicated advisors; responsive communication.\n\n`;
+
+      ragContext += `KNOWLEDGE DOCUMENTS (DETAILED REPOSITORY):\n`;
       if (docsData.rows.length === 0) {
         ragContext += `(No custom documents uploaded yet)\n`;
       } else {
@@ -1240,7 +1456,7 @@ export async function createApp() {
         });
       }
 
-      ragContext += `FREQUENTLY ASKED QUESTIONS (FAQS & ANSWERS):\n`;
+      ragContext += `FREQUENTLY ASKED QUESTIONS (FAQS & ANSWERS FROM DB):\n`;
       faqsData.rows.forEach(f => {
         ragContext += `[Category: ${f.category}]\n- Question (EN): ${f.question}\n  Answer (EN): ${f.answer}\n`;
         if (f.question_bn || f.answer_bn) {
@@ -1248,7 +1464,7 @@ export async function createApp() {
         }
       });
 
-      ragContext += `\nRECENT FORUM DISCUSSIONS (DATABASE TOPICS):\n`;
+      ragContext += `\nRECENT COMMUNITY INQUIRIES & DISCUSSIONS:\n`;
       topicsData.rows.forEach(t => {
         ragContext += `- Discussion: "${t.title}" (Category: ${t.category}, Author: ${t.author}, Views: ${t.views}, Replies: ${t.replies})\n`;
       });
@@ -1257,321 +1473,213 @@ export async function createApp() {
       let botReply = '';
       let replySource = 'AI';
       let createdTicket: any = null;
+      let botSuggestedActions: string[] = [];
 
-      // 3. Try generating with Gemini API if GEMINI_API_KEY is configured.
-      if (process.env.GEMINI_API_KEY) {
-        const candidateModels = [
-          'gemini-3.8-flash',
-          'gemini-3.1-flash-lite'
-        ];
-        const ai = new GoogleGenAI({
-          apiKey: process.env.GEMINI_API_KEY,
-          httpOptions: {
-            headers: {
-              'User-Agent': 'aistudio-build',
-            }
-          }
-        });
+      // Extract recent conversation history for multi-turn conversational context & continuity
+      const rawHistory = Array.isArray(req.body.recentHistory) && req.body.recentHistory.length > 0
+        ? req.body.recentHistory.slice(-6)
+        : [];
 
-        const systemInstruction = `You are the obedient, polite, respectful, and fully cooperative AI Support Assistant for Ama Community.
-Your goal is to faithfully assist the user and represent Ama Community with the highest standard of helpfulness, professionalism, and brand excellence.
+      const pipelineSettings: PipelineSettings = {
+        supportEmail,
+        forumName,
+        slaHours: typeof slaHours === 'number' ? slaHours : 48,
+        phone,
+        whatsapp
+      };
 
-============================================================
-COMPANY & PLATFORM KNOWLEDGE BASE (LIVE DATABASE CONTEXT):
-${ragContext}
-============================================================
+      const lower = cleanMsg.toLowerCase().trim();
 
-YOUR 4 STRICT BEHAVIORAL PROTOCOLS:
+      // ---------------------------------------------------------------------
+      // Pre-pipeline Stage: Conversational Intents & Pleasantries
+      // ---------------------------------------------------------------------
+      const isHowAreYou = /\b(how\s*(are|r)\s*(you|u|things|life)|how\s*do\s*you\s*do|how'?s\s*(it\s*going|everything|your\s*day)|are\s*you\s*(ok|okay|fine|good|well)|how\s*have\s*you\s*been|whats?\s*up|sup)\b/i.test(lower) ||
+        ['কেমন আছেন', 'কেমন আছো', 'কি অবস্থা', 'কি খবর', 'কেমন চলছে', 'ভালো আছেন'].some(phrase => lower.includes(phrase));
 
-1. NORMAL CONVERSATION & CASUAL GREETINGS (e.g., "hi", "hello", "hey", "assalamu alaikum", "good morning", "good evening", "how are you", "who are you", "what can you do", "thanks", "thank you", "bye"):
-   - CLASSIFICATION: "GREETING"
-   - TONE: Obedient, polite, warm, welcoming, and eager to help.
-   - ACTION: Greet the user respectfully, introduce yourself as the official AI Assistant of Ama Community, and ask how you can help them navigate forum discussions, documentation, account guidance, or enterprise consultancy.
-   - STRICT CONSTRAINT: NEVER mention support tickets, NEVER suggest creating or submitting tickets, and NEVER output errors or say you cannot answer. Simply offer your obedient assistance with a welcoming demeanor.
+      const isWhoAreYou = /\b(who\s*are\s*you|what\s*are\s*you|what\s*is\s*your\s*name|what'?s\s*your\s*name|are\s*you\s*(an?\s*)?(ai|bot|robot|human|real)|tell\s*me\s*about\s*yourself|introduce\s*yourself)\b/i.test(lower) ||
+        ['আপনি কে', 'আপনার নাম কি', 'তোমার নাম কি', 'তুমি কে', 'পরিচয় দিন'].some(phrase => lower.includes(phrase));
 
-2. COMPANY & PLATFORM QUESTIONS (Information available in the Database or Platform Mechanics):
-   - CLASSIFICATION: "COMPANY_ANSWER_FROM_DB"
-   - TONE: Professional, obedient, helpful, and grounded.
-   - ACTION: Answer the user's question accurately and thoroughly based on the Knowledge Documents, FAQs, Recent Discussions, Platform Identity, and platform mechanics provided in the context above:
-     * Community forum posting and replying
-     * Author and admin permissions (only the original author or system admin can delete a post)
-     * Modern bbPress & Docly theme integration
-     * Real-time serverless Neon PostgreSQL persistence across all topics and messages
-     * Enterprise Consultancy retainers (custom architecture, ${slaHours}-hour SLA, priority support at ${supportEmail})
-   - Ground all factual statements in the provided database context. Do not invent unverified facts.
+      const isGratitude = /\b(thank\s*you|thanks|thx|thankyou|appreciate\s*it|great\s*job|awesome|good\s*job|helpful|nice\s*one|well\s*done)\b/i.test(lower) ||
+        ['ধন্যবাদ', 'অনেক ধন্যবাদ', 'থ্যাংকস', 'অসাধারণ'].some(phrase => lower.includes(phrase));
 
-3. COMPANY-SPECIFIC QUESTIONS OR ISSUES WHERE DATABASE HAS NO DATA / SPECIFIC INFO:
-   - CLASSIFICATION: "COMPANY_SPECIFIC_NEEDS_TICKET"
-   - TONE: Empathetic, polite, obedient, and action-oriented.
-   - OCCURS WHEN: The user asks a question or reports an issue specifically about Ama Community, their user account, platform errors, billing/payment questions, custom enterprise agreements, feature roadmaps, or technical troubleshooting, BUT the database/knowledge base above DOES NOT contain the specific data or requires human staff intervention.
-   - ACTION: You MUST automatically raise an official support ticket for the user!
-   - In your reply:
-     a) Explain politely and obediently that because this specific matter is not documented in the public database or requires direct team investigation, you have automatically created an official support ticket: {{TICKET_NUMBER}}.
-     b) Reassure the user that our dedicated engineering and support specialists have received their ticket and will investigate under our official ${slaHours}-hour SLA.
-     c) Mention they can track the status under the "My Tickets" tab or contact ${supportEmail} for further assistance.
-   - Set ticketSubject to a clear, concise 3-8 word summary of the user's inquiry.
-   - Set ticketPriority to "Normal", "High", or "Urgent" based on severity.
+      const isUserFine = /\b(i('?m| am)?\s*(good|fine|doing\s*well|great|okay|ok|alright)|doing\s*(good|fine|well))\b/i.test(lower) ||
+        ['ভালো আছি', 'সব ঠিক আছে', 'আলহামদুলিল্লাহ'].some(phrase => lower.includes(phrase));
 
-4. TOPICS OUTSIDE THE DATABASE OR NOT RELATED TO THE COMPANY:
-   - CLASSIFICATION: "OUTSIDE_SCOPE_UNRELATED"
-   - OCCURS WHEN: The user asks about topics completely unrelated to Ama Community (such as general trivia, recipes, cooking, weather, celebrity gossip, movies, sports, history, general homework, or non-company subjects).
-   - TONE: Extremely humble, courteous, and respectful.
-   - ACTION:
-     a) HUMBLY APOLOGIZE: Express genuine, humble apologies (e.g., "I humbly apologize, but as the dedicated assistant for Ama Community, I am unable to assist with topics outside of our platform and software services...").
-     b) BRAND THE COMPANY: Proudly highlight Ama Community's mission and core offerings:
-        "**Ama Community** is the premier developer and digital nomad platform featuring modern Docly bbPress forum discussions, extensive technical knowledge base documentation, real-time serverless Neon PostgreSQL persistence, and custom enterprise software consultancy."
-     c) RE-ENGAGE: Politely invite the user to ask about our community discussions, platform guides, technical stack, or consultancy services.
-   - STRICT CONSTRAINT: DO NOT raise a ticket, and DO NOT ask or suggest the user to submit a ticket for unrelated topics!
+      const isGreeting = (
+        /\b(hi|hello|hey|greetings|hola|assalamu\s*alaikum|salam|good\s*(morning|afternoon|evening|day)|howdy|yo)\b/i.test(lower) ||
+        ['হ্যালো', 'হাই', 'সালাম', 'নমস্কার', 'শুভ সকাল', 'শুভ সন্ধ্যা'].some(g => lower.includes(g))
+      ) && (lower.split(/\s+/).length <= 4 || /^(hi|hello|hey|salam|assalamu\s*alaikum)[\s,!.]*$/i.test(lower));
 
-LANGUAGE RULE:
-- Reply in Bengali if the user wrote in Bengali or requested it; otherwise use clear, professional English.
-- Use clean Markdown with bolding and bullet points where helpful. No headings, no excessive emojis.`;
-
-        for (const modelName of candidateModels) {
-          try {
-            const response = await withTimeout(
-              ai.models.generateContent({
-                model: modelName,
-                contents: cleanMsg,
-                config: {
-                  systemInstruction,
-                  responseMimeType: 'application/json',
-                  responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                      classification: {
-                        type: Type.STRING,
-                        description: 'One of: GREETING, COMPANY_ANSWER_FROM_DB, COMPANY_SPECIFIC_NEEDS_TICKET, OUTSIDE_SCOPE_UNRELATED'
-                      },
-                      reply: {
-                        type: Type.STRING,
-                        description: "The assistant's markdown response to the user"
-                      },
-                      ticketSubject: {
-                        type: Type.STRING,
-                        description: 'Short concise subject for the ticket if COMPANY_SPECIFIC_NEEDS_TICKET, else empty string'
-                      },
-                      ticketPriority: {
-                        type: Type.STRING,
-                        description: 'Priority: Normal, High, or Urgent if COMPANY_SPECIFIC_NEEDS_TICKET, else Normal'
-                      }
-                    },
-                    required: ['classification', 'reply']
-                  },
-                  temperature: 0.2,
-                  maxOutputTokens: 800
-                }
-              }),
-              7000
-            );
-
-            if (response.text) {
-              try {
-                const parsedAi = JSON.parse(response.text.trim());
-                if (parsedAi && parsedAi.reply) {
-                  if (parsedAi.classification === 'COMPANY_SPECIFIC_NEEDS_TICKET') {
-                    const autoTicket = await createSupportTicket({
-                      userEmail: userEmail || undefined,
-                      subject: parsedAi.ticketSubject || cleanMsg.slice(0, 60),
-                      question: cleanMsg,
-                      priority: parsedAi.ticketPriority || 'Normal',
-                      sessionId: cleanSession,
-                      source: 'AI_Auto'
-                    });
-                    createdTicket = autoTicket;
-
-                    let finalReply = parsedAi.reply;
-                    if (finalReply.includes('{{TICKET_NUMBER}}')) {
-                      finalReply = finalReply.replace(/\{\{TICKET_NUMBER\}\}/g, `#${autoTicket.ticketNumber}`);
-                    } else if (!finalReply.includes(autoTicket.ticketNumber)) {
-                      finalReply += `\n\n**Support Ticket Created**: #${autoTicket.ticketNumber}`;
-                    }
-                    botReply = finalReply;
-                    replySource = 'AI_AUTO_TICKET';
-                  } else {
-                    botReply = parsedAi.reply;
-                    replySource = 'AI';
-                  }
-                  break;
-                }
-              } catch (parseErr) {
-                // If model returned plain text instead of JSON
-                botReply = response.text.trim();
-                replySource = 'AI';
-                break;
-              }
-            }
-          } catch (aiErr: any) {
-            continue;
-          }
-        }
+      if (isHowAreYou) {
+        botReply = userLang === 'bn'
+          ? `ওয়ালাইকুম আসসালাম! আমি খুব ভালো আছি, আন্তরিকভাবে জিজ্ঞাসা করার জন্য অনেক ধন্যবাদ! 😊\n\n**ট্রেক কনসালটেন্সি (Trek Consultancy)**-তে আপনাকে স্বাগতম। আমরা বিদেশি বিনিয়োগকারী ও আন্তর্জাতিক কোম্পানিগুলোকে সৌদি আরবে শতভাগ মালিকানায় কোম্পানি গঠন (MISA লাইসেন্স), ভিসা/প্রো সার্ভিস এবং আধুনিক সফটওয়্যার ডেভেলপমেন্টে পূর্ণ আস্থা ও নিশ্চয়তার সাথে সহায়তা করি।\n\nআজ আপনার সৌদি ব্যবসা বা বিনিয়োগ পরিকল্পনায় কীভাবে সহায়তা করতে পারি?`
+          : `Assalamu Alaikum! I'm doing very well, thank you for asking! 😊\n\nWelcome to **Trek Consultancy**. We help foreign investors and international companies set up and scale their businesses in Saudi Arabia with complete confidence under Vision 2030—providing MISA licensing, turnkey company formation, PRO/visa processing, and software solutions all under one roof.\n\nHow can we assist your business expansion plans today?`;
+        replySource = 'AI';
+        botSuggestedActions = userLang === 'bn'
+          ? ['সৌদি কোম্পানি গঠন', 'MISA লাইসেন্স তথ্য', 'সফটওয়্যার ও ERP সল্যুশন', 'ফ্রি কনসালটেন্সি বুকিং']
+          : ['Saudi Business Setup', 'MISA License Details', 'Software & ERP Solutions', 'Book Free Consultation'];
+      } else if (isWhoAreYou) {
+        botReply = userLang === 'bn'
+          ? `আমি **ট্রেক কনসালটেন্সি (Trek Consultancy)**-র অফিশিয়াল এআই অ্যাডভাইজরি স্পেশালিস্ট! 🏢✨\n\nআমাদের মূল লক্ষ্য হলো বিদেশি উদ্যোক্তা ও কোম্পানিগুলোকে সৌদি আরবে ব্যবসা স্থাপন ও সম্প্রসারণে এক ছাতার নিচে (under one roof) সম্পূর্ণ সমাধান দেওয়া।\n\n**আমাদের বৈশ্বিক অফিসসমূহ:**\n- **সৌদি আরব**: রিয়াদ ও মদিনা (জেদ্দায় শীঘ্রই চালু হচ্ছে)\n- **যুক্তরাষ্ট্র (USA)**: মন্টানা\n- **বাংলাদেশ**: ঢাকা\n\n**আমাদের ৬টি প্রধান সেবা স্তম্ভ:**\n1. **সৌদি বিজনেস সেটআপ**: MISA ফরেন ইনভেস্টমেন্ট লাইসেন্স (১০০% বিদেশি মালিকানা), কমার্শিয়াল রেজিস্ট্রেশন (CR), এবং করপোরেট ব্যাংক অ্যাকাউন্ট।\n2. **সফটওয়্যার ও ডিজিটাল সল্যুশন**: কাস্টম সফটওয়্যার, ইআরপি (ERP), মোবাইল অ্যাপ, এবং এআই অটোমেশন।\n3. **ভিসা ও প্রো (PRO) সার্ভিসেস**: ইনভেস্টর ভিসা, ওয়ার্ক পারমিট, ইকামাহ, কিওয়া ও মুকিম পোর্টাল পরিচালনা।\n4. **রিয়েল এস্টেট ইনভেস্টমেন্ট**: বাণিজ্যিক প্রপার্টি লিজিং, ক্রয় এবং বিদেশি বিনিয়োগকারী গাইডেন্স।\n5. **হিসাব ও ট্যাক্স (ZATCA)**: ভ্যাট ও ট্যাক্স কমপ্লায়েন্স, অডিট ও পে-রোল।\n6. **আন্তর্জাতিক কোম্পানি গঠন**: ইউএসএ এলএলসি (USA LLC), ইউকে লিমিটেড ও গ্লোবাল ব্যাংকিং।\n\nআজ আপনার প্রজেক্ট বা ব্যবসার জন্য কী ধরনের তথ্য বা পরামর্শ প্রয়োজন?`
+          : `I am the official AI Advisory Specialist for **Trek Consultancy**! 🏢✨\n\nTrek Consultancy is the premier international consulting firm helping foreign investors and global companies set up and grow businesses in Saudi Arabia with complete confidence under Vision 2030.\n\n**Our Global Presence:**\n- **Saudi Arabia**: Riyadh & Madinah (Jeddah upcoming)\n- **United States**: Montana\n- **Bangladesh**: Dhaka\n\n**Our 6 Core Service Pillars (All Under One Roof):**\n1. **Saudi Business Setup**: MISA Foreign Investment Licenses (up to 100% foreign ownership), Commercial Registration (CR), and Corporate Bank Accounts.\n2. **Software & Digital Solutions**: In-house Custom Software, ERP development, Mobile Apps, and AI Automation.\n3. **Visa & PRO Services**: Investor Visas, Work Permits, Iqama issuance/renewals, Qiwa & Muqeem management.\n4. **Real Estate Investment**: Commercial real estate, office leasing, and foreign investor acquisition.\n5. **Business Support & Tax**: ZATCA VAT compliance, accounting, and payroll.\n6. **International Expansion**: USA LLCs (Delaware/Wyoming/Montana), UK Ltd, and global banking.\n\nHow can we support your business setup or expansion today?`;
+        replySource = 'AI';
+        botSuggestedActions = userLang === 'bn'
+          ? ['সৌদি সেটআপ রোডম্যাপ', 'প্রয়োজনীয় ডকুমেন্টস', 'হোয়াটসঅ্যাপে যোগাযোগ', 'ফ্রি কনসালটেন্সি বুকিং']
+          : ['Saudi Setup Roadmap', 'Required Documents', 'WhatsApp Contact', 'Free Consultation'];
+      } else if (isGratitude) {
+        botReply = userLang === 'bn'
+          ? `আপনাকে অনেক স্বাগতম! 😊 **ট্রেক কনসালটেন্সি**-তে আপনার সহায়তা করতে পেরে আমরা আনন্দিত। সৌদি আরবে আপনার ব্যবসার সাফল্যই আমাদের অঙ্গীকার। আর কোনো প্রশ্ন থাকলে নির্দ্বিধায় জানান, অথবা সরাসরি আমাদের হোয়াটসঅ্যাপে (${whatsapp}) যোগাযোগ করতে পারেন!`
+          : `You are very welcome! 😊 It is our pleasure to assist you at **Trek Consultancy**. We are committed to making your business expansion into Saudi Arabia seamless and secure. Feel free to ask any further questions, or reach out anytime via WhatsApp at **${whatsapp}**!`;
+        replySource = 'AI';
+        botSuggestedActions = userLang === 'bn'
+          ? ['অন্য প্রশ্ন জিজ্ঞাসা করুন', 'হোয়াটসঅ্যাপে মেসেজ', 'ফ্রি কনসালটেন্সি']
+          : ['Ask Another Question', 'Chat on WhatsApp', 'Book Free Consultation'];
+      } else if (isUserFine) {
+        botReply = userLang === 'bn'
+          ? `আলহামদুলিল্লাহ, জেনে খুব ভালো লাগল! 😊 আজ আপনার সৌদি ব্যবসায়িক উদ্যোগের জন্য কী সহায়তা করতে পারি? MISA লাইসেন্স, কমার্শিয়াল রেজিস্ট্রেশন, প্রপার্টি ইনভেস্টমেন্ট কিংবা সফটওয়্যার সমাধান সম্পর্কে যেকোনো প্রশ্ন করতে পারেন!`
+          : `Delighted to hear that, Alhamdulillah! 😊 How can Trek Consultancy assist your business aspirations today? Feel free to ask about MISA investment licenses, Saudi company formation, software solutions, or visa processing!`;
+        replySource = 'AI';
+        botSuggestedActions = userLang === 'bn'
+          ? ['সৌদি কোম্পানি গঠন', 'MISA লাইসেন্স', 'সফটওয়্যার সল্যুশন', 'ভিসা ও প্রো সার্ভিস']
+          : ['Saudi Company Setup', 'MISA License Details', 'Software Solutions', 'PRO & Visa Services'];
+      } else if (isGreeting) {
+        botReply = userLang === 'bn'
+          ? `আসসালামু আলাইকুম! **ট্রেক কনসালটেন্সি (Trek Consultancy)**-তে আপনাকে স্বাগতম। 🇸🇦✨\n\nআমরা সৌদি ভিশন ২০৩০-এর অধীনে বিদেশি বিনিয়োগকারী এবং আন্তর্জাতিক কোম্পানিগুলোকে সম্পূর্ণ আস্থা ও নিরাপত্তার সাথে সৌদি আরবে ব্যবসা স্থাপন, MISA লাইসেন্স, ব্যাংক অ্যাকাউন্ট, ভিসা/প্রো সার্ভিস এবং আধুনিক সফটওয়্যার সল্যুশন প্রদান করি।\n\nআমাদের অফিস রয়েছে **রিয়াদ, মদিনা, মন্টানা (USA) এবং ঢাকা (বাংলাদেশ)**-এ। আজ আপনার ব্যবসায়িক উদ্যোগ বা বিনিয়োগে কীভাবে সহায়তা করতে পারি?`
+          : `Assalamu Alaikum and welcome to **Trek Consultancy**! 🇸🇦✨\n\nWe are your trusted partner helping foreign investors and international companies set up, launch, and scale businesses in Saudi Arabia with complete confidence under Vision 2030.\n\nWith physical offices in **Riyadh, Madinah, Montana (USA), and Dhaka (Bangladesh)**, we deliver end-to-end MISA licensing, CR formation, corporate banking, government PRO, and custom software engineering—all under one roof.\n\nHow may we assist your Saudi expansion or business setup today?`;
+        replySource = 'AI';
+        botSuggestedActions = userLang === 'bn'
+          ? ['কীভাবে কোম্পানি খুলব?', 'MISA লাইসেন্স সুবিধা', 'প্রয়োজনীয় ডকুমেন্টস', 'ফ্রি কনসালটেন্সি বুকিং']
+          : ['How to Set Up in Saudi', 'MISA License Benefits', 'Required Documents', 'Book Free Consultation'];
+      } else if (/(custom quote|pricing quote|personalized quote|price quote|cost quote|detailed quote|get a quote|quote for|quotation|proposal|contract review|legal judgment|regulatory judgment|case review|call me back|callback|call back|named advisor|speak with an advisor|speak to an advisor|consultant callback|case-specific|specific case|custom pricing)/i.test(lower)) {
+        // Direct Escalation -> Stage 4 Human Ticket
+        const ticketRes = await createHumanTicketFallback(
+          cleanMsg,
+          userLang,
+          cleanEmail,
+          cleanUserId,
+          cleanSession,
+          pipelineSettings,
+          createSupportTicket
+        );
+        botReply = ticketRes.reply;
+        replySource = ticketRes.source;
+        botSuggestedActions = ticketRes.suggestedActions;
+        createdTicket = ticketRes.createdTicket;
       }
 
-      // Fallback: Intelligent heuristic matching with RAG context
+      // ---------------------------------------------------------------------
+      // 5-STAGE SUPPORT PIPELINE (REUSED FUNNEL ARCHITECTURE)
+      // ---------------------------------------------------------------------
+
+      // Stage 1: Direct KB match (Instant, deterministic answers for exact lookups)
       if (!botReply) {
-        const lower = cleanMsg.toLowerCase().trim();
-        const STOP_WORDS = new Set([
-          'what', 'when', 'where', 'which', 'who', 'whom', 'whose', 'why', 'how',
-          'this', 'that', 'these', 'those', 'there', 'here',
-          'the', 'and', 'for', 'with', 'about', 'against', 'between', 'into', 'through',
-          'during', 'before', 'after', 'above', 'below', 'from', 'up', 'down', 'in', 'out', 'on', 'off', 'over', 'under',
-          'again', 'further', 'then', 'once',
-          'any', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such',
-          'no', 'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very',
-          'can', 'will', 'just', 'should', 'now', 'have', 'has', 'had', 'having',
-          'does', 'did', 'doing', 'would', 'could', 'tell', 'give', 'know', 'want', 'need', 'please'
-        ]);
-        const cleanWords = lower
-          .replace(/[^a-z0-9\s]/g, ' ')
-          .split(/\s+/)
-          .filter((w: string) => w.length >= 4 && !STOP_WORDS.has(w));
+        const stage1 = matchDirectKB(cleanMsg, userLang, pipelineSettings);
+        if (stage1) {
+          botReply = stage1.reply;
+          replySource = stage1.source;
+          botSuggestedActions = stage1.suggestedActions;
+        }
+      }
 
-        // 1. Check if greeting / polite casual conversation
-        const isGreeting = /^(hi|hello|hey|greetings|hola|assalamu\s*alaikum|salam|good\s*(morning|afternoon|evening|day)|howdy|who\s*are\s*you|what\s*can\s*you\s*do|what\s*are\s*you|thanks|thank\s*you|bye|goodbye)\b/i.test(lower) ||
-          ['hi', 'hello', 'hey', 'salam', 'hola', 'namaste', 'test', 'হ্যালো', 'হাই', 'সালাম', 'কেমন আছেন', 'নমস্কার'].some(g => lower.includes(g));
+      // Stage 1b: Fuzzy FAQ match (Catches paraphrased versions of published FAQs via stemming & synonym dictionary)
+      if (!botReply) {
+        const stage1b = matchFuzzyFAQ(cleanMsg, userLang, faqsData.rows, docsData.rows);
+        if (stage1b) {
+          botReply = stage1b.reply;
+          replySource = stage1b.source;
+          botSuggestedActions = stage1b.suggestedActions;
+        }
+      }
 
-        if (isGreeting) {
-          botReply = userLang === 'bn'
-            ? `হ্যালো! **আমা কমিউনিটি**-তে আপনাকে স্বাগতম। আমি আপনার অনুগত এআই অ্যাসিস্ট্যান্ট।\n\nআমাদের ফোরামের আলোচনা অনুসন্ধান, টেকনিক্যাল নলেজ বেস ডকুমেন্টেশন, প্ল্যাটফর্মের ফিচারসমূহ অথবা এন্টারপ্রাইজ কনসালটেন্সি সার্ভিস সম্পর্কে যেকোনো সহায়তার জন্য আমি সর্বদা প্রস্তুত। আজ আপনাকে কীভাবে সহায়তা করতে পারি?`
-            : `Hello! Welcome to **Ama Community**. I am your dedicated AI Assistant, obediently at your service.\n\nI can help you search community discussions, explore technical documentation, explain Docly-inspired bbPress features, or guide you through our Enterprise Consultancy retainers. How may I assist you today?`;
-          replySource = 'AI';
-        } else {
-          // 2. Check knowledge docs scoring
-          let bestDoc: any = null;
-          let bestDocScore = 0;
-
-          for (const d of docsData.rows) {
-            const dTitle = (d.title || '').toLowerCase();
-            const dContent = (d.content || '').toLowerCase();
-            const dCategory = (d.category || '').toLowerCase();
-            let score = 0;
-
-            if (lower.length > 4 && (dTitle.includes(lower) || dContent.includes(lower))) {
-              score += 25;
-            }
-
-            for (const w of cleanWords) {
-              if (dTitle.includes(w)) score += 6;
-              if (dCategory.includes(w)) score += 4;
-              if (dContent.includes(w)) score += 2;
-            }
-
-            if (score > bestDocScore) {
-              bestDocScore = score;
-              bestDoc = d;
-            }
-          }
-
-          // Check FAQ matching
-          let bestFaq: any = null;
-          let bestFaqScore = 0;
-
-          for (const f of faqsData.rows) {
-            const qLow = (f.question || '').toLowerCase();
-            const aLow = (f.answer || '').toLowerCase();
-            const qBnLow = (f.question_bn || '').toLowerCase();
-            const aBnLow = (f.answer_bn || '').toLowerCase();
-            let score = 0;
-
-            if (lower.length > 4 && (qLow.includes(lower) || aLow.includes(lower) || qBnLow.includes(lower))) {
-              score += 25;
-            }
-
-            for (const w of cleanWords) {
-              if (qLow.includes(w) || qBnLow.includes(w)) score += 6;
-              if (aLow.includes(w)) score += 2;
-            }
-
-            if (score > bestFaqScore) {
-              bestFaqScore = score;
-              bestFaq = f;
-            }
-          }
-
-          if (bestDoc && bestDocScore >= 14) {
-            botReply = userLang === 'bn'
-              ? `নলেজ বেস থেকে তথ্য (${bestDoc.title}):\n\n${bestDoc.content}`
-              : `**From Knowledge Base (${bestDoc.title}):**\n\n${bestDoc.content}`;
-            replySource = 'RAG';
-          } else if (bestFaq && bestFaqScore >= 14) {
-            botReply = userLang === 'bn' && bestFaq.answer_bn ? bestFaq.answer_bn : bestFaq.answer;
-            replySource = 'FAQ';
-          } else if (/\b(demo|import|theme|docly|bbpress|wordpress)\b/i.test(lower)) {
-            botReply = userLang === 'bn'
-              ? 'Docly থিমে ডেমো ইম্পোর্ট করতে WordPress ড্যাশবোর্ডে Appearance > Import Demo Data অপশনে যান। bbPress প্লাগইন সক্রিয় থাকা নিশ্চিত করুন।'
-              : 'To import demo content in the Docly theme, navigate to Appearance > Import Demo Data in your WordPress dashboard. Make sure bbPress is enabled!';
-            replySource = 'RAG';
-          } else if (/\b(delete|deleted|deleting|remove|removed|removing|permission|permissions|author|authors)\b/i.test(lower)) {
-            botReply = userLang === 'bn'
-              ? 'ফোরামের পোস্ট শুধুমাত্র পোস্টটির মূল লেখক (অথর) অথবা সিস্টেম অ্যাডমিনিস্ট্রেটর ডিলিট করতে পারবেন।'
-              : 'Only the verified author who created the post or an authorized System Administrator has permission to delete that discussion post.';
-            replySource = 'RAG';
-          } else if (/\b(database|databases|postgres|postgresql|neon|sql|persist|persistence)\b/i.test(lower)) {
-            botReply = userLang === 'bn'
-              ? 'প্ল্যাটফর্মটি Neon PostgreSQL ডাটাবেজে রিয়েল-টাইমে সব আলোচনা, বার্তা ও সাপোর্ট টিকিট সংরক্ষণ করে।'
-              : 'Our platform is securely connected to a serverless Neon PostgreSQL database with instant persistence across topics, replies, tickets, and messages.';
-            replySource = 'RAG';
-          } else if (/\b(consultancy|retainer|retainers|pricing|quote|quotation)\b/i.test(lower)) {
-            botReply = userLang === 'bn'
-              ? 'আমাদের এন্টারপ্রাইজ কনসালটেন্সি প্যাকেজে ফুলস্ট্যাক আর্কিটেকচার, কাস্টম ফোরাম ইন্টিগ্রেশন ও ডেডিকেটেড প্রায়োরিটি সাপোর্ট রয়েছে। সাইডবারের "Enterprise Consultancy" বাটনে ক্লিক করে প্রজেক্ট রিকোয়েস্ট পাঠাতে পারেন।'
-              : 'Our Enterprise Retainers include custom fullstack architecture, forum optimizations, and dedicated SLA response. You can submit an inquiry through the Enterprise Consultancy modal in the sidebar!';
-            replySource = 'RAG';
-          } else {
-            // 3. Company-specific questions or issues with no specific database record -> Auto-raise ticket
-            const companyKeywords = [
-              'account', 'login', 'signin', 'sign in', 'password', 'email', 'profile', 'username',
-              'billing', 'invoice', 'payment', 'charge', 'refund', 'card', 'checkout', 'subscription', 'credit',
-              'error', 'bug', 'glitch', 'crash', 'fail', 'broken', 'issue', 'problem', 'stuck', 'not working',
-              'ticket', 'tickets', 'human', 'specialist', 'agent', 'support', 'help desk',
-              'enterprise', 'contract', 'nda', 'security', 'audit', 'compliance',
-              'sla', 'custom', 'feature', 'roadmap', 'api', 'webhook', 'integration',
-              'ama', 'community', 'forum', 'moderator', 'banned', 'suspend', 'thread', 'reply'
-            ];
-
-            const isCompanySpecific = companyKeywords.some(k => {
-              if (k.includes(' ')) {
-                return lower.includes(k);
-              }
-              return new RegExp(`\\b${k}\\b`, 'i').test(lower);
-            });
-
-            if (isCompanySpecific) {
-              const autoTicket = await createSupportTicket({
-                userEmail: userEmail,
-                subject: cleanMsg.slice(0, 60),
-                question: cleanMsg,
-                priority: lower.includes('urgent') || lower.includes('critical') || lower.includes('payment') ? 'High' : 'Normal',
-                sessionId: cleanSession,
-                source: 'AI_Auto'
-              });
-              createdTicket = autoTicket;
-
-              botReply = userLang === 'bn'
-                ? `যেহেতু এই নির্দিষ্ট বিষয়টি আমাদের বর্তমান নলেজ বেসে নথিভুক্ত নেই এবং এর জন্য সরাসরি বিশেষজ্ঞ অনুসন্ধান প্রয়োজন, তাই আমি আপনার জন্য স্বয়ংক্রিয়ভাবে একটি অফিশিয়াল সাপোর্ট টিকিট খুলেছি: **#${autoTicket.ticketNumber}**।\n\nআমাদের সাপোর্ট টিম আমাদের অফিশিয়াল ${slaHours} ঘণ্টার এসএলএ-এর মধ্যে এটি পর্যালোচনা করবে। আপনি "My Tickets" ট্যাবে এটি পর্যবেক্ষণ করতে পারেন অথবা সরাসরি **${supportEmail}**-এ ইমেইল করতে পারেন।`
-                : `Because this specific inquiry is not available in our public knowledge base and requires direct investigation by our specialists, I have automatically raised an official support ticket for you: **#${autoTicket.ticketNumber}**.\n\nOur specialized engineering and support team has received your inquiry and will review it under our official ${slaHours}-hour SLA. You can track this anytime in the **"My Tickets"** tab, or email us directly at **${supportEmail}**.`;
-              replySource = 'AI_AUTO_TICKET';
-            } else {
-              // 4. Topics outside the database or NOT related to the company -> Humbly apologize and brand the company
-              botReply = userLang === 'bn'
-                ? `আমি বিনীতভাবে ক্ষমা প্রার্থনা করছি, কিন্তু **আমা কমিউনিটি**-র অফিসিয়াল অ্যাসিস্ট্যান্ট হিসেবে আমি আমাদের প্ল্যাটফর্ম এবং সফটওয়্যার সার্ভিসের বাইরের বিষয়ে সহায়তা করতে অপারগ।\n\n**আমা কমিউনিটি** হলো ডেভেলপার ও ডিজিটাল নোম্যাডদের জন্য একটি আধুনিক প্ল্যাটফর্ম—যেখানে রয়েছে রিয়েল-টাইম নিয়ন পোস্টগ্রেসকিউএল ডেটাবেজ পারসিস্টেন্স, ডকলি বিবিপ্রেস ডিসকাশন ফোরাম এবং এন্টারপ্রাইজ কনসালটেন্সি সল্যুশন।\n\nআমাদের ফোরামের টপিক, টেকনিক্যাল গাইড কিংবা কনসালটেন্সি সম্পর্কিত যেকোনো বিষয়ে সহায়তা করতে আমি সর্বদা প্রস্তুত আছি!`
-                : `I humbly apologize, but as the dedicated assistant for **Ama Community**, I am unable to assist with topics outside of our platform, developer discussions, and software services.\n\n**Ama Community** is a modern forum and knowledge hub built for developers and digital nomads—featuring real-time Neon PostgreSQL database persistence, seamless Docly bbPress community discussions, and comprehensive Enterprise Full-Stack Consultancy.\n\nPlease let me know how I can assist you with our community discussions, platform guides, technical stack, or consultancy services!`;
-              replySource = 'AI';
-            }
+      // Stage 2: Grounded LLM generation (Handles composite/exploratory questions using RAG context)
+      if (!botReply) {
+        const stage2 = await generateGroundedLLM(
+          cleanMsg,
+          userLang,
+          ragContext,
+          rawHistory,
+          cleanEmail,
+          cleanUserId,
+          cleanSession,
+          pipelineSettings,
+          createSupportTicket
+        );
+        if (stage2) {
+          botReply = stage2.reply;
+          replySource = stage2.source;
+          botSuggestedActions = stage2.suggestedActions;
+          if (stage2.createdTicket) {
+            createdTicket = stage2.createdTicket;
           }
         }
       }
 
-      // 4. Save bot response.
+      // Stage 3: Keyword fallback (Canned category answers per pillar if LLM fails or is unavailable)
+      if (!botReply) {
+        const stage3 = matchKeywordFallback(cleanMsg, userLang, pipelineSettings);
+        if (stage3) {
+          botReply = stage3.reply;
+          replySource = stage3.source;
+          botSuggestedActions = stage3.suggestedActions;
+        }
+      }
+
+      // Stage 4: Human ticket fallback (Auto-creates ticket with 48-hour response promise if consulting query)
+      if (!botReply) {
+        const consultationKeywords = [
+          'quote', 'quotation', 'price', 'cost', 'fee', 'retainer', 'contract', 'nda',
+          'meeting', 'consultation', 'advisory', 'appointment', 'advisor', 'specialist',
+          'proposal', 'audit', 'tax', 'zatca', 'bank', 'banking', 'account',
+          'setup', 'misa', 'formation', 'register', 'cr', 'company', 'saudi', 'invest'
+        ];
+
+        const isConsultingScope = consultationKeywords.some(k => lower.includes(k));
+
+        if (isConsultingScope) {
+          const stage4 = await createHumanTicketFallback(
+            cleanMsg,
+            userLang,
+            cleanEmail,
+            cleanUserId,
+            cleanSession,
+            pipelineSettings,
+            createSupportTicket
+          );
+          botReply = stage4.reply;
+          replySource = stage4.source;
+          botSuggestedActions = stage4.suggestedActions;
+          createdTicket = stage4.createdTicket;
+        } else {
+          // Off-topic fallback
+          botReply = userLang === 'bn'
+            ? `আমি **ট্রেক কনসালটেন্সি (Trek Consultancy)**-র অফিশিয়াল এআই বিজনেস সেটআপ অ্যান্ড গ্রোথ অ্যাসিস্ট্যান্ট। আমি মূলত আমাদের সেবা ক্ষেত্রসমূহ—যেমন সৌদি বিজনেস সেটআপ (MISA লাইসেন্স, CR), সফটওয়্যার ও ডিজিটাল সল্যুশন, ভিসা ও প্রো (PRO) সার্ভিস, সৌদি আরবে রিয়েল এস্টেট ইনভেস্টমেন্ট, এবং আন্তর্জাতিক কোম্পানি গঠনে সহায়তা করার জন্য নিবেদিত।\n\nযেহেতু আপনার প্রশ্নটি আমাদের সেবামূলক বিষয়ের বহির্ভূত, তাই এ বিষয়ে আমি তথ্য দিতে অপারগ। আমাদের যেকোনো ব্যবসায়িক ও ডিজিটাল সেবা সম্পর্কে যেকোনো প্রশ্ন করতে পারেন—আমি সানন্দে সহায়তা করব!`
+            : `I am **Trek Consultancy's Official AI Business Setup & Growth Assistant**.\n\nI am dedicated specifically to assisting with Trek Consultancy's core service areas:\n- **Saudi Business Setup** (MISA 100% Foreign Ownership, CR, Corporate Banking, ZATCA)\n- **Software & Digital Solutions** (Custom Software, ERP, Mobile Apps, AI Automation)\n- **Visa & PRO Services** (Investor Visas, Work Permits, Iqama, Qiwa, Muqeem)\n- **Real Estate Investment in Saudi Arabia** (Commercial Leasing & Property Purchase)\n- **Business Support Services** (Accounting, Tax, VAT, Audits)\n- **International Business Services** (USA LLC, UK Ltd, Canada, Global Banking)\n\nBecause your inquiry is outside of Trek's service scope, I am unable to assist with this topic. Please feel free to ask about any of our corporate, digital, or investment services!`;
+          replySource = 'AI';
+          botSuggestedActions = ['Saudi Business Setup', 'MISA License Details', 'Software & ERP Solutions', 'PRO & Visa Services'];
+        }
+      }
+
+      // 4. Save bot response to DB ONLY IF user is authenticated. If GUEST, do NOT save to database.
       const botMsgId = `msg-${Date.now()}-b`;
-      await pool.query(`
-        INSERT INTO support_messages (id, session_id, sender, message, source)
-        VALUES ($1, $2, 'bot', $3, $4)
-      `, [botMsgId, cleanSession, botReply, replySource]);
+      if (!isGuest) {
+        await pool.query(`
+          INSERT INTO support_messages (id, session_id, conversation_id, user_email, user_id, sender, message, source, created_at)
+          VALUES ($1, $2, $3, $4, $5, 'bot', $6, $7, NOW())
+        `, [botMsgId, cleanSession, convId, cleanEmail, cleanUserId, botReply, replySource]);
+      }
 
       res.status(201).json({
         userMessage: { id: userMsgId, sender: 'user', message: cleanMsg, source: 'USER', time: 'Just now' },
-        botReply: { id: botMsgId, sender: 'bot', message: botReply, source: replySource, time: 'Just now' },
-        autoTicket: createdTicket || null
+        botReply: {
+          id: botMsgId,
+          sender: 'bot',
+          message: botReply,
+          source: replySource,
+          time: 'Just now',
+          suggestedActions: botSuggestedActions.length > 0 ? botSuggestedActions : undefined
+        },
+        autoTicket: createdTicket || null,
+        savedToDb: !isGuest
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -1586,7 +1694,7 @@ LANGUAGE RULE:
       const q = ((req.query.q as string) || '').trim().toLowerCase();
 
       let query = `
-        SELECT id, ticket_number as "ticketNumber", user_id as "userId", user_email as "userEmail", session_id as "sessionId",
+        SELECT id, ticket_number as "ticketNumber", user_id as "userId", user_email as "userEmail", user_whatsapp as "userWhatsapp", session_id as "sessionId",
                subject, question, priority, status, admin_answer as "adminAnswer", assigned_to as "assignedTo",
                created_at as "createdAt", answered_at as "answeredAt"
         FROM support_tickets
@@ -1639,7 +1747,7 @@ LANGUAGE RULE:
         UPDATE support_tickets
         SET status = $1, admin_answer = $2, assigned_to = $3, priority = $4, answered_at = $5
         WHERE id = $6
-        RETURNING id, ticket_number as "ticketNumber", user_id as "userId", user_email as "userEmail", session_id as "sessionId",
+        RETURNING id, ticket_number as "ticketNumber", user_id as "userId", user_email as "userEmail", user_whatsapp as "userWhatsapp", session_id as "sessionId",
                   subject, question, priority, status, admin_answer as "adminAnswer", assigned_to as "assignedTo",
                   created_at as "createdAt", answered_at as "answeredAt"
       `, [newStatus, newAnswer, newAssigned, newPriority, answeredAt, id]);
@@ -1750,16 +1858,23 @@ LANGUAGE RULE:
   // Support Admin: Live Chat Conversations Overview
   app.get('/api/admin/support/conversations', async (_req, res) => {
     try {
+      // Query from conversations table joined with support_messages
       const result = await pool.query(`
         SELECT 
-          session_id as "sessionId",
-          COUNT(*) as "messageCount",
-          MAX(created_at) as "lastActive",
-          (SELECT message FROM support_messages sm2 WHERE sm2.session_id = sm.session_id ORDER BY created_at DESC LIMIT 1) as "lastMessage",
-          (SELECT sender FROM support_messages sm3 WHERE sm3.session_id = sm.session_id ORDER BY created_at DESC LIMIT 1) as "lastSender"
-        FROM support_messages sm
-        GROUP BY session_id
-        ORDER BY MAX(created_at) DESC
+          c.id,
+          c.session_id as "sessionId",
+          COALESCE(c.user_email, MAX(sm.user_email)) as "userEmail",
+          COALESCE(c.user_id, MAX(sm.user_id)) as "userId",
+          c.user_whatsapp as "userWhatsapp",
+          c.created_at as "createdAt",
+          c.updated_at as "lastActive",
+          COUNT(sm.id) as "messageCount",
+          (SELECT message FROM support_messages sm2 WHERE sm2.session_id = c.session_id ORDER BY created_at DESC LIMIT 1) as "lastMessage",
+          (SELECT sender FROM support_messages sm3 WHERE sm3.session_id = c.session_id ORDER BY created_at DESC LIMIT 1) as "lastSender"
+        FROM conversations c
+        LEFT JOIN support_messages sm ON sm.session_id = c.session_id
+        GROUP BY c.id, c.session_id, c.user_id, c.user_email, c.user_whatsapp, c.created_at, c.updated_at
+        ORDER BY c.updated_at DESC
         LIMIT 50
       `);
       res.json(result.rows);
@@ -1777,13 +1892,32 @@ LANGUAGE RULE:
         return res.status(400).json({ error: 'Message cannot be empty.' });
       }
 
+      // Check if session has user association
+      const sessUser = await pool.query(
+        `SELECT user_email, user_id FROM support_messages WHERE session_id = $1 AND user_email IS NOT NULL LIMIT 1`,
+        [sessionId]
+      );
+      const userEmail = sessUser.rows[0]?.user_email || null;
+      const userId = sessUser.rows[0]?.user_id || null;
+
       const msgId = `msg-${Date.now()}-staff`;
       const staffSender = staffName || 'Support Specialist';
+      const convId = `conv_${sessionId}`;
+
       const insertRes = await pool.query(`
-        INSERT INTO support_messages (id, session_id, sender, message, source)
-        VALUES ($1, $2, 'bot', $3, 'STAFF')
-        RETURNING id, sender, message, source, created_at as "createdAt"
-      `, [msgId, sessionId, `[${staffSender}]: ${message.trim()}`]);
+        INSERT INTO support_messages (id, session_id, conversation_id, user_email, user_id, sender, message, source, created_at)
+        VALUES ($1, $2, $3, $4, $5, 'bot', $6, 'STAFF', NOW())
+        RETURNING id, session_id as "sessionId", conversation_id as "conversationId", user_email as "userEmail", user_id as "userId", sender, message, source, created_at as "createdAt"
+      `, [msgId, sessionId, convId, userEmail, userId, `[${staffSender}]: ${message.trim()}`]);
+
+      // Update conversation timestamp
+      await pool.query(`
+        UPDATE conversations 
+        SET updated_at = NOW(),
+            user_email = COALESCE(user_email, $1),
+            user_id = COALESCE(user_id, $2)
+        WHERE session_id = $3 OR id = $4
+      `, [userEmail, userId, sessionId, convId]);
 
       res.status(201).json(insertRes.rows[0]);
     } catch (err: any) {

@@ -2,6 +2,7 @@ import { neonConfig, Pool } from '@neondatabase/serverless';
 import ws from 'ws';
 import dotenv from 'dotenv';
 import fs from 'fs';
+import { seedTrekKnowledgeBase } from './trekSeedData';
 
 dotenv.config();
 if (!process.env.DATABASE_URL && fs.existsSync('env.txt')) {
@@ -26,19 +27,21 @@ if (!connectionString) {
 }
 
 export const defaultSettings = {
-  forumName: 'Ama Community',
-  forumTagline: 'The modern community platform for developers and digital nomads',
+  forumName: 'Trek Consultancy',
+  forumTagline: 'Helping foreign investors and companies set up and grow in Saudi Arabia with confidence',
   enableGuestPosting: true,
   enableAutoModeration: true,
   announcementText: '',
   showAnnouncement: false,
-  primarySupportEmail: 'support@amacommunity.io',
-  slaHours: 24,
+  primarySupportEmail: 'contact@trekconsultancy.com',
+  whatsapp: '+966 50 241 1744',
+  phone: '+966 55 363 8960',
+  slaHours: 48,
   floatingSupportEnabled: true,
-  floatingSupportTagTextEn: 'Support Assistant & FAQs',
-  floatingSupportTagTextBn: '২৪/৭ সাপোর্ট চ্যাট ও হেল্প',
-  floatingSupportGreetingEn: 'Hello! How can our support team & AI assist your community journey today?',
-  floatingSupportGreetingBn: 'নমস্কার! আমাদের সাপোর্ট টিম ও এআই অ্যাসিস্ট্যান্ট কীভাবে আপনাকে সহায়তা করতে পারে?',
+  floatingSupportTagTextEn: 'Trek Advisory & Support',
+  floatingSupportTagTextBn: 'ট্রেক অ্যাডভাইজরি ও ২৪/৭ সাপোর্ট',
+  floatingSupportGreetingEn: 'Assalamu Alaikum! Welcome to Trek Consultancy. How may our advisors assist your business setup, software, or investment plans in Saudi Arabia today?',
+  floatingSupportGreetingBn: 'আসসালামু আলাইকুম! ট্রেক কনসালটেন্সিতে স্বাগতম। সৌদি আরবে ব্যবসা গঠন, সফটওয়্যার সলিউশন কিংবা রিয়েল এস্টেট বিনিয়োগে আপনাকে কীভাবে সহায়তা করতে পারি?',
   floatingSupportAiEnabled: true,
   floatingSupportDefaultPriority: 'Normal',
   floatingSupportMessengerTheme: 'messenger-blue'
@@ -123,6 +126,8 @@ export async function initDb() {
       );
       ALTER TABLE users DROP COLUMN IF EXISTS reputation;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT true;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS whatsapp VARCHAR(255);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(255);
       ALTER TABLE users ALTER COLUMN role SET DEFAULT 'User';
 
       CREATE TABLE IF NOT EXISTS email_verifications (
@@ -170,6 +175,8 @@ export async function initDb() {
         id VARCHAR(64) PRIMARY KEY,
         topic_id VARCHAR(64) NOT NULL REFERENCES topics(id) ON DELETE CASCADE,
         author VARCHAR(255) NOT NULL,
+        author_email VARCHAR(255),
+        author_id VARCHAR(64),
         author_role VARCHAR(100) DEFAULT 'Member',
         author_avatar TEXT,
         time_ago VARCHAR(100) DEFAULT 'Just now',
@@ -177,6 +184,8 @@ export async function initDb() {
         likes INT DEFAULT 0,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
+      ALTER TABLE replies ADD COLUMN IF NOT EXISTS author_email VARCHAR(255);
+      ALTER TABLE replies ADD COLUMN IF NOT EXISTS author_id VARCHAR(64);
     `);
 
     // 4. Blogs table
@@ -256,17 +265,75 @@ export async function initDb() {
       );
     `);
 
-    // 9. Support & Chat Messages table
+    // 8.5. Conversations table (Tracking chat threads, session metadata, WhatsApp and user binding)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS conversations (
+        id VARCHAR(255) PRIMARY KEY,
+        user_id VARCHAR(255),
+        session_id VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        user_email VARCHAR(255),
+        user_whatsapp VARCHAR(255)
+      );
+      ALTER TABLE conversations ADD COLUMN IF NOT EXISTS user_id VARCHAR(255);
+      ALTER TABLE conversations ADD COLUMN IF NOT EXISTS session_id VARCHAR(255);
+      ALTER TABLE conversations ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+      ALTER TABLE conversations ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+      ALTER TABLE conversations ADD COLUMN IF NOT EXISTS user_email VARCHAR(255);
+      ALTER TABLE conversations ADD COLUMN IF NOT EXISTS user_whatsapp VARCHAR(255);
+
+      CREATE INDEX IF NOT EXISTS idx_conversations_session ON conversations (session_id);
+      CREATE INDEX IF NOT EXISTS idx_conversations_session_id ON conversations (session_id);
+      CREATE INDEX IF NOT EXISTS idx_conversations_updated_at ON conversations (updated_at);
+      CREATE INDEX IF NOT EXISTS idx_conversations_user ON conversations (user_id);
+      CREATE INDEX IF NOT EXISTS idx_conversations_user_email ON conversations (user_email);
+      CREATE INDEX IF NOT EXISTS idx_conversations_user_whatsapp ON conversations (user_whatsapp);
+    `);
+
+    // 9. Support & Chat Messages table (Persisted for authenticated users and converted accounts)
     await client.query(`
       CREATE TABLE IF NOT EXISTS support_messages (
         id VARCHAR(64) PRIMARY KEY,
         session_id VARCHAR(64) NOT NULL,
+        conversation_id VARCHAR(255),
+        user_id VARCHAR(64),
+        user_email VARCHAR(255),
         sender VARCHAR(32) NOT NULL,
         message TEXT NOT NULL,
         source VARCHAR(50) DEFAULT 'AI',
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
+      ALTER TABLE support_messages ADD COLUMN IF NOT EXISTS conversation_id VARCHAR(255);
       ALTER TABLE support_messages ADD COLUMN IF NOT EXISTS source VARCHAR(50) DEFAULT 'AI';
+      ALTER TABLE support_messages ADD COLUMN IF NOT EXISTS user_id VARCHAR(64);
+      ALTER TABLE support_messages ADD COLUMN IF NOT EXISTS user_email VARCHAR(255);
+      CREATE INDEX IF NOT EXISTS idx_support_messages_email ON support_messages(LOWER(user_email));
+      CREATE INDEX IF NOT EXISTS idx_support_messages_user_id ON support_messages(user_id);
+      CREATE INDEX IF NOT EXISTS idx_support_messages_session ON support_messages(session_id);
+      CREATE INDEX IF NOT EXISTS idx_support_messages_conv_id ON support_messages(conversation_id);
+    `);
+
+    // Backfill conversations table from existing support messages if any exist
+    await client.query(`
+      INSERT INTO conversations (id, session_id, user_id, user_email, created_at, updated_at)
+      SELECT 
+        'conv_' || session_id,
+        session_id,
+        MAX(user_id),
+        MAX(user_email),
+        COALESCE(MIN(created_at), NOW()),
+        COALESCE(MAX(created_at), NOW())
+      FROM support_messages
+      WHERE session_id IS NOT NULL 
+        AND session_id != ''
+        AND session_id NOT IN (SELECT session_id FROM conversations)
+      GROUP BY session_id
+      ON CONFLICT (id) DO NOTHING;
+
+      UPDATE support_messages
+      SET conversation_id = 'conv_' || session_id
+      WHERE conversation_id IS NULL AND session_id IS NOT NULL;
     `);
 
     // 10. FAQ Categories table
@@ -333,28 +400,11 @@ export async function initDb() {
       CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON support_tickets(status);
       CREATE INDEX IF NOT EXISTS idx_support_tickets_session ON support_tickets(session_id);
       CREATE INDEX IF NOT EXISTS idx_support_tickets_created ON support_tickets(created_at DESC);
+      ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS user_whatsapp VARCHAR(255);
     `);
 
     // Default configuration settings if not present
     const settingsCheck = await client.query("SELECT value FROM settings WHERE key = 'platform'");
-    const defaultSettings = {
-      forumName: 'Ama Community',
-      forumTagline: 'The modern community platform for developers and digital nomads',
-      enableGuestPosting: true,
-      enableAutoModeration: true,
-      announcementText: '',
-      showAnnouncement: false,
-      primarySupportEmail: 'support@amacommunity.io',
-      slaHours: 24,
-      floatingSupportEnabled: true,
-      floatingSupportTagTextEn: 'Support Assistant & FAQs',
-      floatingSupportTagTextBn: '২৪/৭ সাপোর্ট চ্যাট ও হেল্প',
-      floatingSupportGreetingEn: 'Hello! How can our support team & AI assist your community journey today?',
-      floatingSupportGreetingBn: 'নমস্কার! আমাদের সাপোর্ট টিম ও এআই অ্যাসিস্ট্যান্ট কীভাবে আপনাকে সহায়তা করতে পারে?',
-      floatingSupportAiEnabled: true,
-      floatingSupportDefaultPriority: 'Normal',
-      floatingSupportMessengerTheme: 'messenger-blue'
-    };
 
     if (settingsCheck.rows.length === 0) {
       await client.query("INSERT INTO settings (key, value) VALUES ('platform', $1)", [JSON.stringify(defaultSettings)]);
@@ -372,6 +422,9 @@ export async function initDb() {
         await client.query("UPDATE settings SET value = $1 WHERE key = 'platform'", [JSON.stringify(current)]);
       }
     }
+
+    // Seed Trek Consultancy knowledge base documents and FAQs
+    await seedTrekKnowledgeBase(client);
 
     console.log('[Database] PostgreSQL schema initialized successfully on Neon.');
   } catch (err) {

@@ -1,6 +1,8 @@
 export interface ForumReply {
   id: string;
   author: string;
+  authorEmail?: string;
+  authorId?: string;
   authorRole?: string;
   authorAvatar: string;
   timeAgo: string;
@@ -91,6 +93,8 @@ export interface AdminUser {
   id: string;
   name: string;
   email: string;
+  whatsapp?: string;
+  phone?: string;
   role: 'Super Admin' | 'Moderator' | 'Support Specialist' | 'Community Lead' | 'User';
   status: 'active' | 'pending' | 'suspended';
   avatar: string;
@@ -112,6 +116,7 @@ export interface SupportTicket {
   ticketNumber: string;
   userId?: string;
   userEmail: string;
+  userWhatsapp?: string;
   sessionId: string;
   subject: string;
   question: string;
@@ -143,12 +148,27 @@ export interface FAQItem {
   createdAt?: string;
 }
 
-export interface SupportChatSession {
+export interface ConversationRecord {
+  id: string;
+  userId?: string;
   sessionId: string;
+  createdAt: string;
+  updatedAt: string;
+  userEmail?: string;
+  userWhatsapp?: string;
+}
+
+export interface SupportChatSession {
+  id?: string;
+  sessionId: string;
+  userEmail?: string;
+  userId?: string;
+  userWhatsapp?: string;
   lastMessage: string;
   lastSender: string;
   messageCount: number;
   lastActive: string;
+  createdAt?: string;
 }
 
 export interface PlatformSettings {

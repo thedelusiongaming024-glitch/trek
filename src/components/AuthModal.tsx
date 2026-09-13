@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Lock, Mail, User, ArrowRight, ArrowLeft, Loader2, AlertCircle, ShieldCheck, CheckCircle2, RefreshCw, UserCheck, LogOut } from 'lucide-react';
+import { syncGuestConversationToDb } from '../utils/chatSync';
 
 export interface AuthUserData {
   id?: string;
@@ -229,6 +230,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const data = await res.json();
       if (res.ok && data.success && data.user) {
         const verifiedUser = data.user;
+        // Automatically migrate & save any prior guest AI assistant chat into the database for the new account
+        syncGuestConversationToDb(verifiedUser.email, verifiedUser.id).catch(() => {});
         handleClose();
         onSuccess(verifiedUser);
       } else {
@@ -266,6 +269,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const data = await res.json();
       if (res.ok && data.success && data.user) {
         const loggedUser = data.user;
+        // Sync any prior guest AI assistant chat into the database
+        syncGuestConversationToDb(loggedUser.email, loggedUser.id).catch(() => {});
         handleClose();
         onSuccess(loggedUser);
       } else {

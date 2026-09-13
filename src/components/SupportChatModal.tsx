@@ -24,9 +24,20 @@ import {
   ShieldAlert,
   Copy,
   Check,
-  BookOpen
+  BookOpen,
+  Database,
+  Cloud,
+  CheckCircle,
+  Phone
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import {
+  getGuestMessagesFromStorage,
+  saveGuestMessagesToStorage,
+  clearGuestMessagesFromStorage,
+  syncGuestConversationToDb,
+  ChatMessageToSync
+} from '../utils/chatSync';
 
 interface SupportChatModalProps {
   isOpen: boolean;
@@ -34,6 +45,7 @@ interface SupportChatModalProps {
   currentUser?: {
     name?: string;
     email?: string;
+    whatsapp?: string;
   } | null;
   onRequireAuth?: () => void;
 }
@@ -52,6 +64,7 @@ interface MessageItem {
     status: string;
     assignedTo?: string;
   };
+  suggestedActions?: string[];
 }
 
 interface FaqItem {
@@ -74,6 +87,7 @@ interface SupportTicketItem {
   id: string;
   ticketNumber: string;
   userEmail: string;
+  userWhatsapp?: string;
   subject: string;
   question: string;
   priority: string;
@@ -116,6 +130,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
   const [tickets, setTickets] = useState<SupportTicketItem[]>([]);
   const [ticketSubject, setTicketSubject] = useState('');
   const [ticketEmail, setTicketEmail] = useState(currentUser?.email || '');
+  const [ticketWhatsapp, setTicketWhatsapp] = useState(currentUser?.whatsapp || '');
   const [ticketQuestion, setTicketQuestion] = useState('');
   const [ticketPriority, setTicketPriority] = useState('Normal');
   const [isSubmittingTicket, setIsSubmittingTicket] = useState(false);
@@ -152,46 +167,69 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
     }
   }, [currentUser, ticketEmail]);
 
-  // Initial welcome message in selected language
+  // Fetch chat messages (Loaded from PostgreSQL Database for authenticated users, Ephemeral Local Storage for Guests)
   useEffect(() => {
-    if (messages.length === 0) {
+    if (!isOpen) return;
+    const fetchHistory = async () => {
+      if (currentUser?.email) {
+        // Automatically migrate & sync any pending guest conversation that was held before creating an account or logging in
+        await syncGuestConversationToDb(currentUser.email, (currentUser as any)?.id, sessionId);
+
+        try {
+          const res = await fetch(`/api/support/messages?sessionId=${sessionId}&userEmail=${encodeURIComponent(currentUser.email)}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data) && data.length > 0) {
+              setMessages(
+                data.map((m: any) => ({
+                  id: m.id,
+                  sender: m.sender,
+                  source: m.source || (m.sender === 'bot' ? 'AI' : 'USER'),
+                  text: m.message,
+                  time: m.createdAt ? new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recorded'
+                }))
+              );
+              return;
+            }
+          }
+        } catch (err) {
+          console.error('Failed to load chat history from database:', err);
+        }
+      } else {
+        // Pure guest user: Load temporary messages from local cache (NEVER fetched from/saved to DB)
+        const cached = getGuestMessagesFromStorage(sessionId);
+        if (cached && cached.length > 0) {
+          setMessages(
+            cached.map((m) => ({
+              id: m.id,
+              sender: m.sender,
+              source: m.source || (m.sender === 'bot' ? 'AI' : 'USER'),
+              text: m.text,
+              time: m.time || 'Just now'
+            }))
+          );
+          return;
+        }
+      }
+
+      // Initial welcome message if no prior messages exist
       setMessages([
         {
           sender: 'bot',
           source: 'AI',
-          text: t('Hello! Welcome to Ama Community Support. I am your intelligent assistant. How can I help you today?'),
-          time: 'Just now'
+          text: language === 'bn'
+            ? 'হ্যালো! **আমা কমিউনিটি** সাপোর্ট সেন্টারে আপনাকে স্বাগতম। আমি আপনার সার্বক্ষণিক এআই অ্যাসিস্ট্যান্ট।\n\nফোরাম ডিসকাশন, টেকনিক্যাল ডকুমেন্টেশন, প্ল্যাটফর্ম ফিচার বা এন্টারপ্রাইজ কনসালটেন্সি—যেকোনো বিষয়ে যেকোনো প্রশ্ন করতে পারেন। আজ আপনাকে কীভাবে সহায়তা করতে পারি?'
+            : 'Hello! Welcome to **Ama Community Support**. I am your dedicated AI Assistant.\n\nWhether you need help navigating forum discussions, exploring technical documentation, resolving platform questions, or learning about our Enterprise Consultancy retainers—I am here to assist you! How can I help you today?',
+          time: 'Just now',
+          suggestedActions: language === 'bn'
+            ? ['কীভাবে ফোরামে পোস্ট করব?', 'নলেজ বেস ডকুমেন্টেশন', 'এন্টারপ্রাইজ কনসালটেন্সি', 'সাপোর্ট টিকিট স্ট্যাটাস']
+            : ['How do I post in forums?', 'Knowledge Base & Docs', 'Enterprise Consultancy Retainers', 'Track Support Tickets']
         }
       ]);
-    }
-  }, [language, t, messages.length]);
-
-  // Fetch past chat messages
-  useEffect(() => {
-    if (!isOpen) return;
-    const fetchHistory = async () => {
-      try {
-        const res = await fetch(`/api/support/messages?sessionId=${sessionId}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data) && data.length > 0) {
-            setMessages(
-              data.map((m: any) => ({
-                id: m.id,
-                sender: m.sender,
-                source: m.source || (m.sender === 'bot' ? 'AI' : 'USER'),
-                text: m.message,
-                time: m.createdAt ? new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recorded'
-              }))
-            );
-          }
-        }
-      } catch (err) {
-        console.error('Failed to load chat history:', err);
-      }
     };
+
     fetchHistory();
-  }, [isOpen, sessionId]);
+  }, [isOpen, sessionId, currentUser?.email, language, t]);
 
   // Fetch FAQs
   useEffect(() => {
@@ -282,30 +320,48 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
           sessionId,
           message: messageToSend,
           language,
-          userEmail: currentUser?.email || undefined
+          userEmail: currentUser?.email || undefined,
+          userId: (currentUser as any)?.id || undefined,
+          userWhatsapp: ticketWhatsapp.trim() || currentUser?.whatsapp || undefined,
+          guestMessageCount: isGuest ? userMessagesCount : undefined,
+          recentHistory: messages.slice(-6).map(m => ({ sender: m.sender, text: m.text }))
         })
       });
 
       if (res.ok) {
         const data = await res.json();
-        setMessages((prev) => [
-          ...prev.slice(0, -1),
-          {
-            id: data.userMessage.id,
-            sender: 'user',
-            source: 'USER',
-            text: data.userMessage.message,
-            time: data.userMessage.time
-          },
-          {
-            id: data.botReply.id,
-            sender: 'bot',
-            source: data.botReply.source || 'AI',
-            text: data.botReply.message,
-            time: data.botReply.time,
-            autoTicket: data.autoTicket || undefined
+        const updatedUserMsg: MessageItem = {
+          id: data.userMessage.id,
+          sender: 'user',
+          source: 'USER',
+          text: data.userMessage.message,
+          time: data.userMessage.time
+        };
+        const updatedBotMsg: MessageItem = {
+          id: data.botReply.id,
+          sender: 'bot',
+          source: data.botReply.source || 'AI',
+          text: data.botReply.message,
+          time: data.botReply.time,
+          autoTicket: data.autoTicket || undefined,
+          suggestedActions: Array.isArray(data.botReply.suggestedActions) ? data.botReply.suggestedActions : undefined
+        };
+
+        setMessages((prev) => {
+          const next = [...prev.slice(0, -1), updatedUserMsg, updatedBotMsg];
+          // If guest, save conversation purely in ephemeral local storage, NOT to database
+          if (isGuest) {
+            saveGuestMessagesToStorage(sessionId, next.map(m => ({
+              id: m.id,
+              sender: m.sender,
+              text: m.text,
+              source: m.source,
+              time: m.time,
+              suggestedActions: m.suggestedActions
+            })));
           }
-        ]);
+          return next;
+        });
 
         if (data.autoTicket) {
           loadTickets();
@@ -370,6 +426,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
         body: JSON.stringify({
           sessionId,
           userEmail: ticketEmail || currentUser?.email || 'guest@amacommunity.io',
+          userWhatsapp: ticketWhatsapp.trim() || undefined,
           subject: ticketSubject || (ticketQuestion.slice(0, 45) + '...'),
           question: ticketQuestion,
           priority: ticketPriority,
@@ -415,6 +472,17 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
               <h4 className="text-sm font-bold text-white tracking-tight">
                 {t('Ama Support Assistant')}
               </h4>
+              {currentUser?.email ? (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40" title="All conversations are securely saved in your database account">
+                  <Database className="w-2.5 h-2.5 text-emerald-400" />
+                  <span>{language === 'bn' ? 'ডাটাবেজে সংরক্ষিত' : 'DB Synced'}</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40" title="Guest chat is temporary and not saved to the database unless you create an account">
+                  <Clock className="w-2.5 h-2.5 text-amber-400" />
+                  <span>{language === 'bn' ? 'গেস্ট মোড (অস্থায়ী)' : 'Guest Mode'}</span>
+                </span>
+              )}
             </div>
             <p className="text-[11px] text-slate-300 flex items-center gap-1.5 mt-0.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
@@ -639,12 +707,15 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
                           </div>
                         )}
 
-                        {/* 1-Click Raise Human Support Action Button (shown only when manual submission is indicated and not already auto-created) */}
+                        {/* 1-Click Raise Community Support with Specialist Action Button (shown only when escalation/ticket submission is indicated and not already auto-created) */}
                         {!m.autoTicket && (m.text.includes('Submit Ticket') ||
                           m.text.includes('সাপোর্ট টিকিট') ||
                           m.text.includes('support ticket') ||
                           m.text.includes('হিউম্যান সাপোর্ট') ||
-                          m.text.includes('Human Support')) && (
+                          m.text.includes('Human Support') ||
+                          m.text.includes('Community Support') ||
+                          m.text.includes('কমিউনিটি সাপোর্ট') ||
+                          m.text.includes('Specialist')) && (
                           <div className="mt-2.5 pt-2.5 border-t border-slate-100 flex items-center gap-2">
                             <button
                               type="button"
@@ -659,7 +730,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
                             >
                               <Ticket className="w-3.5 h-3.5" />
                               <span>
-                                {language === 'bn' ? 'অফিশিয়াল সাপোর্ট টিকিট জমা দিন' : 'Raise Official Support Ticket'}
+                                {language === 'bn' ? 'কমিউনিটি সাপোর্ট ও স্পেশালিস্টের সাথে যোগাযোগ' : 'Community Support with Specialist'}
                               </span>
                             </button>
                           </div>
@@ -668,27 +739,11 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
                     )}
                   </div>
 
-                  {/* Message footer with source tag & quick copy */}
+                  {/* Message footer with quick copy */}
                   <div className="flex items-center gap-2 mt-1 px-1 text-[10px] text-slate-400">
                     <span>{m.time}</span>
                     {m.sender === 'bot' && (
                       <>
-                        {m.source && (
-                          <span className={`px-1.5 py-0.2 rounded font-medium border ${
-                            m.source === 'AI_AUTO_TICKET'
-                              ? 'bg-teal-100 text-teal-800 border-teal-300'
-                              : 'bg-slate-100 text-slate-600 border-slate-200/50'
-                          }`}>
-                            {m.source === 'AI_AUTO_TICKET'
-                              ? (language === 'bn' ? 'স্বয়ংক্রিয় টিকিট' : 'Auto-Raised Ticket')
-                              : m.source === 'FAQ'
-                              ? t('FAQ Match')
-                              : m.source === 'RAG'
-                              ? t('Knowledge Base')
-                              : t('AI Answer')}
-                          </span>
-                        )}
-
                         <button
                           type="button"
                           onClick={() => handleCopyMessage(msgKey, m.text)}
@@ -952,6 +1007,25 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
             </div>
 
             <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-[11px] font-semibold text-slate-700">
+                  {t('WhatsApp / Phone Number')}
+                </label>
+                <span className="text-[10px] text-slate-400 font-normal">{t('Optional')}</span>
+              </div>
+              <div className="relative">
+                <input
+                  type="tel"
+                  value={ticketWhatsapp}
+                  onChange={(e) => setTicketWhatsapp(e.target.value)}
+                  placeholder="+880 1700 000000"
+                  className="w-full pl-8 pr-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-base sm:text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                />
+                <Phone className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              </div>
+            </div>
+
+            <div>
               <label className="block text-[11px] font-semibold text-slate-700 mb-1">
                 {t('Subject / Topic')}
               </label>
@@ -1071,6 +1145,13 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
                       {t(tkt.status)}
                     </span>
                   </div>
+
+                  {tkt.userWhatsapp && (
+                    <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 bg-emerald-50/80 px-2 py-1 rounded-lg border border-emerald-100/60 w-fit">
+                      <Phone className="w-3 h-3 text-emerald-600 shrink-0" />
+                      <span className="font-mono text-[10px]">{tkt.userWhatsapp}</span>
+                    </div>
+                  )}
 
                   <h6 className="text-xs font-bold text-slate-900 leading-snug">
                     {tkt.subject || tkt.question.slice(0, 45)}

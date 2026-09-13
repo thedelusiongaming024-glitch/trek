@@ -268,17 +268,23 @@ export async function initDb() {
       );
     `);
 
-    // 9. Support & Chat Messages table
+    // 9. Support & Chat Messages table (Persisted for authenticated users and converted accounts)
     await client.query(`
       CREATE TABLE IF NOT EXISTS support_messages (
         id VARCHAR(64) PRIMARY KEY,
         session_id VARCHAR(64) NOT NULL,
+        user_id VARCHAR(64),
+        user_email VARCHAR(255),
         sender VARCHAR(32) NOT NULL,
         message TEXT NOT NULL,
         source VARCHAR(50) DEFAULT 'AI',
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
       ALTER TABLE support_messages ADD COLUMN IF NOT EXISTS source VARCHAR(50) DEFAULT 'AI';
+      ALTER TABLE support_messages ADD COLUMN IF NOT EXISTS user_id VARCHAR(64);
+      ALTER TABLE support_messages ADD COLUMN IF NOT EXISTS user_email VARCHAR(255);
+      CREATE INDEX IF NOT EXISTS idx_support_messages_email ON support_messages(user_email);
+      CREATE INDEX IF NOT EXISTS idx_support_messages_session ON support_messages(session_id);
     `);
 
     // 10. FAQ Categories table
@@ -1563,17 +1569,85 @@ export async function createApp() {
     }
   });
 
-  // Support Chat Messages: List
+  // Support Chat Messages: List (Loaded for Authenticated Users or Migrated Sessions)
   app.get('/api/support/messages', async (req, res) => {
     try {
       const sessionId = (req.query.sessionId as string) || 'default';
-      const result = await pool.query(`
-        SELECT id, sender, message, source, created_at as "createdAt"
-        FROM support_messages
-        WHERE session_id = $1
-        ORDER BY created_at ASC
-      `, [sessionId]);
+      const userEmail = ((req.query.userEmail as string) || (req.query.email as string) || '').trim().toLowerCase();
+
+      let result;
+      if (userEmail) {
+        result = await pool.query(`
+          SELECT id, sender, message, source, created_at as "createdAt"
+          FROM support_messages
+          WHERE LOWER(user_email) = $1 OR (user_email IS NULL AND session_id = $2)
+          ORDER BY created_at ASC
+        `, [userEmail, sessionId]);
+      } else {
+        result = await pool.query(`
+          SELECT id, sender, message, source, created_at as "createdAt"
+          FROM support_messages
+          WHERE session_id = $1 AND (user_email IS NULL OR user_email = '')
+          ORDER BY created_at ASC
+        `, [sessionId]);
+      }
       res.json(result.rows);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Support Chat Messages: Sync Guest Conversation when User Creates an Account
+  app.post('/api/support/sync-conversation', async (req, res) => {
+    try {
+      const { sessionId, userEmail, userId, messages } = req.body;
+      const cleanEmail = (userEmail || '').trim().toLowerCase();
+      const cleanUserId = (userId || '').trim() || null;
+      const cleanSession = sessionId || 'default';
+
+      if (!cleanEmail) {
+        return res.status(400).json({ error: 'User email is required to sync conversation.' });
+      }
+
+      if (!Array.isArray(messages) || messages.length === 0) {
+        return res.json({ success: true, syncedCount: 0, message: 'No messages to sync.' });
+      }
+
+      let syncedCount = 0;
+      for (const msg of messages) {
+        const text = (msg.text || msg.message || '').trim();
+        if (!text) continue;
+        const sender = msg.sender === 'bot' ? 'bot' : 'user';
+        const source = msg.source || (sender === 'bot' ? 'AI' : 'USER');
+        const id = msg.id || `msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+        const createdAt = msg.createdAt ? new Date(msg.createdAt) : new Date();
+
+        // Check if already stored
+        const dupCheck = await pool.query(
+          `SELECT id FROM support_messages WHERE id = $1 OR (session_id = $2 AND sender = $3 AND message = $4)`,
+          [id, cleanSession, sender, text]
+        );
+
+        if (dupCheck.rows.length === 0) {
+          await pool.query(`
+            INSERT INTO support_messages (id, session_id, user_email, user_id, sender, message, source, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          `, [id, cleanSession, cleanEmail, cleanUserId, sender, text, source, createdAt]);
+          syncedCount++;
+        } else {
+          await pool.query(`
+            UPDATE support_messages 
+            SET user_email = $1, user_id = $2 
+            WHERE id = $3 AND (user_email IS NULL OR user_email = '')
+          `, [cleanEmail, cleanUserId, dupCheck.rows[0].id]);
+        }
+      }
+
+      res.json({
+        success: true,
+        syncedCount,
+        message: `Successfully saved ${syncedCount} message(s) to the database for ${cleanEmail}.`
+      });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -1582,38 +1656,37 @@ export async function createApp() {
   // Support Chat Messages: Send & AI Response (RAG + Gemini / Knowledge Base)
   app.post('/api/support/messages', async (req, res) => {
     try {
-      const { sessionId, message, language, userEmail } = req.body;
+      const { sessionId, message, language, userEmail, userId, guestMessageCount } = req.body;
       const cleanSession = sessionId || 'default';
       const cleanMsg = (message || '').trim();
       const userLang = language === 'bn' ? 'bn' : 'en';
+      const cleanEmail = (userEmail || '').trim().toLowerCase() || null;
+      const cleanUserId = (userId || '').trim() || null;
+      const isGuest = !cleanEmail;
 
       if (!cleanMsg) {
         return res.status(400).json({ error: 'Message cannot be empty.' });
       }
 
       // Guest message preview limit check (allow up to 3 guest messages before requiring account)
-      if (!userEmail) {
-        const countRes = await pool.query(
-          `SELECT COUNT(*) FROM support_messages WHERE session_id = $1 AND sender = 'user'`,
-          [cleanSession]
-        );
-        const existingCount = parseInt(countRes.rows[0].count, 10);
-        if (existingCount >= 3) {
-          return res.status(403).json({
-            error: 'Free conversation preview limit reached. Please sign in or create an account to continue.',
-            requiresAuth: true
-          });
-        }
+      if (isGuest && typeof guestMessageCount === 'number' && guestMessageCount >= 3) {
+        return res.status(403).json({
+          error: 'Free conversation preview limit reached. Please sign in or create an account to continue.',
+          requiresAuth: true
+        });
       }
 
-      // 1. Save the user's message and fetch RAG context in parallel — this
-      // alone removes several sequential DB round-trips from the hot path.
+      // 1. If authenticated user, save user message to DB. If GUEST, do NOT save to database!
       const userMsgId = `msg-${Date.now()}-u`;
+      const dbSavePromise = !isGuest
+        ? pool.query(`
+            INSERT INTO support_messages (id, session_id, user_email, user_id, sender, message, source)
+            VALUES ($1, $2, $3, $4, 'user', $5, 'USER')
+          `, [userMsgId, cleanSession, cleanEmail, cleanUserId, cleanMsg])
+        : Promise.resolve(null);
+
       const [, { faqsData, docsData, topicsData, settingsData }] = await Promise.all([
-        pool.query(`
-          INSERT INTO support_messages (id, session_id, sender, message, source)
-          VALUES ($1, $2, 'user', $3, 'USER')
-        `, [userMsgId, cleanSession, cleanMsg]),
+        dbSavePromise,
         getRagData()
       ]);
 
@@ -1963,17 +2036,20 @@ LANGUAGE RULE:
       }
     }
 
-      // 4. Save bot response.
+      // 4. Save bot response to DB ONLY IF user is authenticated. If GUEST, do NOT save to database.
       const botMsgId = `msg-${Date.now()}-b`;
-      await pool.query(`
-        INSERT INTO support_messages (id, session_id, sender, message, source)
-        VALUES ($1, $2, 'bot', $3, $4)
-      `, [botMsgId, cleanSession, botReply, replySource]);
+      if (!isGuest) {
+        await pool.query(`
+          INSERT INTO support_messages (id, session_id, user_email, user_id, sender, message, source)
+          VALUES ($1, $2, $3, $4, 'bot', $5, $6)
+        `, [botMsgId, cleanSession, cleanEmail, cleanUserId, botReply, replySource]);
+      }
 
       res.status(201).json({
         userMessage: { id: userMsgId, sender: 'user', message: cleanMsg, source: 'USER', time: 'Just now' },
         botReply: { id: botMsgId, sender: 'bot', message: botReply, source: replySource, time: 'Just now' },
-        createdTicket: createdTicket || null
+        autoTicket: createdTicket || null,
+        savedToDb: !isGuest
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
