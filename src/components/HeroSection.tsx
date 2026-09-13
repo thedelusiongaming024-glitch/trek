@@ -1,21 +1,32 @@
 import React from 'react';
-import { Search, X } from 'lucide-react';
+import { Search, X, Bell } from 'lucide-react';
+import { PlatformSettings } from '../types';
 
 interface HeroSectionProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   onSelectTag?: (tag: string) => void;
   children?: React.ReactNode;
+  settings?: PlatformSettings;
 }
 
 export const HeroSection: React.FC<HeroSectionProps> = ({
   searchQuery,
   onSearchChange,
   onSelectTag,
-  children
+  children,
+  settings
 }) => {
   return (
     <div className="relative pb-20 md:pb-24 overflow-hidden">
+      {/* Announcement Banner (if configured in Database Platform Settings) */}
+      {settings?.showAnnouncement && settings?.announcementText && (
+        <div className="relative z-50 bg-gradient-to-r from-teal-600 via-[#00a8b5] to-emerald-600 text-white text-xs font-semibold py-2.5 px-4 text-center shadow-md flex items-center justify-center gap-2">
+          <Bell className="w-3.5 h-3.5 animate-bounce shrink-0" />
+          <span>{settings.announcementText}</span>
+        </div>
+      )}
+
       {/* Faceted Geometric Polyhedral Purple/Violet Background Mesh matching reference */}
       <div className="absolute inset-0 pointer-events-none select-none overflow-hidden">
         {/* Deep purple base gradient */}
@@ -121,9 +132,17 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
       {/* Content Container */}
       <div className="relative max-w-4xl mx-auto px-4 sm:px-6 text-center z-10 pt-8 sm:pt-12">
         {/* Main Heading */}
-        <h1 className="text-2xl sm:text-4xl md:text-5xl font-extrabold text-white tracking-tight mb-5 sm:mb-7 font-heading drop-shadow-sm px-2">
-          Welcome to Ama Support Center
+        <h1 className="text-2xl sm:text-4xl md:text-5xl font-extrabold text-white tracking-tight mb-2 sm:mb-3 font-heading drop-shadow-sm px-2">
+          Welcome to {settings?.forumName || 'Ama'} Support Center
         </h1>
+        {settings?.forumTagline && (
+          <p className="text-xs sm:text-sm text-teal-200/90 font-medium mb-5 sm:mb-7 max-w-xl mx-auto">
+            {settings.forumTagline}
+          </p>
+        )}
+        {!settings?.forumTagline && (
+          <div className="mb-5 sm:mb-7" />
+        )}
 
         {/* Search Bar Container */}
         <div className="max-w-2xl mx-auto px-1 sm:px-0">

@@ -194,6 +194,19 @@ export interface PlatformSettings {
   floatingSupportAiEnabled?: boolean;
   floatingSupportDefaultPriority?: 'Normal' | 'Urgent' | 'Critical';
   floatingSupportMessengerTheme?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+export interface SettingsHistoryItem {
+  id: string;
+  key: string;
+  changedKeys: string[];
+  oldValue?: Partial<PlatformSettings>;
+  newValue: Partial<PlatformSettings>;
+  changedBy: string;
+  changeSummary?: string;
+  createdAt: string;
 }
 
 export interface KnowledgeDocument {

@@ -251,12 +251,29 @@ export async function initDb() {
       );
     `);
 
-    // 7. Settings table
+    // 7. Settings table & Change Audit History
     await client.query(`
       CREATE TABLE IF NOT EXISTS settings (
         key VARCHAR(64) PRIMARY KEY,
-        value JSONB NOT NULL
+        value JSONB NOT NULL,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_by VARCHAR(255) DEFAULT 'System'
       );
+      ALTER TABLE settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+      ALTER TABLE settings ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255) DEFAULT 'System';
+
+      CREATE TABLE IF NOT EXISTS settings_history (
+        id VARCHAR(64) PRIMARY KEY,
+        key VARCHAR(64) NOT NULL,
+        changed_keys JSONB NOT NULL,
+        old_value JSONB,
+        new_value JSONB NOT NULL,
+        changed_by VARCHAR(255) DEFAULT 'Administrator',
+        change_summary TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_settings_history_created_at ON settings_history(created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_settings_history_key ON settings_history(key);
     `);
 
     // 8. Newsletter Subscribers table

@@ -252,12 +252,29 @@ export async function initDb() {
       );
     `);
 
-    // 7. Settings table
+    // 7. Settings table & Change Audit History
     await client.query(`
       CREATE TABLE IF NOT EXISTS settings (
         key VARCHAR(64) PRIMARY KEY,
-        value JSONB NOT NULL
+        value JSONB NOT NULL,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_by VARCHAR(255) DEFAULT 'System'
       );
+      ALTER TABLE settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+      ALTER TABLE settings ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255) DEFAULT 'System';
+
+      CREATE TABLE IF NOT EXISTS settings_history (
+        id VARCHAR(64) PRIMARY KEY,
+        key VARCHAR(64) NOT NULL,
+        changed_keys JSONB NOT NULL,
+        old_value JSONB,
+        new_value JSONB NOT NULL,
+        changed_by VARCHAR(255) DEFAULT 'Administrator',
+        change_summary TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_settings_history_created_at ON settings_history(created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_settings_history_key ON settings_history(key);
     `);
 
     // 8. Newsletter Subscribers table
@@ -3222,38 +3239,188 @@ LANGUAGE RULE:
     }
   });
 
-  // Settings
+  // Settings - Read active platform settings from database
   app.get('/api/settings', async (_req, res) => {
     try {
-      const result = await pool.query("SELECT value FROM settings WHERE key = 'platform'");
+      const result = await pool.query("SELECT value, updated_at as \"updatedAt\", updated_by as \"updatedBy\" FROM settings WHERE key = 'platform'");
       if (result.rows.length > 0) {
-        res.json(result.rows[0].value);
+        const stored = result.rows[0].value || {};
+        const merged = {
+          ...defaultSettings,
+          ...stored,
+          updatedAt: result.rows[0].updatedAt,
+          updatedBy: result.rows[0].updatedBy
+        };
+        res.json(merged);
       } else {
-        res.json({
-          forumName: 'Ama Community',
-          forumTagline: 'The modern community platform for developers and digital nomads',
-          enableGuestPosting: true,
-          enableAutoModeration: true,
-          announcementText: '',
-          showAnnouncement: false,
-          primarySupportEmail: 'support@amacommunity.io',
-          slaHours: 24
-        });
+        res.json({ ...defaultSettings });
       }
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
 
+  // Settings - Save platform settings to database, record changes in settings_history & activity_logs
   app.post('/api/settings', async (req, res) => {
     try {
-      const newSettings = req.body;
-      await pool.query(`
-        INSERT INTO settings (key, value) VALUES ('platform', $1)
-        ON CONFLICT (key) DO UPDATE SET value = $1
-      `, [JSON.stringify(newSettings)]);
+      const incoming = req.body || {};
+      const actor = (req.headers['x-user-name'] as string) || (req.headers['x-user-email'] as string) || incoming.updatedBy || 'Administrator';
 
-      res.json({ success: true, settings: newSettings });
+      // 1. Fetch current database settings to compute diff
+      const currentRes = await pool.query("SELECT value FROM settings WHERE key = 'platform'");
+      const oldSettings = currentRes.rows.length > 0 ? (currentRes.rows[0].value || {}) : { ...defaultSettings };
+
+      // 2. Merge incoming updates cleanly with existing values so no fields are dropped
+      const mergedSettings = {
+        ...defaultSettings,
+        ...oldSettings,
+        ...incoming
+      };
+      // Clean up metadata properties from the JSON value
+      delete (mergedSettings as any).updatedAt;
+      delete (mergedSettings as any).updatedBy;
+
+      // 3. Compute changed keys
+      const changedKeys: string[] = [];
+      const changeSummaries: string[] = [];
+      for (const [key, newVal] of Object.entries(mergedSettings)) {
+        const oldVal = oldSettings[key];
+        if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
+          changedKeys.push(key);
+          if (typeof newVal === 'string' || typeof newVal === 'number' || typeof newVal === 'boolean') {
+            changeSummaries.push(`${key}: "${oldVal ?? 'none'}" ➔ "${newVal}"`);
+          } else {
+            changeSummaries.push(`${key} updated`);
+          }
+        }
+      }
+
+      // 4. Save merged settings to database with audit timestamp and author
+      await pool.query(`
+        INSERT INTO settings (key, value, updated_at, updated_by)
+        VALUES ('platform', $1, NOW(), $2)
+        ON CONFLICT (key) DO UPDATE
+        SET value = $1, updated_at = NOW(), updated_by = $2
+      `, [JSON.stringify(mergedSettings), actor]);
+
+      // 5. If changes occurred (or initial commit), record audit log into settings_history
+      let historyId: string | null = null;
+      if (changedKeys.length > 0) {
+        historyId = `set-hist-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+        const changeSummary = `Updated ${changedKeys.length} parameter(s): ${changeSummaries.slice(0, 4).join(', ')}${changeSummaries.length > 4 ? ` and ${changeSummaries.length - 4} more` : ''}`;
+
+        await pool.query(`
+          INSERT INTO settings_history (id, key, changed_keys, old_value, new_value, changed_by, change_summary, created_at)
+          VALUES ($1, 'platform', $2, $3, $4, $5, $6, NOW())
+        `, [
+          historyId,
+          JSON.stringify(changedKeys),
+          JSON.stringify(oldSettings),
+          JSON.stringify(mergedSettings),
+          actor,
+          changeSummary
+        ]);
+
+        // Also record in activity_logs for the admin activity stream
+        await pool.query(`
+          INSERT INTO activity_logs (id, action, actor, target, time_ago, type)
+          VALUES ($1, 'Saved Platform Settings', $2, $3, 'Just now', 'setting')
+        `, [`act-${Date.now()}`, actor, `${changedKeys.length} settings updated in database`]);
+      }
+
+      // 6. Invalidate RAG and AI caches so changes instantly affect the whole project
+      invalidateRagCache();
+
+      res.json({
+        success: true,
+        settings: {
+          ...mergedSettings,
+          updatedAt: new Date().toISOString(),
+          updatedBy: actor
+        },
+        changedKeys,
+        changeCount: changedKeys.length,
+        historyId
+      });
+    } catch (err: any) {
+      console.error('[Settings] Error saving settings to database:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Settings History - Retrieve revision audit logs
+  app.get('/api/settings/history', async (_req, res) => {
+    try {
+      const result = await pool.query(`
+        SELECT id, key, changed_keys as "changedKeys", old_value as "oldValue", new_value as "newValue",
+               changed_by as "changedBy", change_summary as "changeSummary", created_at as "createdAt"
+        FROM settings_history
+        WHERE key = 'platform'
+        ORDER BY created_at DESC
+        LIMIT 50
+      `);
+      res.json(result.rows);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Settings Restore - Revert database settings to a previous revision
+  app.post('/api/settings/restore/:historyId', async (req, res) => {
+    try {
+      const { historyId } = req.params;
+      const actor = (req.headers['x-user-name'] as string) || (req.headers['x-user-email'] as string) || 'Administrator';
+
+      const histRes = await pool.query('SELECT * FROM settings_history WHERE id = $1', [historyId]);
+      if (histRes.rows.length === 0) {
+        return res.status(404).json({ error: 'Settings history record not found.' });
+      }
+
+      const targetRevision = histRes.rows[0];
+      const restoredValues = targetRevision.new_value;
+
+      // Current values before restoring
+      const currentRes = await pool.query("SELECT value FROM settings WHERE key = 'platform'");
+      const currentValues = currentRes.rows.length > 0 ? currentRes.rows[0].value : defaultSettings;
+
+      // Update settings table
+      await pool.query(`
+        INSERT INTO settings (key, value, updated_at, updated_by)
+        VALUES ('platform', $1, NOW(), $2)
+        ON CONFLICT (key) DO UPDATE
+        SET value = $1, updated_at = NOW(), updated_by = $2
+      `, [JSON.stringify(restoredValues), `${actor} (Restored from revision #${historyId.slice(-6)})`]);
+
+      // Record this restore action into settings_history
+      const newHistId = `set-hist-${Date.now()}-restore`;
+      await pool.query(`
+        INSERT INTO settings_history (id, key, changed_keys, old_value, new_value, changed_by, change_summary, created_at)
+        VALUES ($1, 'platform', $2, $3, $4, $5, $6, NOW())
+      `, [
+        newHistId,
+        JSON.stringify(Object.keys(restoredValues)),
+        JSON.stringify(currentValues),
+        JSON.stringify(restoredValues),
+        actor,
+        `Restored configuration from revision #${historyId.slice(-6)} (dated ${new Date(targetRevision.created_at).toLocaleString()})`
+      ]);
+
+      await pool.query(`
+        INSERT INTO activity_logs (id, action, actor, target, time_ago, type)
+        VALUES ($1, 'Restored Settings Revision', $2, $3, 'Just now', 'setting')
+      `, [`act-${Date.now()}`, actor, `Revision #${historyId.slice(-6)} restored to database`]);
+
+      invalidateRagCache();
+
+      res.json({
+        success: true,
+        message: 'Settings successfully restored from database revision.',
+        settings: {
+          ...restoredValues,
+          updatedAt: new Date().toISOString(),
+          updatedBy: actor
+        }
+      });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

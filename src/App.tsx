@@ -614,11 +614,23 @@ export default function App() {
 
   const handleSaveSettings = async (newSettings: PlatformSettings) => {
     try {
-      await fetch('/api/settings', {
+      const res = await fetch('/api/settings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-name': adminAuthUser?.name || currentUser?.name || 'Administrator',
+          'x-user-email': adminAuthUser?.email || currentUser?.email || 'admin@trekconsultancy.com'
+        },
         body: JSON.stringify(newSettings)
       });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.settings) {
+          setPlatformSettings(data.settings);
+          showToast(`Settings recorded to database (${data.changeCount || 0} change(s) logged).`);
+          return;
+        }
+      }
     } catch (e) {
       console.error(e);
     }
@@ -972,6 +984,7 @@ export default function App() {
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             onSelectTag={handleSelectTag}
+            settings={platformSettings}
           >
             <Navbar
               onOpenAuth={() => triggerAuthModal(undefined, 'login')}

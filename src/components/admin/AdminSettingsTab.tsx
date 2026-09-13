@@ -23,9 +23,13 @@ import {
   Database,
   Globe,
   Phone,
-  Mail
+  Mail,
+  History,
+  RotateCcw,
+  MessageSquare,
+  Check
 } from 'lucide-react';
-import { PlatformSettings, AIModelPreset, AIKnowledgeStatus } from '../../types';
+import { PlatformSettings, AIModelPreset, AIKnowledgeStatus, SettingsHistoryItem } from '../../types';
 import { AI_MODEL_PRESETS, getModelPreset, resolveAIProvider } from '../../lib/aiModels';
 
 interface AdminSettingsTabProps {
@@ -47,6 +51,12 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [liveStatus, setLiveStatus] = useState<AIKnowledgeStatus | null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
+
+  // Settings History state
+  const [historyList, setHistoryList] = useState<SettingsHistoryItem[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [restoreSuccessMsg, setRestoreSuccessMsg] = useState<string | null>(null);
 
   // Model Live Test state
   const [testPrompt, setTestPrompt] = useState('How does Trek Consultancy assist foreign companies with MISA licensing and commercial registration in Saudi Arabia?');
@@ -82,15 +92,69 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({
     }
   };
 
+  // Fetch settings audit history from database
+  const fetchHistory = async () => {
+    setIsLoadingHistory(true);
+    try {
+      const res = await fetch('/api/settings/history');
+      if (res.ok) {
+        const data = await res.json();
+        setHistoryList(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.warn('Failed to load settings history:', err);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
   useEffect(() => {
     fetchStatus();
+    fetchHistory();
   }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSaveSettings(formData);
     setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 3500);
+    setTimeout(() => {
+      setSavedSuccess(false);
+      fetchHistory();
+    }, 1500);
+  };
+
+  const handleRestoreRevision = async (item: SettingsHistoryItem) => {
+    if (!window.confirm(`Are you sure you want to restore settings from ${new Date(item.createdAt).toLocaleString()}? This will update the PostgreSQL database.`)) {
+      return;
+    }
+
+    setRestoringId(item.id);
+    try {
+      const res = await fetch(`/api/settings/restore/${item.id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-name': 'Administrator'
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.settings) {
+          setFormData(data.settings);
+          onSaveSettings(data.settings);
+          setRestoreSuccessMsg(`Revision #${item.id.slice(-6)} successfully restored and active across the project!`);
+          setTimeout(() => setRestoreSuccessMsg(null), 4000);
+          fetchHistory();
+        }
+      } else {
+        alert('Failed to restore settings revision from database.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error restoring revision from database.');
+    } finally {
+      setRestoringId(null);
+    }
   };
 
   const handleTestModel = async (overrideModel?: string) => {
@@ -614,7 +678,84 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({
         </div>
 
         {/* ================================================================= */}
-        {/* 3. ANNOUNCEMENT BANNER & AUTOMATION */}
+        {/* 3. FLOATING SUPPORT WIDGET SETTINGS */}
+        {/* ================================================================= */}
+        <div className="rounded-3xl p-6 sm:p-7 bg-white/80 backdrop-blur-xl border border-white/80 shadow-xs space-y-4">
+          <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
+            <div className="p-2 rounded-xl bg-teal-500/10 text-teal-600">
+              <MessageSquare className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-sm font-heading font-bold text-slate-900">
+                Floating Support Messenger & Widget
+              </h3>
+              <p className="text-xs text-slate-500">
+                Controls the bottom-right floating support widget, greeting copy, and AI assistance
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200/60">
+              <div>
+                <span className="text-xs font-bold text-slate-800 block">Enable Floating Support Button</span>
+                <span className="text-[11px] text-slate-500">Displays chat widget launcher across public pages</span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.floatingSupportEnabled !== false}
+                  onChange={(e) => setFormData({ ...formData, floatingSupportEnabled: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#00a8b5]"></div>
+              </label>
+            </div>
+
+            <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200/60">
+              <div>
+                <span className="text-xs font-bold text-slate-800 block">AI Automated Support Responses</span>
+                <span className="text-[11px] text-slate-500">Instant answers grounded in knowledge documents</span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.floatingSupportAiEnabled !== false}
+                  onChange={(e) => setFormData({ ...formData, floatingSupportAiEnabled: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#00a8b5]"></div>
+              </label>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-700 block mb-1">
+                English Tag / Bubble Label
+              </label>
+              <input
+                type="text"
+                value={formData.floatingSupportTagTextEn || 'Ask Trek AI'}
+                onChange={(e) => setFormData({ ...formData, floatingSupportTagTextEn: e.target.value })}
+                className="w-full p-2.5 rounded-xl border border-slate-200/80 bg-white/90 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-700 block mb-1">
+                Bengali Tag / Bubble Label
+              </label>
+              <input
+                type="text"
+                value={formData.floatingSupportTagTextBn || 'ট্রেক এআই-কে জিজ্ঞাসা করুন'}
+                onChange={(e) => setFormData({ ...formData, floatingSupportTagTextBn: e.target.value })}
+                className="w-full p-2.5 rounded-xl border border-slate-200/80 bg-white/90 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* ================================================================= */}
+        {/* 4. ANNOUNCEMENT BANNER & AUTOMATION */}
         {/* ================================================================= */}
         <div className="rounded-3xl p-6 sm:p-7 bg-white/80 backdrop-blur-xl border border-white/80 shadow-xs space-y-4">
           <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
@@ -676,13 +817,113 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({
         </div>
 
         {/* ================================================================= */}
+        {/* 5. DATABASE SETTINGS CHANGE HISTORY & AUDIT LOG */}
+        {/* ================================================================= */}
+        <div className="rounded-3xl p-6 sm:p-7 bg-white/80 backdrop-blur-xl border border-white/80 shadow-xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-teal-500/10 text-teal-600">
+                <History className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-heading font-bold text-slate-900">
+                  Database Settings Audit Trail & Revision History
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Every change to platform parameters is recorded in PostgreSQL. You can inspect diffs and rollback with 1-click.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={fetchHistory}
+              disabled={isLoadingHistory}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 cursor-pointer shadow-xs transition-all disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingHistory ? 'animate-spin text-teal-600' : 'text-slate-500'}`} />
+              <span>Refresh History</span>
+            </button>
+          </div>
+
+          {isLoadingHistory ? (
+            <div className="p-8 text-center text-slate-400 text-xs">
+              <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-teal-600" />
+              <span>Loading database audit logs...</span>
+            </div>
+          ) : historyList.length === 0 ? (
+            <div className="p-8 text-center text-slate-400 text-xs border border-dashed border-slate-200 rounded-2xl">
+              <Database className="w-6 h-6 mx-auto mb-2 text-slate-300" />
+              <span>No recorded setting changes yet. Any future saves will be permanently logged here.</span>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {historyList.map((item, idx) => {
+                const isRestoring = restoringId === item.id;
+                const changedKeysArray = Array.isArray(item.changedKeys) ? item.changedKeys : [];
+                return (
+                  <div
+                    key={item.id || idx}
+                    className="p-4 rounded-2xl bg-white border border-slate-200/80 hover:border-teal-500/40 shadow-xs transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                  >
+                    <div className="space-y-1.5 flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
+                          #{item.id.slice(-6)}
+                        </span>
+                        <span className="text-xs font-bold text-slate-800">
+                          {item.changedBy || 'Administrator'}
+                        </span>
+                        <span className="text-[11px] text-slate-400">
+                          • {new Date(item.createdAt).toLocaleString()}
+                        </span>
+                      </div>
+
+                      <p className="text-xs text-slate-600 leading-relaxed font-sans">
+                        {item.changeSummary || `Modified ${changedKeysArray.length} setting parameter(s)`}
+                      </p>
+
+                      {changedKeysArray.length > 0 && (
+                        <div className="flex flex-wrap gap-1 pt-1">
+                          {changedKeysArray.map((key) => (
+                            <span
+                              key={key}
+                              className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-100"
+                            >
+                              {key}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="shrink-0 flex items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => handleRestoreRevision(item)}
+                        disabled={isRestoring}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-teal-50 border border-slate-200 hover:border-teal-200 text-slate-700 hover:text-teal-800 text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
+                        title="Rollback platform settings to this saved version"
+                      >
+                        <RotateCcw className={`w-3.5 h-3.5 ${isRestoring ? 'animate-spin text-teal-600' : 'text-slate-500'}`} />
+                        <span>{isRestoring ? 'Restoring...' : 'Restore Revision'}</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* ================================================================= */}
         {/* SAVE BAR */}
         {/* ================================================================= */}
         <div className="flex items-center justify-between pt-2 pb-8 sticky bottom-4 z-20">
           {savedSuccess ? (
             <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 px-4 py-2 rounded-full border border-emerald-200 shadow-md">
               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <span>AI model & platform settings successfully saved and active across the whole project!</span>
+              <span>Settings recorded in database and active across the whole project!</span>
             </div>
           ) : (
             <div />
@@ -693,7 +934,7 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({
             className="inline-flex items-center gap-2 px-7 py-3 rounded-full bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-700 hover:to-teal-600 text-white text-xs font-bold shadow-lg shadow-teal-500/25 active:scale-95 transition-all cursor-pointer"
           >
             <Save className="w-4 h-4" />
-            <span>Save & Apply AI Configuration</span>
+            <span>Save & Record Settings to Database</span>
           </button>
         </div>
       </form>
