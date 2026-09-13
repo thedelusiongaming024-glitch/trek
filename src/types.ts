@@ -179,7 +179,13 @@ export interface PlatformSettings {
   announcementText: string;
   showAnnouncement: boolean;
   primarySupportEmail: string;
+  whatsapp?: string;
+  phone?: string;
   slaHours: number;
+  activeAiModel?: string;
+  aiProvider?: 'auto' | 'gemini' | 'openai';
+  aiTemperature?: number;
+  aiMaxTokens?: number;
   floatingSupportEnabled?: boolean;
   floatingSupportTagTextEn?: string;
   floatingSupportTagTextBn?: string;
@@ -200,6 +206,22 @@ export interface KnowledgeDocument {
   updatedAt?: string;
 }
 
+export interface AIModelPreset {
+  id: string;
+  name: string;
+  displayName?: string;
+  provider: 'gemini' | 'openai' | 'custom' | 'local';
+  providerLabel: string;
+  providerName?: string;
+  badge: string;
+  speed: 'Ultra Fast' | 'Fast' | 'Deep Reasoning' | 'Instant (5ms)';
+  tier?: 'flagship' | 'fast' | 'reasoning' | 'standard';
+  description: string;
+  contextWindow: string;
+  bestFor?: string;
+  recommended?: boolean;
+}
+
 export interface AIKnowledgeStatus {
   totalFaqs: number;
   totalChunks: number;
@@ -209,4 +231,13 @@ export interface AIKnowledgeStatus {
   lastSyncedAt: string;
   liveSyncStatus: 'ACTIVE' | 'SYNCING' | 'READY';
   models: string[];
+  activeModel?: string;
+  activeAiModel?: string;
+  aiProvider?: string;
+  aiTemperature?: number;
+  geminiConfigured?: boolean;
+  openaiConfigured?: boolean;
+  hasGeminiKey?: boolean;
+  hasOpenAiKey?: boolean;
+  availableModels?: AIModelPreset[];
 }

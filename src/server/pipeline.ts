@@ -16,6 +16,9 @@ export interface PipelineSettings {
   phone: string;
   whatsapp: string;
   slaHours: number;
+  activeAiModel?: string;
+  aiProvider?: 'auto' | 'gemini' | 'openai';
+  aiTemperature?: number;
 }
 
 /** Builds a wa.me deep link from whatever format the admin saved the WhatsApp number in. */
@@ -500,6 +503,101 @@ export function matchFuzzyFAQ(
 // STAGE 2: GROUNDED LLM GENERATION (Composite / Exploratory)
 // ============================================================
 
+const OPENAI_SUPPORT_JSON_SCHEMA = {
+  name: 'support_chat_reply',
+  strict: true,
+  schema: {
+    type: 'object',
+    properties: {
+      classification: {
+        type: 'string',
+        description: 'One of: GREETING, IN_SCOPE_ANSWER, CLARIFYING_QUESTION, INSUFFICIENT_KNOWLEDGE, OFF_TOPIC'
+      },
+      reply: {
+        type: 'string',
+        description: "The assistant's markdown response. If escalation is required, start with 'INSUFFICIENT_KNOWLEDGE: [brief note]'."
+      },
+      ticketSubject: {
+        type: 'string',
+        description: 'Concise subject for the ticket if escalation is needed, else empty string'
+      },
+      ticketPriority: {
+        type: 'string',
+        description: 'Priority: Normal, High, or Urgent if escalation is needed'
+      },
+      suggestedActions: {
+        type: 'array',
+        items: { type: 'string' },
+        description: '2 to 3 contextual follow-up prompts for the user'
+      }
+    },
+    required: ['classification', 'reply', 'ticketSubject', 'ticketPriority', 'suggestedActions'],
+    additionalProperties: false
+  }
+} as const;
+
+async function callOpenAIGroundedLLM(
+  modelName: string,
+  systemInstruction: string,
+  rawHistory: any[],
+  cleanMsg: string
+): Promise<{ classification: string; reply: string; ticketSubject?: string; ticketPriority?: string; suggestedActions?: string[] } | null> {
+  if (!process.env.OPENAI_API_KEY) return null;
+
+  const openAiMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+    { role: 'system', content: systemInstruction }
+  ];
+
+  for (const turn of rawHistory) {
+    if (turn && typeof turn.text === 'string' && turn.text.trim()) {
+      openAiMessages.push({
+        role: turn.sender === 'user' ? 'user' : 'assistant',
+        content: turn.text.trim()
+      });
+    }
+  }
+  openAiMessages.push({ role: 'user', content: cleanMsg });
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 9000);
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: modelName,
+        messages: openAiMessages,
+        response_format: { type: 'json_schema', json_schema: OPENAI_SUPPORT_JSON_SCHEMA },
+        max_completion_tokens: 1200,
+        temperature: 0.45
+      }),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => '');
+      console.warn(`[OpenAI GroundedLLM] ${modelName} returned status ${response.status}: ${errText.slice(0, 200)}`);
+      return null;
+    }
+
+    const data: any = await response.json();
+    const rawContent = data?.choices?.[0]?.message?.content;
+    if (!rawContent) return null;
+
+    return JSON.parse(rawContent);
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    console.warn(`[OpenAI GroundedLLM] ${modelName} call failed:`, err?.message || err);
+    return null;
+  }
+}
+
 export async function generateGroundedLLM(
   cleanMsg: string,
   userLang: 'en' | 'bn',
@@ -511,25 +609,15 @@ export async function generateGroundedLLM(
   settings: PipelineSettings,
   createTicketFn: (ticketData: any) => Promise<any>
 ): Promise<PipelineResult | null> {
-  if (!process.env.GEMINI_API_KEY) {
-    return null;
-  }
+  const preferredModel = (settings.activeAiModel || 'gemini-2.5-flash').trim();
+  const explicitProvider = settings.aiProvider || 'auto';
 
-  const candidateModels = [
-    'gemini-2.5-flash',
-    'gemini-3.8-flash',
-    'gemini-3.1-flash-lite',
-    'gemini-flash-latest'
-  ];
-
-  const ai = new GoogleGenAI({
-    apiKey: process.env.GEMINI_API_KEY,
-    httpOptions: {
-      headers: {
-        'User-Agent': 'aistudio-build',
-      }
-    }
-  });
+  const isModelOpenAi =
+    explicitProvider === 'openai' ||
+    preferredModel.startsWith('gpt-') ||
+    preferredModel.startsWith('o1-') ||
+    preferredModel.startsWith('o3-') ||
+    preferredModel.startsWith('chatgpt-');
 
   const systemInstruction = `You are Trek Consultancy's Official AI Business Setup & Growth Assistant, speaking on a support chat widget on trekconsultancy.com. Trek Consultancy helps foreign investors and companies establish and grow businesses in Saudi Arabia, with additional offices in the USA and Bangladesh.
 
@@ -573,174 +661,230 @@ ESCALATION (creates a real support ticket with a ${settings.slaHours}-hour SLA �
 - Never escalate just because one exact figure is missing, because the question is broad, or because a clarifying question would resolve it — ask the clarifying question or give your best grounded answer instead.
 - When you do escalate, still answer whatever part of the question the KB *does* cover first, so the user gets real value immediately instead of only a ticket number. Then format that portion followed by 'INSUFFICIENT_KNOWLEDGE: [one concise line on what specifically needs advisor review]' — e.g. "INSUFFICIENT_KNOWLEDGE: Client needs a custom quotation for an industrial MISA license plus commercial office lease."`;
 
-  // Assemble multi-turn conversational turns
-  const conversationTurns: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = [];
+  // Helper to handle ticket creation when escalation is triggered
+  const handleEscalationResult = async (parsedAi: { classification: string; reply: string; ticketSubject?: string; ticketPriority?: string; suggestedActions?: string[] }) => {
+    const isInsufficient =
+      parsedAi.classification === 'INSUFFICIENT_KNOWLEDGE' ||
+      parsedAi.classification === 'COMPANY_SPECIFIC_NEEDS_TICKET' ||
+      (typeof parsedAi.reply === 'string' && parsedAi.reply.includes('INSUFFICIENT_KNOWLEDGE:'));
 
-  for (const turn of rawHistory) {
-    if (turn && typeof turn.text === 'string' && turn.text.trim()) {
-      const role = turn.sender === 'user' ? 'user' : 'model';
-      if (conversationTurns.length === 0 && role !== 'user') continue;
-      if (conversationTurns.length > 0 && conversationTurns[conversationTurns.length - 1].role === role) {
-        conversationTurns[conversationTurns.length - 1].parts[0].text += `\n${turn.text.trim()}`;
+    if (isInsufficient) {
+      const noteMatch = parsedAi.reply.match(/INSUFFICIENT_KNOWLEDGE:\s*\[?(.*?)\]?(\n|$)/i);
+      const note = noteMatch && noteMatch[1] ? noteMatch[1].trim() : (parsedAi.ticketSubject || cleanMsg.slice(0, 60));
+
+      const autoTicket = await createTicketFn({
+        userEmail: cleanEmail || undefined,
+        userId: cleanUserId || undefined,
+        subject: note || parsedAi.ticketSubject || cleanMsg.slice(0, 60),
+        question: cleanMsg,
+        priority: parsedAi.ticketPriority || (cleanMsg.toLowerCase().includes('urgent') ? 'High' : 'Normal'),
+        sessionId: cleanSession,
+        source: 'AI_Auto'
+      });
+
+      let finalReply = parsedAi.reply.replace(/INSUFFICIENT_KNOWLEDGE:\s*\[?.*?\]?(\n|$)/gi, '').trim();
+      if (!finalReply || finalReply.length < 10) {
+        finalReply = userLang === 'bn'
+          ? `এই প্রশ্নটার জন্য একজন অ্যাডভাইজরের সরাসরি চোখ বুলানো দরকার, তাই একটা টিকিট খুলে দিলাম: **#${autoTicket.ticketNumber}**। ${settings.slaHours} ঘণ্টার মধ্যে একজন সিনিয়র অ্যাডভাইজর আপনার সাথে যোগাযোগ করবেন।\n\nদ্রুত দরকার হলে সরাসরি যোগাযোগ করুন:\n- 📱 **হোয়াটসঅ্যাপ**: [${settings.whatsapp}](${buildWhatsAppLink(settings.whatsapp)})\n- 📞 **ফোন**: ${settings.phone}\n- ✉️ **ইমেইল**: ${settings.supportEmail}`
+          : `This one really needs a closer look from an advisor, so I've opened ticket **#${autoTicket.ticketNumber}** for you. A senior advisor will follow up within ${settings.slaHours} hours.\n\nIf it's urgent, reach us directly:\n- 📱 **WhatsApp**: [${settings.whatsapp}](${buildWhatsAppLink(settings.whatsapp)})\n- 📞 **Phone**: ${settings.phone}\n- ✉️ **Email**: ${settings.supportEmail}`;
       } else {
-        conversationTurns.push({
-          role,
-          parts: [{ text: turn.text.trim() }]
-        });
+        if (finalReply.includes('{{TICKET_NUMBER}}')) {
+          finalReply = finalReply.replace(/\{\{TICKET_NUMBER\}\}/g, `#${autoTicket.ticketNumber}`);
+        } else if (!finalReply.includes(autoTicket.ticketNumber)) {
+          finalReply += `\n\n**Official Support Ticket Created**: #${autoTicket.ticketNumber} (Advisor response within ${settings.slaHours} hours)`;
+        }
+      }
+
+      return {
+        reply: finalReply,
+        source: 'AI_AUTO_TICKET' as const,
+        suggestedActions: ['Track in My Tickets', 'Contact on WhatsApp', 'Book Free Consultation'],
+        autoTicket,
+        createdTicket: autoTicket,
+        stageExecuted: 'STAGE_4_HUMAN_TICKET' as const
+      };
+    }
+
+    const suggested = Array.isArray(parsedAi.suggestedActions) && parsedAi.suggestedActions.length > 0
+      ? parsedAi.suggestedActions.slice(0, 3)
+      : ['Saudi Business Setup', 'Contact on WhatsApp', 'Book Free Consultation'];
+
+    return {
+      reply: parsedAi.reply,
+      source: 'AI' as const,
+      suggestedActions: suggested,
+      stageExecuted: 'STAGE_2_GROUNDED_LLM' as const
+    };
+  };
+
+  // Execution Path 1: If OpenAI is preferred or requested
+  if (isModelOpenAi && process.env.OPENAI_API_KEY) {
+    const openAiCandidates = Array.from(new Set([preferredModel, 'gpt-4.1-mini', 'gpt-4o', 'gpt-5-mini', 'gpt-4o-mini']));
+    for (const modelName of openAiCandidates) {
+      try {
+        const parsed = await callOpenAIGroundedLLM(modelName, systemInstruction, rawHistory, cleanMsg);
+        if (parsed && parsed.reply) {
+          return await handleEscalationResult(parsed);
+        }
+      } catch (e) {
+        console.warn(`[OpenAI GroundedLLM] Candidate ${modelName} failed:`, e);
       }
     }
   }
 
-  if (conversationTurns.length > 0 && conversationTurns[conversationTurns.length - 1].role === 'user') {
-    conversationTurns[conversationTurns.length - 1].parts[0].text += `\n${cleanMsg}`;
-  } else {
-    conversationTurns.push({
-      role: 'user',
-      parts: [{ text: cleanMsg }]
-    });
-  }
+  // Execution Path 2: Google Gemini
+  if (process.env.GEMINI_API_KEY) {
+    const geminiCandidates = Array.from(new Set([
+      isModelOpenAi ? 'gemini-2.5-flash' : preferredModel,
+      'gemini-2.5-flash',
+      'gemini-3.8-flash',
+      'gemini-3.1-flash-lite',
+      'gemini-flash-latest'
+    ]));
 
-  const geminiContents = conversationTurns.length > 1 ? conversationTurns : cleanMsg;
-
-  for (const modelName of candidateModels) {
-    try {
-      const response = await Promise.race([
-        ai.models.generateContent({
-          model: modelName,
-          contents: geminiContents as any,
-          config: {
-            systemInstruction,
-            responseMimeType: 'application/json',
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                classification: {
-                  type: Type.STRING,
-                  description: 'One of: GREETING, IN_SCOPE_ANSWER, CLARIFYING_QUESTION, INSUFFICIENT_KNOWLEDGE, OFF_TOPIC. Prefer IN_SCOPE_ANSWER or CLARIFYING_QUESTION over INSUFFICIENT_KNOWLEDGE whenever you can genuinely answer or a single follow-up question would let you answer.'
-                },
-                reply: {
-                  type: Type.STRING,
-                  description: "The assistant's markdown response. If escalation is required, start with 'INSUFFICIENT_KNOWLEDGE: [brief note]'."
-                },
-                ticketSubject: {
-                  type: Type.STRING,
-                  description: 'Concise subject for the ticket if escalation is needed, else empty string'
-                },
-                ticketPriority: {
-                  type: Type.STRING,
-                  description: 'Priority: Normal, High, or Urgent if escalation is needed'
-                },
-                suggestedActions: {
-                  type: Type.ARRAY,
-                  items: { type: Type.STRING },
-                  description: '2 to 3 contextual follow-up prompts for the user'
-                }
-              },
-              required: ['classification', 'reply']
-            },
-            temperature: 0.45,
-            maxOutputTokens: 1200
-          }
-        }),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Gemini API timeout')), 9000))
-      ]);
-
-      if (response && response.text) {
-        let parsedAi: any = null;
-        try {
-          parsedAi = JSON.parse(response.text.trim());
-        } catch {
-          const rawOutput = response.text.trim();
-          if (rawOutput.includes('INSUFFICIENT_KNOWLEDGE:')) {
-            const noteMatch = rawOutput.match(/INSUFFICIENT_KNOWLEDGE:\s*\[?(.*?)\]?(\n|$)/i);
-            const note = noteMatch && noteMatch[1] ? noteMatch[1].trim() : cleanMsg.slice(0, 60);
-
-            const autoTicket = await createTicketFn({
-              userEmail: cleanEmail || undefined,
-              userId: cleanUserId || undefined,
-              subject: note,
-              question: cleanMsg,
-              priority: 'Normal',
-              sessionId: cleanSession,
-              source: 'AI_Auto'
-            });
-
-            return {
-              reply: userLang === 'bn'
-                ? `এই প্রশ্নটার জন্য একজন অ্যাডভাইজরের সরাসরি চোখ বুলানো দরকার, তাই একটা টিকিট খুলে দিলাম: **#${autoTicket.ticketNumber}**। ${settings.slaHours} ঘণ্টার মধ্যে একজন সিনিয়র অ্যাডভাইজর আপনার সাথে যোগাযোগ করবেন।\n\nদ্রুত দরকার হলে সরাসরি যোগাযোগ করুন:\n- 📱 **হোয়াটসঅ্যাপ**: [${settings.whatsapp}](${buildWhatsAppLink(settings.whatsapp)})\n- 📞 **ফোন**: ${settings.phone}\n- ✉️ **ইমেইল**: ${settings.supportEmail}`
-                : `This one really needs a closer look from an advisor, so I've opened ticket **#${autoTicket.ticketNumber}** for you. A senior advisor will follow up within ${settings.slaHours} hours.\n\nIf it's urgent, reach us directly:\n- 📱 **WhatsApp**: [${settings.whatsapp}](${buildWhatsAppLink(settings.whatsapp)})\n- 📞 **Phone**: ${settings.phone}\n- ✉️ **Email**: ${settings.supportEmail}`,
-              source: 'AI_AUTO_TICKET',
-              suggestedActions: ['Track in My Tickets', 'Contact on WhatsApp', 'Book Free Consultation'],
-              autoTicket,
-              stageExecuted: 'STAGE_4_HUMAN_TICKET'
-            };
-          }
-
-          return {
-            reply: rawOutput,
-            source: 'AI',
-            suggestedActions: ['Saudi Business Setup', 'Contact on WhatsApp', 'Book Free Consultation'],
-            stageExecuted: 'STAGE_2_GROUNDED_LLM'
-          };
+    const ai = new GoogleGenAI({
+      apiKey: process.env.GEMINI_API_KEY,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
         }
+      }
+    });
 
-        if (parsedAi && parsedAi.reply) {
-          const isInsufficient =
-            parsedAi.classification === 'INSUFFICIENT_KNOWLEDGE' ||
-            parsedAi.classification === 'COMPANY_SPECIFIC_NEEDS_TICKET' ||
-            (typeof parsedAi.reply === 'string' && parsedAi.reply.includes('INSUFFICIENT_KNOWLEDGE:'));
+    // Assemble multi-turn conversational turns
+    const conversationTurns: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = [];
 
-          if (isInsufficient) {
-            const noteMatch = parsedAi.reply.match(/INSUFFICIENT_KNOWLEDGE:\s*\[?(.*?)\]?(\n|$)/i);
-            const note = noteMatch && noteMatch[1] ? noteMatch[1].trim() : (parsedAi.ticketSubject || cleanMsg.slice(0, 60));
+    for (const turn of rawHistory) {
+      if (turn && typeof turn.text === 'string' && turn.text.trim()) {
+        const role = turn.sender === 'user' ? 'user' : 'model';
+        if (conversationTurns.length === 0 && role !== 'user') continue;
+        if (conversationTurns.length > 0 && conversationTurns[conversationTurns.length - 1].role === role) {
+          conversationTurns[conversationTurns.length - 1].parts[0].text += `\n${turn.text.trim()}`;
+        } else {
+          conversationTurns.push({
+            role,
+            parts: [{ text: turn.text.trim() }]
+          });
+        }
+      }
+    }
 
-            const autoTicket = await createTicketFn({
-              userEmail: cleanEmail || undefined,
-              userId: cleanUserId || undefined,
-              subject: note || parsedAi.ticketSubject || cleanMsg.slice(0, 60),
-              question: cleanMsg,
-              priority: parsedAi.ticketPriority || (cleanMsg.toLowerCase().includes('urgent') ? 'High' : 'Normal'),
-              sessionId: cleanSession,
-              source: 'AI_Auto'
-            });
+    if (conversationTurns.length > 0 && conversationTurns[conversationTurns.length - 1].role === 'user') {
+      conversationTurns[conversationTurns.length - 1].parts[0].text += `\n${cleanMsg}`;
+    } else {
+      conversationTurns.push({
+        role: 'user',
+        parts: [{ text: cleanMsg }]
+      });
+    }
 
-            let finalReply = parsedAi.reply.replace(/INSUFFICIENT_KNOWLEDGE:\s*\[?.*?\]?(\n|$)/gi, '').trim();
-            if (!finalReply || finalReply.length < 10) {
-              finalReply = userLang === 'bn'
-                ? `এই প্রশ্নটার জন্য একজন অ্যাডভাইজরের সরাসরি চোখ বুলানো দরকার, তাই একটা টিকিট খুলে দিলাম: **#${autoTicket.ticketNumber}**। ${settings.slaHours} ঘণ্টার মধ্যে একজন সিনিয়র অ্যাডভাইজর আপনার সাথে যোগাযোগ করবেন।\n\nদ্রুত দরকার হলে সরাসরি যোগাযোগ করুন:\n- 📱 **হোয়াটসঅ্যাপ**: [${settings.whatsapp}](${buildWhatsAppLink(settings.whatsapp)})\n- 📞 **ফোন**: ${settings.phone}\n- ✉️ **ইমেইল**: ${settings.supportEmail}`
-                : `This one really needs a closer look from an advisor, so I've opened ticket **#${autoTicket.ticketNumber}** for you. A senior advisor will follow up within ${settings.slaHours} hours.\n\nIf it's urgent, reach us directly:\n- 📱 **WhatsApp**: [${settings.whatsapp}](${buildWhatsAppLink(settings.whatsapp)})\n- 📞 **Phone**: ${settings.phone}\n- ✉️ **Email**: ${settings.supportEmail}`;
-            } else {
-              if (finalReply.includes('{{TICKET_NUMBER}}')) {
-                finalReply = finalReply.replace(/\{\{TICKET_NUMBER\}\}/g, `#${autoTicket.ticketNumber}`);
-              } else if (!finalReply.includes(autoTicket.ticketNumber)) {
-                finalReply += `\n\n**Official Support Ticket Created**: #${autoTicket.ticketNumber} (Advisor response within 48 hours)`;
-              }
+    const geminiContents = conversationTurns.length > 1 ? conversationTurns : cleanMsg;
+
+    for (const modelName of geminiCandidates) {
+      try {
+        const response = await Promise.race([
+          ai.models.generateContent({
+            model: modelName,
+            contents: geminiContents as any,
+            config: {
+              systemInstruction,
+              responseMimeType: 'application/json',
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  classification: {
+                    type: Type.STRING,
+                    description: 'One of: GREETING, IN_SCOPE_ANSWER, CLARIFYING_QUESTION, INSUFFICIENT_KNOWLEDGE, OFF_TOPIC. Prefer IN_SCOPE_ANSWER or CLARIFYING_QUESTION over INSUFFICIENT_KNOWLEDGE whenever you can genuinely answer or a single follow-up question would let you answer.'
+                  },
+                  reply: {
+                    type: Type.STRING,
+                    description: "The assistant's markdown response. If escalation is required, start with 'INSUFFICIENT_KNOWLEDGE: [brief note]'."
+                  },
+                  ticketSubject: {
+                    type: Type.STRING,
+                    description: 'Concise subject for the ticket if escalation is needed, else empty string'
+                  },
+                  ticketPriority: {
+                    type: Type.STRING,
+                    description: 'Priority: Normal, High, or Urgent if escalation is needed'
+                  },
+                  suggestedActions: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING },
+                    description: '2 to 3 contextual follow-up prompts for the user'
+                  }
+                },
+                required: ['classification', 'reply']
+              },
+              temperature: 0.45,
+              maxOutputTokens: 1200
+            }
+          }),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Gemini API timeout')), 9000))
+        ]);
+
+        if (response && response.text) {
+          let parsedAi: any = null;
+          try {
+            parsedAi = JSON.parse(response.text.trim());
+          } catch {
+            const rawOutput = response.text.trim();
+            if (rawOutput.includes('INSUFFICIENT_KNOWLEDGE:')) {
+              const noteMatch = rawOutput.match(/INSUFFICIENT_KNOWLEDGE:\s*\[?(.*?)\]?(\n|$)/i);
+              const note = noteMatch && noteMatch[1] ? noteMatch[1].trim() : cleanMsg.slice(0, 60);
+
+              const autoTicket = await createTicketFn({
+                userEmail: cleanEmail || undefined,
+                userId: cleanUserId || undefined,
+                subject: note,
+                question: cleanMsg,
+                priority: 'Normal',
+                sessionId: cleanSession,
+                source: 'AI_Auto'
+              });
+
+              return {
+                reply: userLang === 'bn'
+                  ? `এই প্রশ্নটার জন্য একজন অ্যাডভাইজরের সরাসরি চোখ বুলানো দরকার, তাই একটা টিকিট খুলে দিলাম: **#${autoTicket.ticketNumber}**। ${settings.slaHours} ঘণ্টার মধ্যে একজন সিনিয়র অ্যাডভাইজর আপনার সাথে যোগাযোগ করবেন।\n\nদ্রুত দরকার হলে সরাসরি যোগাযোগ করুন:\n- 📱 **হোয়াটসঅ্যাপ**: [${settings.whatsapp}](${buildWhatsAppLink(settings.whatsapp)})\n- 📞 **ফোন**: ${settings.phone}\n- ✉️ **ইমেইল**: ${settings.supportEmail}`
+                  : `This one really needs a closer look from an advisor, so I've opened ticket **#${autoTicket.ticketNumber}** for you. A senior advisor will follow up within ${settings.slaHours} hours.\n\nIf it's urgent, reach us directly:\n- 📱 **WhatsApp**: [${settings.whatsapp}](${buildWhatsAppLink(settings.whatsapp)})\n- 📞 **Phone**: ${settings.phone}\n- ✉️ **Email**: ${settings.supportEmail}`,
+                source: 'AI_AUTO_TICKET',
+                suggestedActions: ['Track in My Tickets', 'Contact on WhatsApp', 'Book Free Consultation'],
+                autoTicket,
+                stageExecuted: 'STAGE_4_HUMAN_TICKET'
+              };
             }
 
             return {
-              reply: finalReply,
-              source: 'AI_AUTO_TICKET',
-              suggestedActions: ['Track in My Tickets', 'Contact on WhatsApp', 'Book Free Consultation'],
-              autoTicket,
-              createdTicket: autoTicket,
-              stageExecuted: 'STAGE_4_HUMAN_TICKET'
+              reply: rawOutput,
+              source: 'AI',
+              suggestedActions: ['Saudi Business Setup', 'Contact on WhatsApp', 'Book Free Consultation'],
+              stageExecuted: 'STAGE_2_GROUNDED_LLM'
             };
           }
 
-          const suggested = Array.isArray(parsedAi.suggestedActions) && parsedAi.suggestedActions.length > 0
-            ? parsedAi.suggestedActions.slice(0, 3)
-            : ['Saudi Business Setup', 'Contact on WhatsApp', 'Book Free Consultation'];
-
-          return {
-            reply: parsedAi.reply,
-            source: 'AI',
-            suggestedActions: suggested,
-            stageExecuted: 'STAGE_2_GROUNDED_LLM'
-          };
+          if (parsedAi && parsedAi.reply) {
+            return await handleEscalationResult(parsedAi);
+          }
         }
+      } catch (err: any) {
+        console.warn(`[Gemini GroundedLLM] ${modelName} failed:`, err?.message || err);
+        continue;
       }
-    } catch {
-      continue;
+    }
+  }
+
+  // Execution Path 3: Fallback to OpenAI if Gemini failed or wasn't available
+  if (!isModelOpenAi && process.env.OPENAI_API_KEY) {
+    const openAiCandidates = ['gpt-4.1-mini', 'gpt-4o', 'gpt-5-mini', 'gpt-4o-mini'];
+    for (const modelName of openAiCandidates) {
+      try {
+        const parsed = await callOpenAIGroundedLLM(modelName, systemInstruction, rawHistory, cleanMsg);
+        if (parsed && parsed.reply) {
+          return await handleEscalationResult(parsed);
+        }
+      } catch (e) {
+        console.warn(`[OpenAI GroundedLLM Fallback] ${modelName} failed:`, e);
+      }
     }
   }
 

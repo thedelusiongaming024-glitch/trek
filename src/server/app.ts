@@ -159,56 +159,155 @@ async function callOpenAIForChunks(
     .filter((c: { content: string }) => c.content.trim().length > 0);
 }
 
-async function runOpenAIKnowledgeExtraction(
+async function callGeminiForChunks(
+  model: string,
+  systemPrompt: string,
+  userContent: any
+): Promise<{ title: string; category: string; content: string }[] | null> {
+  if (!process.env.GEMINI_API_KEY) return null;
+
+  const ai = new GoogleGenAI({
+    apiKey: process.env.GEMINI_API_KEY,
+    httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+  });
+
+  const response = await ai.models.generateContent({
+    model,
+    contents: userContent,
+    config: {
+      systemInstruction: systemPrompt,
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          chunks: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                title: { type: Type.STRING },
+                category: { type: Type.STRING },
+                content: { type: Type.STRING }
+              },
+              required: ['title', 'category', 'content']
+            }
+          }
+        },
+        required: ['chunks']
+      },
+      temperature: 0.2
+    }
+  });
+
+  if (!response.text) return null;
+  const parsed = JSON.parse(response.text.trim());
+  if (!parsed?.chunks || !Array.isArray(parsed.chunks) || parsed.chunks.length === 0) return null;
+
+  return parsed.chunks
+    .map((c: any) => ({
+      title: String(c.title || 'Untitled Chunk'),
+      category: String(c.category || ''),
+      content: String(c.content || '')
+    }))
+    .filter((c: { content: string }) => c.content.trim().length > 0);
+}
+
+async function runAIKnowledgeExtraction(
   fileData: string,
   fileName: string,
   mimeType: string,
-  categoryHint: string
+  categoryHint: string,
+  preferredModel?: string
 ): Promise<{ title: string; category: string; content: string }[]> {
-  const candidateModels = ['gpt-5-mini', 'gpt-4o', 'gpt-4.1-mini'];
+  const activeModel = (preferredModel || 'gpt-4.1-mini').trim();
+  const isGeminiModel = activeModel.startsWith('gemini-');
   const systemPrompt = buildKnowledgeExtractionSystemPrompt(categoryHint);
   const isImage = mimeType.startsWith('image/');
 
-  let userContent: any;
+  let openAiUserContent: any;
+  let geminiUserContent: any;
+
   if (isImage) {
-    // Vision input: fileData is already a data: URL for non-text uploads.
     const imageUrl = fileData.startsWith('data:') ? fileData : `data:${mimeType};base64,${fileData}`;
-    userContent = [
+    openAiUserContent = [
       { type: 'text', text: `File Name: ${fileName}\nPreferred Category: ${categoryHint}\nPlease analyze this image and extract the structured knowledge chunks.` },
       { type: 'image_url', image_url: { url: imageUrl } }
+    ];
+    const base64Data = fileData.includes('base64,') ? fileData.split('base64,')[1] : fileData;
+    geminiUserContent = [
+      `File Name: ${fileName}\nPreferred Category: ${categoryHint}\nPlease analyze this image and extract the structured knowledge chunks.`,
+      { inlineData: { mimeType, data: base64Data } }
     ];
   } else {
     const { text, unsupported } = await extractRawTextFromUpload(fileData, fileName, mimeType);
     if (unsupported || !text.trim()) {
-      // Nothing we can hand to a text model — let the caller's fallback/error path handle it.
       return [];
     }
-    userContent = `File Name: ${fileName}\nFile Type: ${mimeType}\nPreferred Category: ${categoryHint}\n\nDocument Content:\n${text}`;
+    const textPrompt = `File Name: ${fileName}\nFile Type: ${mimeType}\nPreferred Category: ${categoryHint}\n\nDocument Content:\n${text}`;
+    openAiUserContent = textPrompt;
+    geminiUserContent = textPrompt;
   }
 
-  for (const model of candidateModels) {
-    for (let attempt = 0; attempt < 2; attempt++) {
+  // 1. If Gemini model is preferred and key is present
+  if (isGeminiModel && process.env.GEMINI_API_KEY) {
+    const geminiCandidates = Array.from(new Set([activeModel, 'gemini-2.5-flash', 'gemini-3.8-flash', 'gemini-3.1-flash-lite']));
+    for (const model of geminiCandidates) {
       try {
-        const chunks = await callOpenAIForChunks(model, systemPrompt, userContent);
+        const chunks = await callGeminiForChunks(model, systemPrompt, geminiUserContent);
         if (chunks && chunks.length > 0) return chunks;
-        break; // valid response but no chunks — no point retrying this model
       } catch (err: any) {
-        const msg = err?.message || String(err);
-        console.error(`[knowledge-extract] OpenAI model "${model}" attempt ${attempt + 1} failed:`, msg);
-        if (err?.status === 401 || msg.includes('invalid_api_key') || msg.includes('Incorrect API key')) {
-          console.error('[knowledge-extract] OPENAI_API_KEY looks invalid or missing. Generate one at https://platform.openai.com/api-keys and set it in your deployment\'s environment variables.');
-        }
-        const isTransient = err?.status === 429 || err?.status === 503 || msg.includes('rate_limit') || msg.includes('overloaded');
-        if (isTransient && attempt === 0) {
-          await new Promise(r => setTimeout(r, 500));
-          continue;
-        }
-        break;
+        console.warn(`[knowledge-extract] Gemini model "${model}" extraction attempt failed:`, err?.message || err);
       }
     }
   }
 
-  console.warn(`[knowledge-extract] All OpenAI models failed for "${fileName}" — falling back to non-AI chunker. Check the logged model errors above.`);
+  // 2. If OpenAI model is preferred (or Gemini fallback) and OpenAI key is present
+  if (process.env.OPENAI_API_KEY) {
+    const openAiCandidates = Array.from(new Set([
+      isGeminiModel ? 'gpt-4.1-mini' : activeModel,
+      'gpt-4.1-mini',
+      'gpt-4o',
+      'gpt-5-mini',
+      'gpt-4o-mini'
+    ]));
+
+    for (const model of openAiCandidates) {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const chunks = await callOpenAIForChunks(model, systemPrompt, openAiUserContent);
+          if (chunks && chunks.length > 0) return chunks;
+          break;
+        } catch (err: any) {
+          const msg = err?.message || String(err);
+          console.error(`[knowledge-extract] OpenAI model "${model}" attempt ${attempt + 1} failed:`, msg);
+          if (err?.status === 401 || msg.includes('invalid_api_key') || msg.includes('Incorrect API key')) {
+            console.error('[knowledge-extract] OPENAI_API_KEY looks invalid or missing.');
+          }
+          const isTransient = err?.status === 429 || err?.status === 503 || msg.includes('rate_limit') || msg.includes('overloaded');
+          if (isTransient && attempt === 0) {
+            await new Promise(r => setTimeout(r, 500));
+            continue;
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  // 3. If OpenAI was preferred but failed, try Gemini as secondary AI fallback
+  if (!isGeminiModel && process.env.GEMINI_API_KEY) {
+    const geminiCandidates = ['gemini-2.5-flash', 'gemini-3.8-flash', 'gemini-3.1-flash-lite'];
+    for (const model of geminiCandidates) {
+      try {
+        const chunks = await callGeminiForChunks(model, systemPrompt, geminiUserContent);
+        if (chunks && chunks.length > 0) return chunks;
+      } catch (err: any) {
+        console.warn(`[knowledge-extract] Gemini fallback model "${model}" failed:`, err?.message || err);
+      }
+    }
+  }
+
+  console.warn(`[knowledge-extract] All AI models failed for "${fileName}" — falling back to non-AI chunker.`);
   return [];
 }
 
@@ -1687,7 +1786,10 @@ export async function createApp() {
         forumName,
         slaHours: typeof slaHours === 'number' ? slaHours : 48,
         phone,
-        whatsapp
+        whatsapp,
+        activeAiModel: platformSettings.activeAiModel || 'gemini-2.5-flash',
+        aiProvider: platformSettings.aiProvider || 'auto',
+        aiTemperature: typeof platformSettings.aiTemperature === 'number' ? platformSettings.aiTemperature : 0.2
       };
 
       const lower = cleanMsg.toLowerCase().trim();
@@ -2246,28 +2348,30 @@ export async function createApp() {
 
       let extractedChunks: { title: string; category: string; content: string }[] = [];
 
-      // 1. If an OpenAI API key is present, use it for AI-powered chunk extraction
-      // (with model failover/retry). This replaced the previous Gemini-based
-      // extraction for this endpoint because Google's "AQ." auth-key rollout
-      // currently breaks simple API-key auth against generativelanguage.googleapis.com
-      // — see https://discuss.ai.google.dev for the ongoing issue. Gemini is still
-      // used elsewhere in this app (the support chat pipeline) and is untouched.
-      if (process.env.OPENAI_API_KEY) {
-        extractedChunks = await runOpenAIKnowledgeExtraction(fileData, cleanFileName, cleanMime, cleanCategory);
+      // 1. Fetch current platform settings to get active AI model
+      let targetModel = req.body.preferredModel;
+      if (!targetModel) {
+        try {
+          const settingsRes = await pool.query("SELECT value FROM settings WHERE key = 'platform'");
+          const platform = settingsRes.rows[0]?.value || {};
+          targetModel = platform.activeAiModel || 'gpt-4.1-mini';
+        } catch {
+          targetModel = 'gpt-4.1-mini';
+        }
       }
 
-      // 2. High-quality intelligent fallback extraction if Gemini is unavailable/failed.
-      // IMPORTANT: this must never decode arbitrary binary (PDF, DOCX, images) as UTF-8 —
-      // that previously produced "chunks" made of raw PDF/DOCX file structure bytes
-      // (e.g. "%PDF-1.4", "1 0 obj") instead of an error, which looked like a working
-      // but very dumb extraction rather than a failure.
+      // 2. Perform AI-powered multi-model extraction with intelligent fallback
+      extractedChunks = await runAIKnowledgeExtraction(fileData, cleanFileName, cleanMime, cleanCategory, targetModel);
+
+      // 3. High-quality intelligent non-AI fallback extraction if AI models were unavailable/failed.
+      // IMPORTANT: this must never decode arbitrary binary (PDF, DOCX, images) as UTF-8.
       if (extractedChunks.length === 0) {
         const { text: textToChunk, unsupported } = await extractRawTextFromUpload(fileData, cleanFileName, cleanMime);
         const baseTitle = cleanFileName.replace(/\.[^/.]+$/, '');
 
         if (unsupported) {
           return res.status(422).json({
-            error: `AI extraction failed for "${cleanFileName}" and this file type has no offline fallback (scanned images and legacy .doc files need working AI extraction). Check the server logs for the AI extraction error (invalid OPENAI_API_KEY, retired model, or quota), or re-save the file as PDF/DOCX/TXT/MD and try again.`
+            error: `AI extraction failed for "${cleanFileName}" and this file type has no offline fallback (scanned images and legacy .doc files need working AI extraction). Check the server logs or try switching the active AI model in Admin Settings.`
           });
         }
 
@@ -2335,7 +2439,7 @@ export async function createApp() {
         }
       }
 
-      // 3. If autoSave is enabled, persist chunks directly into PostgreSQL
+      // 4. If autoSave is enabled, persist chunks directly into PostgreSQL
       const savedDocs: any[] = [];
       if (autoSave && extractedChunks.length > 0) {
         for (const chunk of extractedChunks) {
@@ -2353,6 +2457,7 @@ export async function createApp() {
       res.json({
         success: true,
         fileName: cleanFileName,
+        modelUsed: targetModel,
         extractedChunksCount: extractedChunks.length,
         chunks: extractedChunks,
         savedDocs: savedDocs
@@ -2363,7 +2468,7 @@ export async function createApp() {
     }
   });
 
-  // Support Admin: AI Real-Time Knowledge & RAG Status
+  // Support Admin: AI Real-Time Knowledge & Model Status
   app.get('/api/admin/support/ai-knowledge-status', async (_req, res) => {
     try {
       const faqsCount = await pool.query(`SELECT COUNT(*) FROM faqs WHERE status = 'published'`);
@@ -2371,19 +2476,269 @@ export async function createApp() {
       const topicsCount = await pool.query(`SELECT COUNT(*) FROM topics`);
       const settingsData = await pool.query(`SELECT value FROM settings WHERE key = 'platform'`);
       const platform = settingsData.rows[0]?.value || {};
+      const activeAiModel = platform.activeAiModel || 'gemini-2.5-flash';
+      const aiProvider = platform.aiProvider || 'auto';
+      const hasGeminiKey = !!process.env.GEMINI_API_KEY;
+      const hasOpenAiKey = !!process.env.OPENAI_API_KEY;
 
       res.json({
         totalFaqs: parseInt(faqsCount.rows[0].count, 10),
         totalChunks: parseInt(chunksCount.rows[0].count, 10),
         totalTopics: parseInt(topicsCount.rows[0].count, 10),
-        platformBrand: platform.forumName || 'Ama Community',
-        primaryEmail: platform.primarySupportEmail || 'support@amacommunity.io',
+        platformBrand: platform.forumName || 'Trek Consultancy',
+        primaryEmail: platform.primarySupportEmail || 'contact@trekconsultancy.com',
         lastSyncedAt: new Date().toISOString(),
         liveSyncStatus: 'ACTIVE',
-        models: ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite', 'Local PostgreSQL RAG Fallback']
+        activeAiModel,
+        aiProvider,
+        aiTemperature: typeof platform.aiTemperature === 'number' ? platform.aiTemperature : 0.2,
+        hasGeminiKey,
+        hasOpenAiKey,
+        models: [
+          activeAiModel,
+          'gemini-2.5-flash',
+          'gemini-3.8-flash',
+          'gpt-4.1-mini',
+          'gpt-4o',
+          'gpt-5-mini',
+          'Local PostgreSQL RAG Fallback'
+        ]
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Support Admin: Real-time Live Model Test & Diagnostics
+  app.post('/api/admin/support/test-model', async (req, res) => {
+    const startTime = Date.now();
+    let modelToTest = 'gemini-2.5-flash';
+    let providerName = 'Google Gemini';
+
+    try {
+      const settingsData = await pool.query(`SELECT value FROM settings WHERE key = 'platform'`);
+      const platform = settingsData.rows[0]?.value || {};
+      modelToTest = (req.body.model || platform.activeAiModel || 'gemini-2.5-flash').trim();
+      const testPrompt = (req.body.message || 'Please respond in 1-2 concise sentences confirming that this AI model is active, operational, and connected to the Trek Consultancy platform.').trim();
+
+      const isLocalRag = modelToTest === 'local-rag' || req.body.provider === 'local';
+      const isOpenAi = !isLocalRag && (modelToTest.startsWith('gpt-') || modelToTest.startsWith('o1-') || modelToTest.startsWith('o3-') || req.body.provider === 'openai');
+      providerName = isLocalRag ? 'PostgreSQL Database' : isOpenAi ? 'OpenAI' : 'Google Gemini';
+
+      // Helper to execute PostgreSQL Local RAG
+      const getLocalRagSynthesis = async (queryText: string) => {
+        const [faqsData, docsData] = await Promise.all([
+          pool.query(`
+            SELECT f.question, f.answer, f.question_bn, f.answer_bn, COALESCE(c.name, 'General') as category 
+            FROM faqs f 
+            LEFT JOIN faq_categories c ON f.category_id = c.id 
+            WHERE f.status = 'published' OR f.status IS NULL OR f.status = 'active'
+          `),
+          pool.query(`
+            SELECT id, title, content, category, status 
+            FROM knowledge_documents 
+            WHERE status = 'published' OR status IS NULL OR status = 'active'
+          `)
+        ]);
+
+        const pipelineSettings: PipelineSettings = {
+          forumName: platform.forumName || 'Trek Consultancy',
+          supportEmail: platform.primarySupportEmail || 'contact@trekconsultancy.com',
+          phone: platform.phone || '+966 55 363 8960',
+          whatsapp: platform.whatsapp || '+966 50 241 1744',
+          slaHours: platform.slaHours || 48
+        };
+
+        const directKb = matchDirectKB(queryText, 'en', pipelineSettings);
+        if (directKb) return directKb.reply;
+
+        const fuzzy = matchFuzzyFAQ(queryText, 'en', faqsData.rows, docsData.rows);
+        if (fuzzy) return fuzzy.reply;
+
+        // Semantic word overlap search in knowledge_documents
+        const terms = queryText.toLowerCase().split(/\s+/).filter(t => t.length > 3);
+        let bestDoc: any = null;
+        let bestScore = 0;
+
+        for (const doc of docsData.rows) {
+          const contentLower = `${doc.title || ''} ${doc.content || ''}`.toLowerCase();
+          let score = 0;
+          for (const t of terms) {
+            if (contentLower.includes(t)) score += 1;
+          }
+          if (score > bestScore) {
+            bestScore = score;
+            bestDoc = doc;
+          }
+        }
+
+        if (bestDoc && bestScore > 0) {
+          return `**${bestDoc.title}** (${bestDoc.category || 'General'}):\n${bestDoc.content.slice(0, 450)}...`;
+        }
+
+        return `Trek Consultancy provides end-to-end foreign business setup in Saudi Arabia (MISA licensing, 100% foreign ownership, Commercial Registration, corporate banking), custom software & ERP development, and investor visa services. Reach our advisory team directly via WhatsApp (${pipelineSettings.whatsapp}) or email (${pipelineSettings.supportEmail}).`;
+      };
+
+      if (isLocalRag) {
+        const ragReply = await getLocalRagSynthesis(testPrompt);
+        const latencyMs = Date.now() - startTime;
+        return res.status(200).json({
+          success: true,
+          model: 'PostgreSQL Local RAG',
+          provider: 'PostgreSQL Database',
+          latencyMs,
+          reply: ragReply,
+          isLocalRag: true
+        });
+      }
+
+      if (isOpenAi) {
+        if (!process.env.OPENAI_API_KEY) {
+          const ragFallback = await getLocalRagSynthesis(testPrompt);
+          return res.status(200).json({
+            success: false,
+            model: modelToTest,
+            provider: 'OpenAI',
+            latencyMs: 0,
+            error: 'OPENAI_API_KEY is not configured in the server environment (Settings > Secrets).',
+            ragFallbackReply: ragFallback,
+            hasRagFallback: true
+          });
+        }
+
+        try {
+          const openAiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
+            },
+            body: JSON.stringify({
+              model: modelToTest,
+              messages: [
+                { role: 'system', content: 'You are the official AI test assistant for Trek Consultancy. Reply concisely.' },
+                { role: 'user', content: testPrompt }
+              ],
+              max_tokens: 300,
+              temperature: 0.2
+            })
+          });
+
+          const latencyMs = Date.now() - startTime;
+          if (!openAiRes.ok) {
+            const errText = await openAiRes.text().catch(() => '');
+            const isAuth = openAiRes.status === 401 || errText.includes('invalid_api_key');
+            const ragFallback = await getLocalRagSynthesis(testPrompt);
+            return res.status(200).json({
+              success: false,
+              model: modelToTest,
+              provider: 'OpenAI',
+              latencyMs,
+              error: isAuth
+                ? 'OpenAI Authentication Error (HTTP 401: Invalid API Key).'
+                : `OpenAI API returned HTTP ${openAiRes.status}: ${errText.slice(0, 200)}`,
+              ragFallbackReply: ragFallback,
+              hasRagFallback: true
+            });
+          }
+
+          const data: any = await openAiRes.json();
+          const reply = data?.choices?.[0]?.message?.content || 'No text content returned';
+          return res.status(200).json({
+            success: true,
+            model: modelToTest,
+            provider: 'OpenAI',
+            latencyMs,
+            reply,
+            usage: data?.usage
+          });
+        } catch (openAiErr: any) {
+          const latencyMs = Date.now() - startTime;
+          const ragFallback = await getLocalRagSynthesis(testPrompt);
+          return res.status(200).json({
+            success: false,
+            model: modelToTest,
+            provider: 'OpenAI',
+            latencyMs,
+            error: `OpenAI Network/Execution Error: ${openAiErr?.message || 'Connection failed'}`,
+            ragFallbackReply: ragFallback,
+            hasRagFallback: true
+          });
+        }
+      } else {
+        // Google Gemini
+        if (!process.env.GEMINI_API_KEY) {
+          const ragFallback = await getLocalRagSynthesis(testPrompt);
+          return res.status(200).json({
+            success: false,
+            model: modelToTest,
+            provider: 'Google Gemini',
+            latencyMs: 0,
+            error: 'GEMINI_API_KEY is not configured in the server environment (Settings > Secrets).',
+            ragFallbackReply: ragFallback,
+            hasRagFallback: true
+          });
+        }
+
+        try {
+          const ai = new GoogleGenAI({
+            apiKey: process.env.GEMINI_API_KEY,
+            httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+          });
+
+          const geminiRes = await ai.models.generateContent({
+            model: modelToTest,
+            contents: testPrompt,
+            config: {
+              systemInstruction: 'You are the official AI test assistant for Trek Consultancy. Reply concisely in 1-2 sentences.',
+              maxOutputTokens: 300,
+              temperature: 0.2
+            }
+          });
+
+          const latencyMs = Date.now() - startTime;
+          return res.status(200).json({
+            success: true,
+            model: modelToTest,
+            provider: 'Google Gemini',
+            latencyMs,
+            reply: geminiRes.text?.trim() || 'Operational'
+          });
+        } catch (geminiErr: any) {
+          const latencyMs = Date.now() - startTime;
+          const rawErr = geminiErr?.message || String(geminiErr);
+          const isAuthError =
+            rawErr.includes('401') ||
+            rawErr.includes('UNAUTHENTICATED') ||
+            rawErr.includes('ACCESS_TOKEN_TYPE_UNSUPPORTED') ||
+            rawErr.includes('invalid authentication credentials');
+
+          const formattedError = isAuthError
+            ? 'Cloud AI Key Authentication: To use live Gemini cloud inference, provide an API key in Settings > Secrets. In the meantime, the PostgreSQL Knowledge RAG engine is fully operational.'
+            : `Gemini API Error: ${rawErr.slice(0, 300)}`;
+
+          const ragFallback = await getLocalRagSynthesis(testPrompt);
+
+          return res.status(200).json({
+            success: false,
+            model: modelToTest,
+            provider: 'Google Gemini',
+            latencyMs,
+            error: formattedError,
+            ragFallbackReply: ragFallback,
+            hasRagFallback: true
+          });
+        }
+      }
+    } catch (err: any) {
+      const latencyMs = Date.now() - startTime;
+      res.status(200).json({
+        success: false,
+        model: modelToTest,
+        provider: providerName,
+        latencyMs,
+        error: err.message || 'Model test execution failed'
+      });
     }
   });
 

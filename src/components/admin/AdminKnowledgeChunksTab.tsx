@@ -438,7 +438,7 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
           </div>
 
           {/* Quick Metrics from DB */}
-          <div className="grid grid-cols-3 gap-2.5 self-stretch lg:self-auto shrink-0">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 self-stretch lg:self-auto shrink-0">
             <div className="p-3 rounded-2xl bg-slate-800/80 border border-slate-700/80 text-center">
               <span className="block text-lg font-bold text-teal-400">{status?.totalChunks ?? docs.length}</span>
               <span className="text-[10px] text-slate-400 font-semibold uppercase">Knowledge Chunks</span>
@@ -450,6 +450,12 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
             <div className="p-3 rounded-2xl bg-slate-800/80 border border-slate-700/80 text-center">
               <span className="block text-lg font-bold text-blue-400">{status?.totalTopics ?? 15}</span>
               <span className="text-[10px] text-slate-400 font-semibold uppercase">Topics Indexed</span>
+            </div>
+            <div className="p-3 rounded-2xl bg-slate-800/80 border border-slate-700/80 text-center">
+              <span className="block text-xs font-mono font-bold text-emerald-400 truncate max-w-[120px] mx-auto">
+                {status?.activeAiModel || 'gemini-2.5-flash'}
+              </span>
+              <span className="text-[10px] text-slate-400 font-semibold uppercase">Active AI Model</span>
             </div>
           </div>
         </div>
@@ -883,7 +889,7 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
                     {isAnalyzingFile ? (
                       <>
                         <RefreshCw className="w-4 h-4 animate-spin" />
-                        <span>Analyzing & Extracting Chunks with Gemini AI...</span>
+                        <span>Analyzing & Extracting Chunks with AI...</span>
                       </>
                     ) : (
                       <>

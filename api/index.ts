@@ -2720,14 +2720,256 @@ LANGUAGE RULE:
         totalFaqs: parseInt(faqsCount.rows[0].count, 10),
         totalChunks: parseInt(chunksCount.rows[0].count, 10),
         totalTopics: parseInt(topicsCount.rows[0].count, 10),
-        platformBrand: platform.forumName || 'Ama Community',
-        primaryEmail: platform.primarySupportEmail || 'support@amacommunity.io',
+        platformBrand: platform.forumName || 'Trek Community',
+        primaryEmail: platform.primarySupportEmail || 'support@trekcommunities.com',
         lastSyncedAt: new Date().toISOString(),
         liveSyncStatus: 'ACTIVE',
-        models: ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite', 'Local PostgreSQL RAG Fallback']
+        activeAiModel: platform.activeAiModel || 'gemini-2.5-flash',
+        aiProvider: platform.aiProvider || 'auto',
+        aiTemperature: typeof platform.aiTemperature === 'number' ? platform.aiTemperature : 0.2,
+        hasGeminiKey: Boolean(process.env.GEMINI_API_KEY && !process.env.GEMINI_API_KEY.startsWith('AQ.')),
+        hasOpenAiKey: Boolean(process.env.OPENAI_API_KEY),
+        models: [
+          'gemini-2.5-flash',
+          'gemini-3.8-flash',
+          'gpt-4.1-mini',
+          'gpt-4o',
+          'gpt-5-mini',
+          'Local PostgreSQL RAG Fallback'
+        ]
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Support Admin: Real-time Live Model Test & Diagnostics
+  app.post('/api/admin/support/test-model', async (req, res) => {
+    const startTime = Date.now();
+    let modelToTest = 'gemini-2.5-flash';
+    let providerName = 'Google Gemini';
+
+    try {
+      const settingsData = await pool.query(`SELECT value FROM settings WHERE key = 'platform'`);
+      const platform = settingsData.rows[0]?.value || {};
+      modelToTest = (req.body.model || platform.activeAiModel || 'gemini-2.5-flash').trim();
+      const testPrompt = (req.body.message || 'Please respond in 1-2 concise sentences confirming that this AI model is active, operational, and connected to the Trek Consultancy platform.').trim();
+
+      const isLocalRag = modelToTest === 'local-rag' || req.body.provider === 'local';
+      const isOpenAi = !isLocalRag && (modelToTest.startsWith('gpt-') || modelToTest.startsWith('o1-') || modelToTest.startsWith('o3-') || req.body.provider === 'openai');
+      providerName = isLocalRag ? 'PostgreSQL Database' : isOpenAi ? 'OpenAI' : 'Google Gemini';
+
+      // Helper to execute PostgreSQL Local RAG
+      const getLocalRagSynthesis = async (queryText: string) => {
+        const [faqsData, docsData] = await Promise.all([
+          pool.query(`
+            SELECT f.question, f.answer, f.question_bn, f.answer_bn, COALESCE(c.name, 'General') as category 
+            FROM faqs f 
+            LEFT JOIN faq_categories c ON f.category_id = c.id 
+            WHERE f.status = 'published' OR f.status IS NULL OR f.status = 'active'
+          `),
+          pool.query(`
+            SELECT id, title, content, category, status 
+            FROM knowledge_documents 
+            WHERE status = 'published' OR status IS NULL OR status = 'active'
+          `)
+        ]);
+
+        const qLower = queryText.toLowerCase().trim();
+
+        // 1. Check direct FAQs
+        const matchedFaq = faqsData.rows.find((f: any) => {
+          const fq = (f.question || '').toLowerCase();
+          return qLower.includes(fq) || (fq.length > 8 && qLower.includes(fq.slice(0, 15)));
+        });
+        if (matchedFaq) {
+          return `**${matchedFaq.question}** (${matchedFaq.category}):\n${matchedFaq.answer}`;
+        }
+
+        // 2. Semantic word overlap search in knowledge_documents
+        const terms = qLower.split(/\s+/).filter(t => t.length > 3);
+        let bestDoc: any = null;
+        let bestScore = 0;
+
+        for (const doc of docsData.rows) {
+          const contentLower = `${doc.title || ''} ${doc.content || ''}`.toLowerCase();
+          let score = 0;
+          for (const t of terms) {
+            if (contentLower.includes(t)) score += 1;
+          }
+          if (score > bestScore) {
+            bestScore = score;
+            bestDoc = doc;
+          }
+        }
+
+        if (bestDoc && bestScore > 0) {
+          return `**${bestDoc.title}** (${bestDoc.category || 'General'}):\n${bestDoc.content.slice(0, 450)}...`;
+        }
+
+        return `Trek Consultancy provides end-to-end foreign business setup in Saudi Arabia (MISA licensing, 100% foreign ownership, Commercial Registration, corporate banking), custom software & ERP development, and investor visa services. Reach our advisory team directly via WhatsApp (${platform.whatsapp || '+966 50 241 1744'}) or email (${platform.primarySupportEmail || 'contact@trekconsultancy.com'}).`;
+      };
+
+      if (isLocalRag) {
+        const ragReply = await getLocalRagSynthesis(testPrompt);
+        const latencyMs = Date.now() - startTime;
+        return res.status(200).json({
+          success: true,
+          model: 'PostgreSQL Local RAG',
+          provider: 'PostgreSQL Database',
+          latencyMs,
+          reply: ragReply,
+          isLocalRag: true
+        });
+      }
+
+      if (isOpenAi) {
+        if (!process.env.OPENAI_API_KEY) {
+          const ragFallback = await getLocalRagSynthesis(testPrompt);
+          return res.status(200).json({
+            success: false,
+            model: modelToTest,
+            provider: 'OpenAI',
+            latencyMs: 0,
+            error: 'OPENAI_API_KEY is not configured in the server environment (Settings > Secrets).',
+            ragFallbackReply: ragFallback,
+            hasRagFallback: true
+          });
+        }
+
+        try {
+          const openAiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
+            },
+            body: JSON.stringify({
+              model: modelToTest,
+              messages: [
+                { role: 'system', content: 'You are the official AI test assistant for Trek Consultancy. Reply concisely.' },
+                { role: 'user', content: testPrompt }
+              ],
+              max_tokens: 300,
+              temperature: 0.2
+            })
+          });
+
+          const latencyMs = Date.now() - startTime;
+          if (!openAiRes.ok) {
+            const errText = await openAiRes.text().catch(() => '');
+            const isAuth = openAiRes.status === 401 || errText.includes('invalid_api_key');
+            const ragFallback = await getLocalRagSynthesis(testPrompt);
+            return res.status(200).json({
+              success: false,
+              model: modelToTest,
+              provider: 'OpenAI',
+              latencyMs,
+              error: isAuth
+                ? 'OpenAI Authentication Error (HTTP 401: Invalid API Key).'
+                : `OpenAI API returned HTTP ${openAiRes.status}: ${errText.slice(0, 200)}`,
+              ragFallbackReply: ragFallback,
+              hasRagFallback: true
+            });
+          }
+
+          const data: any = await openAiRes.json();
+          const reply = data?.choices?.[0]?.message?.content || 'No text content returned';
+          return res.status(200).json({
+            success: true,
+            model: modelToTest,
+            provider: 'OpenAI',
+            latencyMs,
+            reply,
+            usage: data?.usage
+          });
+        } catch (openAiErr: any) {
+          const latencyMs = Date.now() - startTime;
+          const ragFallback = await getLocalRagSynthesis(testPrompt);
+          return res.status(200).json({
+            success: false,
+            model: modelToTest,
+            provider: 'OpenAI',
+            latencyMs,
+            error: `OpenAI Network/Execution Error: ${openAiErr?.message || 'Connection failed'}`,
+            ragFallbackReply: ragFallback,
+            hasRagFallback: true
+          });
+        }
+      } else {
+        // Google Gemini
+        if (!process.env.GEMINI_API_KEY) {
+          const ragFallback = await getLocalRagSynthesis(testPrompt);
+          return res.status(200).json({
+            success: false,
+            model: modelToTest,
+            provider: 'Google Gemini',
+            latencyMs: 0,
+            error: 'GEMINI_API_KEY is not configured in the server environment (Settings > Secrets).',
+            ragFallbackReply: ragFallback,
+            hasRagFallback: true
+          });
+        }
+
+        try {
+          const ai = new GoogleGenAI({
+            apiKey: process.env.GEMINI_API_KEY,
+            httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+          });
+
+          const geminiRes = await ai.models.generateContent({
+            model: modelToTest,
+            contents: testPrompt,
+            config: {
+              systemInstruction: 'You are the official AI test assistant for Trek Consultancy. Reply concisely in 1-2 sentences.',
+              maxOutputTokens: 300,
+              temperature: 0.2
+            }
+          });
+
+          const latencyMs = Date.now() - startTime;
+          return res.status(200).json({
+            success: true,
+            model: modelToTest,
+            provider: 'Google Gemini',
+            latencyMs,
+            reply: geminiRes.text?.trim() || 'Operational'
+          });
+        } catch (geminiErr: any) {
+          const latencyMs = Date.now() - startTime;
+          const rawErr = geminiErr?.message || String(geminiErr);
+          const isAuthError =
+            rawErr.includes('401') ||
+            rawErr.includes('UNAUTHENTICATED') ||
+            rawErr.includes('ACCESS_TOKEN_TYPE_UNSUPPORTED') ||
+            rawErr.includes('invalid authentication credentials');
+
+          const formattedError = isAuthError
+            ? 'Cloud AI Key Authentication: To use live Gemini cloud inference, provide an API key in Settings > Secrets. In the meantime, the PostgreSQL Knowledge RAG engine is fully operational.'
+            : `Gemini API Error: ${rawErr.slice(0, 300)}`;
+
+          const ragFallback = await getLocalRagSynthesis(testPrompt);
+
+          return res.status(200).json({
+            success: false,
+            model: modelToTest,
+            provider: 'Google Gemini',
+            latencyMs,
+            error: formattedError,
+            ragFallbackReply: ragFallback,
+            hasRagFallback: true
+          });
+        }
+      }
+    } catch (err: any) {
+      const latencyMs = Date.now() - startTime;
+      res.status(200).json({
+        success: false,
+        model: modelToTest,
+        provider: providerName,
+        latencyMs,
+        error: err.message || 'Model test execution failed'
+      });
     }
   });
 
