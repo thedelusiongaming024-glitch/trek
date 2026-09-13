@@ -233,21 +233,41 @@ Key Offerings:
 
 export async function seedTrekKnowledgeBase(client: any) {
   try {
-    // 1. Seed FAQ Categories
+    // 1. Seed FAQ Categories (safely handling cases where category name already exists under another ID)
+    const categoryIdMap = new Map<string, string>();
+
     for (const cat of trekFaqCategories) {
-      await client.query(
-        `INSERT INTO faq_categories (id, name, description, updated_at)
-         VALUES ($1, $2, $3, NOW())
-         ON CONFLICT (id) DO UPDATE 
-         SET name = EXCLUDED.name, 
-             description = EXCLUDED.description,
-             updated_at = NOW()`,
-        [cat.id, cat.name, cat.description]
+      const existingByName = await client.query(
+        `SELECT id FROM faq_categories WHERE name = $1`,
+        [cat.name]
       );
+
+      if (existingByName.rows && existingByName.rows.length > 0) {
+        const actualId = existingByName.rows[0].id;
+        categoryIdMap.set(cat.id, actualId);
+        await client.query(
+          `UPDATE faq_categories 
+           SET description = $1, updated_at = NOW() 
+           WHERE id = $2`,
+          [cat.description, actualId]
+        );
+      } else {
+        await client.query(
+          `INSERT INTO faq_categories (id, name, description, updated_at)
+           VALUES ($1, $2, $3, NOW())
+           ON CONFLICT (id) DO UPDATE 
+           SET name = EXCLUDED.name, 
+               description = EXCLUDED.description,
+               updated_at = NOW()`,
+          [cat.id, cat.name, cat.description]
+        );
+        categoryIdMap.set(cat.id, cat.id);
+      }
     }
 
     // 2. Seed FAQs
     for (const faq of trekFaqs) {
+      const targetCatId = categoryIdMap.get(faq.categoryId) || faq.categoryId;
       await client.query(
         `INSERT INTO faqs (id, category_id, question, answer, question_bn, answer_bn, status, created_by, updated_at)
          VALUES ($1, $2, $3, $4, $5, $6, 'published', 'Trek Chief Advisor', NOW())
@@ -259,7 +279,7 @@ export async function seedTrekKnowledgeBase(client: any) {
              answer_bn = EXCLUDED.answer_bn,
              status = 'published',
              updated_at = NOW()`,
-        [faq.id, faq.categoryId, faq.question, faq.answer, faq.questionBn, faq.answerBn]
+        [faq.id, targetCatId, faq.question, faq.answer, faq.questionBn, faq.answerBn]
       );
     }
 
