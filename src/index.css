@@ -1,0 +1,93 @@
+@import "tailwindcss";
+
+/* Disable dark mode variant completely so dark theme is never activated */
+@custom-variant dark (&:where([data-theme="never-dark-theme-disabled"]));
+
+@layer base {
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  }
+  
+  h1, h2, h3, h4, h5, h6, .font-heading {
+    font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+    letter-spacing: -0.02em;
+  }
+
+  html[lang="bn"] body,
+  html.lang-bn body,
+  .lang-bn {
+    font-family: 'Hind Siliguri', 'Noto Sans Bengali', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  }
+
+  html[lang="bn"] h1,
+  html[lang="bn"] h2,
+  html[lang="bn"] h3,
+  html[lang="bn"] h4,
+  html[lang="bn"] h5,
+  html[lang="bn"] h6,
+  html[lang="bn"] .font-heading,
+  html.lang-bn h1,
+  html.lang-bn h2,
+  html.lang-bn h3,
+  html.lang-bn h4,
+  html.lang-bn h5,
+  html.lang-bn h6,
+  html.lang-bn .font-heading {
+    font-family: 'Hind Siliguri', 'Outfit', sans-serif;
+    letter-spacing: normal;
+  }
+}
+
+/* Glassmorphism helpers - Pure crisp light theme */
+.glass-card {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.06);
+}
+
+html {
+  scrollbar-gutter: stable;
+  scroll-behavior: smooth;
+}
+
+/* Enhanced Glass Navbar: Translucent Light Blur & Specular Rim */
+.glass-navbar {
+  background: rgba(255, 255, 255, 0.60);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  box-shadow: 0 10px 35px -5px rgba(0, 0, 0, 0.08), 
+              0 2px 6px -1px rgba(0, 0, 0, 0.04), 
+              inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.9);
+}
+
+.glass-navbar-scrolled {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 14px 45px -5px rgba(0, 0, 0, 0.12), 
+              0 4px 10px -2px rgba(0, 0, 0, 0.05), 
+              inset 0 1px 2px 0 rgba(255, 255, 255, 0.95);
+}
+
+/* Custom smooth scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.4);
+}
