@@ -233,7 +233,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                   required
                   value={newEmail}
                   onChange={(e) => setNewEmail(e.target.value)}
-                  placeholder="liam.foster@amatheme.io"
+                  placeholder="liam.foster@trekconsultancy.com"
                   className="w-full p-2.5 rounded-xl border border-slate-200 focus:border-teal-500 focus:outline-none"
                 />
               </div>

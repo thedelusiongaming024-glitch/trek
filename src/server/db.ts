@@ -26,23 +26,83 @@ if (!connectionString) {
 }
 
 export const defaultSettings = {
-  forumName: 'Ama Community',
-  forumTagline: 'The modern community platform for developers and digital nomads',
+  forumName: 'Trek Consultancy Forum',
+  forumTagline: 'The official community forum and support portal for Trek Consultancy',
   enableGuestPosting: true,
   enableAutoModeration: true,
   announcementText: '',
   showAnnouncement: false,
-  primarySupportEmail: 'support@amacommunity.io',
+  primarySupportEmail: 'support@trekconsultancy.com',
   slaHours: 24,
   floatingSupportEnabled: true,
   floatingSupportTagTextEn: 'Support Assistant & FAQs',
   floatingSupportTagTextBn: '২৪/৭ সাপোর্ট চ্যাট ও হেল্প',
-  floatingSupportGreetingEn: 'Hello! How can our support team & AI assist your community journey today?',
+  floatingSupportGreetingEn: 'Hello! How can our support team & AI assist your Trek Consultancy journey today?',
   floatingSupportGreetingBn: 'নমস্কার! আমাদের সাপোর্ট টিম ও এআই অ্যাসিস্ট্যান্ট কীভাবে আপনাকে সহায়তা করতে পারে?',
   floatingSupportAiEnabled: true,
   floatingSupportDefaultPriority: 'Normal',
   floatingSupportMessengerTheme: 'messenger-blue'
 };
+
+export const defaultHeroSettings = {
+  slides: [
+    {
+      id: 'slide-1',
+      url: 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1920&q=80',
+      title: 'Enterprise Architecture & Cloud Systems',
+      subtitle: 'Designing scalable, mission-critical platforms with modern resilience.',
+      isActive: true
+    },
+    {
+      id: 'slide-2',
+      url: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1920&q=80',
+      title: 'Global Technology Strategy & Community Advisory',
+      subtitle: 'Collaborative problem solving with leading senior engineers.',
+      isActive: true
+    },
+    {
+      id: 'slide-3',
+      url: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=1920&q=80',
+      title: 'Performance Engineering & High-Traffic Optimization',
+      subtitle: 'Turnkey solutions for database scaling, APIs, and microservices.',
+      isActive: true
+    }
+  ],
+  autoplay: true,
+  intervalSeconds: 2,
+  overlayOpacity: 0.65,
+  overlayGradient: 'violet-dark',
+  transitionEffect: 'fade',
+  title: 'Welcome to Trek Consultancy Forum',
+  subtitle: 'The official community forum and support portal for Trek Consultancy',
+  searchPlaceholder: 'Search for Topics, Solutions, & Guides....',
+  enableOverlayMesh: true,
+  heroHeight: 'tall'
+};
+
+export const defaultDiscussionCategories = [
+  'Business Setup',
+  'Corporate Support',
+  'Visa & PRO',
+  'Real Estate',
+  'Software & Digital',
+  'General Discussion',
+  'Cloud Architecture',
+  'DevOps & CI/CD',
+  'Enterprise Security',
+  'Docly Theme Support',
+  'Feedback Suggestions'
+];
+
+export const defaultStaffRoles = [
+  { name: 'Administrator', badgeLabel: 'Admin', color: 'indigo' },
+  { name: 'Lead Architect', badgeLabel: 'Architect', color: 'teal' },
+  { name: 'Support Team', badgeLabel: 'Staff', color: 'emerald' },
+  { name: 'Theme Specialist', badgeLabel: 'Specialist', color: 'blue' },
+  { name: 'Moderator', badgeLabel: 'Mod', color: 'purple' },
+  { name: 'Community Lead', badgeLabel: 'Lead', color: 'amber' },
+  { name: 'Senior Consultant', badgeLabel: 'Consultant', color: 'rose' }
+];
 
 // Real Pool instance when connectionString is provided
 let realPool: any = null;
@@ -335,21 +395,80 @@ export async function initDb() {
       CREATE INDEX IF NOT EXISTS idx_support_tickets_created ON support_tickets(created_at DESC);
     `);
 
+    // 14. Discussion Categories table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS discussion_categories (
+        id VARCHAR(64) PRIMARY KEY,
+        name VARCHAR(255) NOT NULL UNIQUE,
+        slug VARCHAR(255) NOT NULL,
+        description TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+
+    // 15. Staff Roles & Badges table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS staff_roles (
+        id VARCHAR(64) PRIMARY KEY,
+        name VARCHAR(100) NOT NULL UNIQUE,
+        badge_label VARCHAR(100),
+        color VARCHAR(50) DEFAULT 'teal',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+
+    // Seed default discussion categories if none exist
+    const catCount = await client.query('SELECT COUNT(*) FROM discussion_categories');
+    if (parseInt(catCount.rows[0].count, 10) === 0) {
+      for (const name of defaultDiscussionCategories) {
+        const id = `cat-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+        const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        await client.query(
+          'INSERT INTO discussion_categories (id, name, slug) VALUES ($1, $2, $3) ON CONFLICT (name) DO NOTHING',
+          [id, name, slug]
+        );
+      }
+    }
+
+    // Ensure any category from existing topics is present in discussion_categories
+    await client.query(`
+      INSERT INTO discussion_categories (id, name, slug)
+      SELECT 
+        'cat-' || lower(regexp_replace(category, '[^a-zA-Z0-9]+', '-', 'g')),
+        category,
+        lower(regexp_replace(category, '[^a-zA-Z0-9]+', '-', 'g'))
+      FROM topics
+      WHERE category IS NOT NULL AND category != ''
+      ON CONFLICT (name) DO NOTHING
+    `);
+
+    // Seed default staff roles if none exist
+    const roleCount = await client.query('SELECT COUNT(*) FROM staff_roles');
+    if (parseInt(roleCount.rows[0].count, 10) === 0) {
+      for (const role of defaultStaffRoles) {
+        const id = `role-${role.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+        await client.query(
+          'INSERT INTO staff_roles (id, name, badge_label, color) VALUES ($1, $2, $3, $4) ON CONFLICT (name) DO NOTHING',
+          [id, role.name, role.badgeLabel, role.color]
+        );
+      }
+    }
+
     // Default configuration settings if not present
     const settingsCheck = await client.query("SELECT value FROM settings WHERE key = 'platform'");
     const defaultSettings = {
-      forumName: 'Ama Community',
-      forumTagline: 'The modern community platform for developers and digital nomads',
+      forumName: 'Trek Consultancy Forum',
+      forumTagline: 'The official community forum and support portal for Trek Consultancy',
       enableGuestPosting: true,
       enableAutoModeration: true,
       announcementText: '',
       showAnnouncement: false,
-      primarySupportEmail: 'support@amacommunity.io',
+      primarySupportEmail: 'support@trekconsultancy.com',
       slaHours: 24,
       floatingSupportEnabled: true,
       floatingSupportTagTextEn: 'Support Assistant & FAQs',
       floatingSupportTagTextBn: '২৪/৭ সাপোর্ট চ্যাট ও হেল্প',
-      floatingSupportGreetingEn: 'Hello! How can our support team & AI assist your community journey today?',
+      floatingSupportGreetingEn: 'Hello! How can our support team & AI assist your Trek Consultancy journey today?',
       floatingSupportGreetingBn: 'নমস্কার! আমাদের সাপোর্ট টিম ও এআই অ্যাসিস্ট্যান্ট কীভাবে আপনাকে সহায়তা করতে পারে?',
       floatingSupportAiEnabled: true,
       floatingSupportDefaultPriority: 'Normal',
@@ -370,6 +489,17 @@ export async function initDb() {
       }
       if (updated) {
         await client.query("UPDATE settings SET value = $1 WHERE key = 'platform'", [JSON.stringify(current)]);
+      }
+    }
+
+    // Default hero configuration settings if not present
+    const heroCheck = await client.query("SELECT value FROM settings WHERE key = 'hero'");
+    if (heroCheck.rows.length === 0) {
+      await client.query("INSERT INTO settings (key, value) VALUES ('hero', $1)", [JSON.stringify(defaultHeroSettings)]);
+    } else {
+      const currentHero = heroCheck.rows[0]?.value;
+      if (!currentHero || !Array.isArray(currentHero.slides) || currentHero.slides.length === 0) {
+        await client.query("UPDATE settings SET value = $1 WHERE key = 'hero'", [JSON.stringify(defaultHeroSettings)]);
       }
     }
 

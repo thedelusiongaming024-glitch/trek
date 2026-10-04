@@ -9,10 +9,12 @@ import {
   ShieldCheck, 
   ArrowLeft,
   Sparkles,
-  Headphones
+  Headphones,
+  Image as ImageIcon
 } from 'lucide-react';
 import { AdminNavbar } from './AdminNavbar';
 import { AdminOverviewTab } from './AdminOverviewTab';
+import { AdminHeroTab } from './AdminHeroTab';
 import { AdminTopicsTab } from './AdminTopicsTab';
 import { AdminConsultancyTab } from './AdminConsultancyTab';
 import { AdminBlogsTab } from './AdminBlogsTab';
@@ -28,7 +30,10 @@ import {
   ConsultancyInquiry, 
   AdminUser, 
   ActivityLog, 
-  PlatformSettings 
+  PlatformSettings,
+  HeroSettings,
+  DiscussionCategory,
+  StaffRoleBadge 
 } from '../../types';
 
 interface AdminPanelProps {
@@ -38,6 +43,14 @@ interface AdminPanelProps {
   users: AdminUser[];
   activityLogs: ActivityLog[];
   settings: PlatformSettings;
+  heroSettings?: HeroSettings;
+  onSaveHeroSettings?: (heroSettings: HeroSettings) => Promise<void> | void;
+  categories?: DiscussionCategory[];
+  staffRoles?: StaffRoleBadge[];
+  onAddCategory?: (category: { name: string; description?: string }) => Promise<void> | void;
+  onDeleteCategory?: (id: string) => Promise<void> | void;
+  onAddStaffRole?: (role: { name: string; badgeLabel?: string; color?: string }) => Promise<void> | void;
+  onDeleteStaffRole?: (id: string) => Promise<void> | void;
   onExitAdmin: () => void;
   currentAdminUser?: { name: string; email: string; role: string } | null;
   onLogout?: () => void;
@@ -66,6 +79,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   users,
   activityLogs,
   settings,
+  heroSettings,
+  onSaveHeroSettings,
+  categories = [],
+  staffRoles = [],
+  onAddCategory,
+  onDeleteCategory,
+  onAddStaffRole,
+  onDeleteStaffRole,
   onExitAdmin,
   currentAdminUser,
   onLogout,
@@ -94,6 +115,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const navItems = [
     { id: 'overview' as AdminTab, label: 'Overview', icon: LayoutDashboard },
+    { id: 'hero' as AdminTab, label: 'Hero Slideshow', icon: ImageIcon },
     { id: 'topics' as AdminTab, label: 'Discussions', icon: MessageSquare, badge: topics.length },
     { id: 'consultancy' as AdminTab, label: 'Consultancy', icon: Briefcase, badge: pendingLeadsCount > 0 ? pendingLeadsCount : undefined, badgeColor: 'bg-emerald-500 text-white' },
     { id: 'support' as AdminTab, label: 'Support & Messenger', icon: Headphones, badgeColor: 'bg-teal-500 text-white' },
@@ -200,6 +222,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             />
           )}
 
+          {activeTab === 'hero' && (
+            <AdminHeroTab
+              heroSettings={heroSettings}
+              onSaveHeroSettings={onSaveHeroSettings || (() => {})}
+            />
+          )}
+
           {activeTab === 'topics' && (
             <AdminTopicsTab
               topics={topics}
@@ -208,6 +237,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               onDeleteTopic={onDeleteTopic}
               onOpenNewTopicModal={() => setIsNewTopicModalOpen(true)}
               onViewTopic={onViewTopic}
+              categories={categories}
+              staffRoles={staffRoles}
+              onAddCategory={onAddCategory}
+              onDeleteCategory={onDeleteCategory}
+              onAddStaffRole={onAddStaffRole}
+              onDeleteStaffRole={onDeleteStaffRole}
             />
           )}
 
@@ -260,6 +295,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         isOpen={isNewTopicModalOpen}
         onClose={() => setIsNewTopicModalOpen(false)}
         onAddTopic={onAddTopic}
+        categories={categories}
+        staffRoles={staffRoles}
       />
 
       <AdminNewBlogModal

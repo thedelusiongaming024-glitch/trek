@@ -1,6 +1,7 @@
 import express from 'express';
 import { GoogleGenAI } from '@google/genai';
-import { pool, initDb } from './db';
+import { Resend } from 'resend';
+import { pool, initDb, defaultHeroSettings, defaultDiscussionCategories, defaultStaffRoles } from './db';
 
 // ---------------------------------------------------------------------------
 // AI support chat performance helpers
@@ -102,7 +103,7 @@ export async function createApp() {
   app.get(['/api', '/api/'], (_req, res) => {
     res.json({
       status: 'ok',
-      service: 'Ama Community API',
+      service: 'Trek Consultancy Forum API',
       healthUrl: '/api/health',
       timestamp: new Date().toISOString()
     });
@@ -175,7 +176,7 @@ export async function createApp() {
 
     res.status(isHealthy ? 200 : 503).json({
       status: isHealthy ? 'healthy' : 'degraded',
-      service: 'Ama Community API',
+      service: 'Trek Consultancy Forum API',
       timestamp: new Date().toISOString(),
       uptimeSeconds: Math.floor(process.uptime()),
       latencyMs: totalDurationMs,
@@ -230,6 +231,135 @@ export async function createApp() {
       }));
 
       res.json(topics);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Discussion Meta: Categories & Staff Roles
+  app.get('/api/discussion/meta', async (_req, res) => {
+    try {
+      const [catRes, roleRes] = await Promise.allSettled([
+        pool.query('SELECT id, name, slug, description FROM discussion_categories ORDER BY created_at ASC'),
+        pool.query('SELECT id, name, badge_label as "badgeLabel", color FROM staff_roles ORDER BY created_at ASC')
+      ]);
+
+      let categories = (catRes.status === 'fulfilled' && catRes.value.rows.length > 0)
+        ? catRes.value.rows
+        : defaultDiscussionCategories.map(c => ({
+            id: `cat-${c.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+            name: c,
+            slug: c.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+          }));
+
+      let staffRoles = (roleRes.status === 'fulfilled' && roleRes.value.rows.length > 0)
+        ? roleRes.value.rows
+        : defaultStaffRoles.map(r => ({
+            id: `role-${r.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+            name: r.name,
+            badgeLabel: r.badgeLabel,
+            color: r.color
+          }));
+
+      res.json({ categories, staffRoles });
+    } catch (err: any) {
+      res.json({
+        categories: defaultDiscussionCategories.map(c => ({
+          id: `cat-${c.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+          name: c,
+          slug: c.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+        })),
+        staffRoles: defaultStaffRoles.map(r => ({
+          id: `role-${r.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+          name: r.name,
+          badgeLabel: r.badgeLabel,
+          color: r.color
+        }))
+      });
+    }
+  });
+
+  // Discussion Categories: Create
+  app.post('/api/discussion/categories', async (req, res) => {
+    try {
+      const { name, description } = req.body;
+      const cleanName = (name || '').trim();
+      if (!cleanName) {
+        return res.status(400).json({ error: 'Category name is required.' });
+      }
+
+      const id = `cat-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+      let slug = cleanName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      if (!slug) {
+        slug = `cat-${encodeURIComponent(cleanName).toLowerCase().replace(/%/g, '').slice(0, 50)}`;
+      }
+      if (!slug) {
+        slug = `cat-${Date.now()}`;
+      }
+
+      const insertRes = await pool.query(`
+        INSERT INTO discussion_categories (id, name, slug, description)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (name) DO UPDATE SET slug = EXCLUDED.slug, description = COALESCE(EXCLUDED.description, discussion_categories.description)
+        RETURNING id, name, slug, description
+      `, [id, cleanName, slug, (description || '').trim() || null]);
+
+      res.status(201).json(insertRes.rows[0]);
+    } catch (err: any) {
+      console.error('[Create Category Error]:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Discussion Categories: Delete
+  app.delete('/api/discussion/categories/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      await pool.query(
+        'DELETE FROM discussion_categories WHERE id = $1 OR name = $1 OR slug = $1',
+        [id]
+      );
+      res.json({ success: true, id });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Staff Roles / Badges: Create
+  app.post('/api/discussion/staff-roles', async (req, res) => {
+    try {
+      const { name, badgeLabel, color } = req.body;
+      const cleanName = (name || '').trim();
+      if (!cleanName) {
+        return res.status(400).json({ error: 'Staff role name is required.' });
+      }
+
+      const id = `role-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+      const cleanLabel = (badgeLabel || cleanName).trim();
+      const cleanColor = (color || 'teal').trim();
+
+      const insertRes = await pool.query(`
+        INSERT INTO staff_roles (id, name, badge_label, color)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (name) DO UPDATE SET badge_label = EXCLUDED.badge_label, color = EXCLUDED.color
+        RETURNING id, name, badge_label as "badgeLabel", color
+      `, [id, cleanName, cleanLabel, cleanColor]);
+
+      res.status(201).json(insertRes.rows[0]);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Staff Roles / Badges: Delete
+  app.delete('/api/discussion/staff-roles/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      await pool.query(
+        'DELETE FROM staff_roles WHERE id = $1 OR name = $1',
+        [id]
+      );
+      res.json({ success: true, id });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -405,10 +535,12 @@ export async function createApp() {
   app.post('/api/topics/:id/like', async (req, res) => {
     try {
       const { id } = req.params;
+      const { delta } = req.body || {};
+      const change = typeof delta === 'number' ? delta : 1;
       const result = await pool.query(`
-        UPDATE topics SET likes = likes + 1 WHERE id = $1 RETURNING likes
-      `, [id]);
-      res.json({ success: true, likes: result.rows[0]?.likes });
+        UPDATE topics SET likes = GREATEST(0, likes + $2) WHERE id = $1 RETURNING likes
+      `, [id, change]);
+      res.json({ success: true, likes: result.rows[0]?.likes ?? 0 });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -427,8 +559,8 @@ export async function createApp() {
         RETURNING *
       `, [replyId, topicId, author || 'Community Member', authorRole || 'Member', avatar, content]);
 
-      // Update topic replies count
-      await pool.query('UPDATE topics SET replies = replies + 1 WHERE id = $1', [topicId]);
+      // Update topic replies count directly from replies table
+      await pool.query('UPDATE topics SET replies = (SELECT COUNT(*) FROM replies WHERE topic_id = $1) WHERE id = $1', [topicId]);
 
       const reply = {
         id: replyRes.rows[0].id,
@@ -813,10 +945,109 @@ export async function createApp() {
 
       console.log(`[Email Verification] Code for ${cleanEmail} (${cleanName}): ${code}`);
 
+      // Attempt real email dispatch via Resend if RESEND_API_KEY is configured
+      let emailSent = false;
+      let emailDeliveryError: string | null = null;
+      const resendApiKey = process.env.RESEND_API_KEY?.trim();
+
+      if (resendApiKey && resendApiKey !== 're_123456789') {
+        try {
+          const resend = new Resend(resendApiKey);
+          let fromAddress = process.env.EMAIL_FROM?.trim() || 'Trek Consultancy Forum <onboarding@resend.dev>';
+          const isUnverifiedPublicDomain = /@(gmail|yahoo|hotmail|outlook|icloud|live|aol|msn)\.com/i.test(fromAddress);
+          if (fromAddress.includes('yourdomain.com') || isUnverifiedPublicDomain) {
+            if (isUnverifiedPublicDomain) {
+              console.warn(`[Resend Notice] Sender '${fromAddress}' uses a public mailbox domain (@gmail/@yahoo/etc.) which cannot be verified on Resend. Falling back to 'Trek Consultancy Forum <onboarding@resend.dev>'. To send from a custom domain, add and verify your domain at https://resend.com/domains.`);
+            }
+            fromAddress = 'Trek Consultancy Forum <onboarding@resend.dev>';
+          }
+
+          const { data: resendData, error: resendError } = await resend.emails.send({
+            from: fromAddress,
+            to: cleanEmail,
+            subject: `${code} is your Trek Consultancy Forum verification code`,
+            text: `Your Trek Consultancy Forum verification code is: ${code}\n\nThis code will expire in 15 minutes.\nIf you did not request this code, you can safely ignore this email.`,
+            html: `
+              <!DOCTYPE html>
+              <html>
+              <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Trek Consultancy Forum Verification Code</title>
+              </head>
+              <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; padding: 40px 16px;">
+                  <tr>
+                    <td align="center">
+                      <table role="presentation" width="100%" style="max-width: 480px; background-color: #ffffff; border-radius: 20px; border: 1px solid #e2e8f0; padding: 36px 32px; box-shadow: 0 4px 12px rgba(0,0,0,0.04);">
+                        <tr>
+                          <td>
+                            <div style="font-size: 22px; font-weight: 800; color: #00a8b5; letter-spacing: -0.5px; margin-bottom: 24px;">
+                              Trek Consultancy Forum
+                            </div>
+                            <h1 style="font-size: 20px; font-weight: 700; color: #0f172a; margin: 0 0 12px 0;">
+                              Verify Your Email Address
+                            </h1>
+                            <p style="font-size: 14px; line-height: 1.6; color: #475569; margin: 0 0 20px 0;">
+                              Hello${cleanName ? ` <strong>${cleanName}</strong>` : ''},<br>
+                              Thank you for registering with <strong>Trek Consultancy Forum</strong>. Please use the following 6-digit confirmation code to complete your verification:
+                            </p>
+                            <div style="background-color: #f0fdfa; border: 1.5px dashed #00a8b5; border-radius: 14px; padding: 18px 24px; text-align: center; margin: 24px 0;">
+                              <span style="font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #0d9488; display: inline-block;">
+                                ${code}
+                              </span>
+                            </div>
+                            <p style="font-size: 13px; line-height: 1.6; color: #64748b; margin: 0 0 24px 0;">
+                              ⏱️ This code will expire in <strong>15 minutes</strong>.<br>
+                              If you did not request this email, please disregard it — no account will be created without this code.
+                            </p>
+                            <div style="border-top: 1px solid #f1f5f9; padding-top: 20px; font-size: 12px; color: #94a3b8; line-height: 1.5;">
+                              This is an automated notification from Trek Consultancy Forum Support & Identity Service.
+                            </div>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                </table>
+              </body>
+              </html>
+            `
+          });
+
+          if (resendError) {
+            console.error('[Resend Error]:', resendError);
+            emailDeliveryError = resendError.message;
+          } else {
+            emailSent = true;
+            console.log(`[Resend Success] OTP email sent to ${cleanEmail} (ID: ${resendData?.id})`);
+          }
+        } catch (resendEx: any) {
+          console.error('[Resend Exception]:', resendEx?.message);
+          emailDeliveryError = resendEx?.message;
+        }
+      }
+
+      // If email was successfully dispatched, do NOT expose previewCode to the client.
+      // If no valid Resend key is provided (or in dev preview mode), provide previewCode as fallback.
+      const isPlaceholderOrMissing = !resendApiKey || resendApiKey === 're_123456789';
+
+      let responseMessage = `A 6-digit verification code was generated for ${cleanEmail}.`;
+      if (emailSent) {
+        responseMessage = `A 6-digit verification code has been sent to ${cleanEmail}. Please check your inbox.`;
+      } else if (emailDeliveryError && emailDeliveryError.includes('You can only send testing emails to your own email address')) {
+        responseMessage = `Resend Test Mode: Real emails can only be sent to your registered Resend email until your domain is verified at resend.com/domains. Use the preview code below to continue testing.`;
+      } else if (emailDeliveryError) {
+        responseMessage = `Code generated, but email delivery encountered an error: ${emailDeliveryError}`;
+      } else if (isPlaceholderOrMissing) {
+        responseMessage = `A 6-digit verification code was generated for ${cleanEmail}. (Development preview mode active)`;
+      }
+
       res.json({
         success: true,
-        message: `A 6-digit verification code was generated for ${cleanEmail}.`,
-        previewCode: code // Provided for seamless in-app preview and testing
+        message: responseMessage,
+        previewCode: emailSent ? undefined : code,
+        emailSent
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -922,7 +1153,7 @@ export async function createApp() {
 
       if (userRes.rows.length === 0) {
         // Fallback check for initial admin bootstrap
-        if (cleanEmail === 'admin@amacommunity.io' && cleanPass === 'admin123') {
+        if ((cleanEmail === 'admin@trekconsultancy.com' || cleanEmail === 'admin@amacommunity.io') && cleanPass === 'admin123') {
           return res.json({
             success: true,
             user: {
@@ -1101,7 +1332,7 @@ export async function createApp() {
 
       const ticketNum = `TKT-${Math.floor(1000 + Math.random() * 9000)}`;
       const id = `tkt-${Date.now()}`;
-      const cleanEmail = (userEmail || '').trim() || 'guest@amacommunity.io';
+      const cleanEmail = (userEmail || '').trim() || 'guest@trekconsultancy.com';
       const cleanSubj = (subject || '').trim() || question.trim().slice(0, 60) + '...';
       const cleanPriority = priority || 'Normal';
       const cleanSession = sessionId || 'default-session';
@@ -1184,8 +1415,8 @@ export async function createApp() {
       ]);
 
       const platformSettings = settingsData.rows[0]?.value || {};
-      const supportEmail = platformSettings.primarySupportEmail || 'support@amacommunity.io';
-      const forumName = platformSettings.forumName || 'Ama Community';
+      const supportEmail = platformSettings.primarySupportEmail || 'support@trekconsultancy.com';
+      const forumName = platformSettings.forumName || 'Trek Consultancy Forum';
       const slaHours = platformSettings.slaHours || 2;
 
       let ragContext = `============================================================\n`;
@@ -1196,7 +1427,7 @@ export async function createApp() {
       ragContext += `- Brand: ${forumName}\n`;
       ragContext += `- Support Email: ${supportEmail}\n`;
       ragContext += `- Official Ticket SLA: ${slaHours} Hours\n`;
-      ragContext += `- Description: Modern bbPress & Docly-inspired community platform connecting developers and digital nomads, powered by Neon Serverless PostgreSQL persistence, role-based topic management, and enterprise full-stack development consultancy.\n\n`;
+      ragContext += `- Description: Official community discussion forum and enterprise services portal for Trek Consultancy, connecting developers and clients, powered by Neon Serverless PostgreSQL persistence, role-based topic management, and enterprise full-stack development consultancy.\n\n`;
 
       ragContext += `CHUNK KNOWLEDGE DOCUMENTS (RAG CHUNKS FROM ADMIN & AI EXTRACTION):\n`;
       if (docsData.rows.length === 0) {
@@ -1234,7 +1465,7 @@ export async function createApp() {
           'gemini-3.1-flash-lite'
         ];
         const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-        const systemInstruction = `You are the support assistant for Ama Community, a discussion forum and knowledge base platform.
+        const systemInstruction = `You are the support assistant for Trek Consultancy Forum, the official community discussion forum and support center for Trek Consultancy.
 
 ${ragContext}
 
@@ -1359,8 +1590,8 @@ Guidelines:
           replySource = 'RAG';
         } else if (lower.includes('ticket') || lower.includes('human') || lower.includes('specialist') || lower.includes('agent') || lower.includes('support')) {
           botReply = userLang === 'bn'
-            ? 'আপনি এই সাপোর্ট উইন্ডোর "Submit Ticket" ট্যাবে গিয়ে আমাদের বিশেষজ্ঞ দলের কাছে সরাসরি অফিশিয়াল সাপোর্ট টিকিট জমা দিতে পারেন অথবা support@amacommunity.io এ ইমেইল করতে পারেন।'
-            : 'You can submit an official support ticket directly via the "Submit Ticket" tab right here in this assistant window, or email our engineering specialists at support@amacommunity.io!';
+            ? 'আপনি এই সাপোর্ট উইন্ডোর "Submit Ticket" ট্যাবে গিয়ে আমাদের বিশেষজ্ঞ দলের কাছে সরাসরি অফিশিয়াল সাপোর্ট টিকিট জমা দিতে পারেন অথবা support@trekconsultancy.com এ ইমেইল করতে পারেন।'
+            : 'You can submit an official support ticket directly via the "Submit Ticket" tab right here in this assistant window, or email our engineering specialists at support@trekconsultancy.com!';
           replySource = 'FAQ';
         } else {
           // Out-of-scope question: acknowledge the gap and point to human support.
@@ -1720,7 +1951,7 @@ Guidelines:
         ];
         const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-        const systemInstruction = `You are an expert technical documentation analyzer and knowledge chunking engine for the Ama Community platform.
+        const systemInstruction = `You are an expert technical documentation analyzer and knowledge chunking engine for the Trek Consultancy Forum.
 Your task is to analyze the provided file/document and extract clean, highly factual, self-contained Knowledge Chunks suitable for real-time RAG (Retrieval-Augmented Generation).
 
 Guidelines:
@@ -1940,8 +2171,8 @@ Output MUST be valid JSON in this exact structure:
         totalFaqs: parseInt(faqsCount.rows[0].count, 10),
         totalChunks: parseInt(chunksCount.rows[0].count, 10),
         totalTopics: parseInt(topicsCount.rows[0].count, 10),
-        platformBrand: platform.forumName || 'Ama Community',
-        primaryEmail: platform.primarySupportEmail || 'support@amacommunity.io',
+        platformBrand: platform.forumName || 'Trek Consultancy Forum',
+        primaryEmail: platform.primarySupportEmail || 'support@trekconsultancy.com',
         lastSyncedAt: new Date().toISOString(),
         liveSyncStatus: 'ACTIVE',
         models: ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite', 'Local PostgreSQL RAG Fallback']
@@ -1976,13 +2207,13 @@ Output MUST be valid JSON in this exact structure:
         res.json(result.rows[0].value);
       } else {
         res.json({
-          forumName: 'Ama Community',
-          forumTagline: 'The modern community platform for developers and digital nomads',
+          forumName: 'Trek Consultancy Forum',
+          forumTagline: 'The official community forum and support portal for Trek Consultancy',
           enableGuestPosting: true,
           enableAutoModeration: true,
           announcementText: '',
           showAnnouncement: false,
-          primarySupportEmail: 'support@amacommunity.io',
+          primarySupportEmail: 'support@trekconsultancy.com',
           slaHours: 24
         });
       }
@@ -2000,6 +2231,48 @@ Output MUST be valid JSON in this exact structure:
       `, [JSON.stringify(newSettings)]);
 
       res.json({ success: true, settings: newSettings });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Hero Section Settings
+  app.get('/api/hero', async (_req, res) => {
+    try {
+      const result = await pool.query("SELECT value FROM settings WHERE key = 'hero'");
+      if (result.rows.length > 0 && result.rows[0].value?.slides?.length > 0) {
+        res.json(result.rows[0].value);
+      } else {
+        res.json(defaultHeroSettings);
+      }
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/admin/hero', async (req, res) => {
+    try {
+      const heroSettings = req.body;
+      await pool.query(`
+        INSERT INTO settings (key, value) VALUES ('hero', $1)
+        ON CONFLICT (key) DO UPDATE SET value = $1
+      `, [JSON.stringify(heroSettings)]);
+
+      res.json({ success: true, hero: heroSettings });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/hero', async (req, res) => {
+    try {
+      const heroSettings = req.body;
+      await pool.query(`
+        INSERT INTO settings (key, value) VALUES ('hero', $1)
+        ON CONFLICT (key) DO UPDATE SET value = $1
+      `, [JSON.stringify(heroSettings)]);
+
+      res.json({ success: true, hero: heroSettings });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

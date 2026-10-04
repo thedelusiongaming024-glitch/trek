@@ -1,24 +1,54 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Sparkles, Pin, Star, ShieldCheck } from 'lucide-react';
-import { ForumTopic } from '../../types';
+import { ForumTopic, DiscussionCategory, StaffRoleBadge } from '../../types';
 
 interface AdminNewTopicModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAddTopic: (topic: ForumTopic) => void;
+  categories?: (string | DiscussionCategory)[];
+  staffRoles?: (string | StaffRoleBadge)[];
 }
 
 export const AdminNewTopicModal: React.FC<AdminNewTopicModalProps> = ({
   isOpen,
   onClose,
-  onAddTopic
+  onAddTopic,
+  categories,
+  staffRoles
 }) => {
+  const availableCategories = useMemo(() => {
+    if (categories && categories.length > 0) {
+      return categories.map(c => typeof c === 'string' ? c : c.name).filter(Boolean);
+    }
+    return [];
+  }, [categories]);
+
+  const availableRoles = useMemo(() => {
+    if (staffRoles && staffRoles.length > 0) {
+      return staffRoles.map(r => typeof r === 'string' ? r : r.name).filter(Boolean);
+    }
+    return [];
+  }, [staffRoles]);
+
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState('Most requested features of 2020');
-  const [authorRole, setAuthorRole] = useState('Administrator');
+  const [category, setCategory] = useState(availableCategories[0] || '');
+  const [authorRole, setAuthorRole] = useState(availableRoles[0] || '');
   const [content, setContent] = useState('');
   const [isFeatured, setIsFeatured] = useState(true);
   const [isPopular, setIsPopular] = useState(false);
+
+  useEffect(() => {
+    if (availableCategories.length > 0 && (!category || !availableCategories.includes(category))) {
+      setCategory(availableCategories[0]);
+    }
+  }, [availableCategories, category]);
+
+  useEffect(() => {
+    if (availableRoles.length > 0 && (!authorRole || !availableRoles.includes(authorRole))) {
+      setAuthorRole(availableRoles[0]);
+    }
+  }, [availableRoles, authorRole]);
 
   if (!isOpen) return null;
 
@@ -26,15 +56,18 @@ export const AdminNewTopicModal: React.FC<AdminNewTopicModalProps> = ({
     e.preventDefault();
     if (!title.trim() || !content.trim()) return;
 
+    const chosenCat = category || availableCategories[0] || 'General Discussion';
+    const chosenRole = authorRole || availableRoles[0] || 'Administrator';
+
     const newTopic: ForumTopic = {
-      id: `topic-${Date.now()}`,
+      id: '',
       title: title.trim(),
       author: 'Forum Admin',
-      authorRole: authorRole,
+      authorRole: chosenRole,
       authorAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
       timeAgo: 'Just now',
-      category: category,
-      categorySlug: category.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      category: chosenCat,
+      categorySlug: chosenCat.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
       views: 1,
       likes: 0,
       replies: 0,
@@ -86,7 +119,7 @@ export const AdminNewTopicModal: React.FC<AdminNewTopicModalProps> = ({
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Ama Theme v3.5 Release Roadmap & Feature Voting"
+              placeholder="e.g. Trek Consultancy Release Roadmap & Feature Voting"
               className="w-full p-3 rounded-2xl border border-slate-200 focus:border-teal-500 focus:outline-none text-slate-800 text-base sm:text-xs"
             />
           </div>
@@ -101,11 +134,15 @@ export const AdminNewTopicModal: React.FC<AdminNewTopicModalProps> = ({
                 onChange={(e) => setCategory(e.target.value)}
                 className="w-full p-2.5 rounded-2xl border border-slate-200 focus:border-teal-500 focus:outline-none text-slate-800 text-base sm:text-xs min-h-[44px]"
               >
-                <option value="Most requested features of 2020">Feature Requests</option>
-                <option value="Latest Product Support">Product Support</option>
-                <option value="Docly Theme Support">Docly Theme Support</option>
-                <option value="WordPress Integrations">WordPress Integrations</option>
-                <option value="Announcement">Official Announcements</option>
+                {availableCategories.length === 0 ? (
+                  <option value="" disabled>Loading categories...</option>
+                ) : (
+                  availableCategories.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))
+                )}
               </select>
             </div>
 
@@ -118,10 +155,15 @@ export const AdminNewTopicModal: React.FC<AdminNewTopicModalProps> = ({
                 onChange={(e) => setAuthorRole(e.target.value)}
                 className="w-full p-2.5 rounded-2xl border border-slate-200 focus:border-teal-500 focus:outline-none text-slate-800 text-base sm:text-xs min-h-[44px]"
               >
-                <option value="Administrator">Administrator</option>
-                <option value="Lead Architect">Lead Architect</option>
-                <option value="Support Team">Support Team</option>
-                <option value="Theme Specialist">Theme Specialist</option>
+                {availableRoles.length === 0 ? (
+                  <option value="" disabled>Loading staff roles...</option>
+                ) : (
+                  availableRoles.map((role) => (
+                    <option key={role} value={role}>
+                      {role}
+                    </option>
+                  ))
+                )}
               </select>
             </div>
           </div>

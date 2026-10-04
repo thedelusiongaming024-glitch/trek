@@ -15,6 +15,7 @@ import {
   UserPlus
 } from 'lucide-react';
 import { ForumTopic, ForumReply } from '../types';
+import { useLanguage } from '../context/LanguageContext';
 
 interface TopicDetailModalProps {
   topic: ForumTopic | null;
@@ -41,6 +42,7 @@ export const TopicDetailModal: React.FC<TopicDetailModalProps> = ({
   currentUser,
   onRequireAuth
 }) => {
+  const { t, formatNumber, formatTimeAgo, translateCategory } = useLanguage();
   const [replyText, setReplyText] = useState('');
   const [authorName, setAuthorName] = useState(currentUser?.name || 'Community Member');
   const [copied, setCopied] = useState(false);
@@ -82,7 +84,7 @@ export const TopicDetailModal: React.FC<TopicDetailModalProps> = ({
           <div>
             <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-600 mb-2">
               <Tag className="w-3.5 h-3.5" />
-              <span>{topic.category}</span>
+              <span>{translateCategory(topic.category)}</span>
             </span>
             <h2 className="text-lg sm:text-xl font-bold text-slate-900 font-heading tracking-tight leading-snug">
               {topic.title}
@@ -93,14 +95,14 @@ export const TopicDetailModal: React.FC<TopicDetailModalProps> = ({
                 {topic.author} {topic.authorRole && `(${topic.authorRole})`}
                 {isAuthor && (
                   <span className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-teal-500/15 text-teal-700 border border-teal-500/25">
-                    You
+                    {t('You')}
                   </span>
                 )}
               </span>
               <span>•</span>
               <span className="flex items-center gap-1">
                 <Clock className="w-3.5 h-3.5 text-slate-400" />
-                {topic.timeAgo}
+                {formatTimeAgo(topic.timeAgo)}
               </span>
             </div>
           </div>
@@ -111,17 +113,17 @@ export const TopicDetailModal: React.FC<TopicDetailModalProps> = ({
                 type="button"
                 onClick={() => onDeleteTopic?.(topic)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100/80 border border-rose-200/70 transition-colors cursor-pointer"
-                title={isAuthor ? 'Delete your post' : 'Delete post (Admin)'}
+                title={isAuthor ? t('Delete your post') : t('Delete post (Admin)')}
                 aria-label="Delete post"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">{isAuthor ? 'Delete Your Post' : 'Delete Post'}</span>
+                <span className="hidden sm:inline">{isAuthor ? t('Delete Your Post') : t('Delete Post')}</span>
               </button>
             )}
             <button
               onClick={handleShare}
               className="min-w-[40px] min-h-[40px] flex items-center justify-center p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
-              title="Copy share link"
+              title={t('Copy share link', 'শেয়ার লিংক কপি করুন')}
             >
               {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Share2 className="w-4 h-4" />}
             </button>
@@ -147,11 +149,11 @@ export const TopicDetailModal: React.FC<TopicDetailModalProps> = ({
             <div className="flex items-center gap-4">
               <span className="flex items-center gap-1.5">
                 <Eye className="w-4 h-4 text-slate-400" />
-                {topic.views} Views
+                {formatNumber(topic.views)} {t('Views')}
               </span>
               <span className="flex items-center gap-1.5">
                 <MessageSquare className="w-4 h-4 text-slate-400" />
-                {topic.repliesList?.length || topic.replies} Replies
+                {formatNumber(topic.repliesList?.length || topic.replies)} {t('Replies')}
               </span>
             </div>
 
@@ -166,7 +168,7 @@ export const TopicDetailModal: React.FC<TopicDetailModalProps> = ({
                 }`}
               >
                 <ThumbsUp className={`w-3.5 h-3.5 ${topic.isLiked ? 'fill-teal-500 text-teal-500' : ''}`} />
-                <span>{topic.likes} {topic.likes === 1 ? 'Like' : 'Likes'}</span>
+                <span>{formatNumber(topic.likes)} {t('Likes')}</span>
               </button>
 
               {showDelete && (
@@ -174,10 +176,10 @@ export const TopicDetailModal: React.FC<TopicDetailModalProps> = ({
                   type="button"
                   onClick={() => onDeleteTopic?.(topic)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-rose-200/80 text-rose-600 hover:text-rose-700 hover:bg-rose-50 bg-white/60 transition-colors cursor-pointer"
-                  title={isAuthor ? 'Delete your post' : 'Delete post (Admin)'}
+                  title={isAuthor ? t('Delete your post') : t('Delete post (Admin)')}
                 >
                   <Trash2 className="w-3.5 h-3.5" />
-                  <span className="text-xs font-semibold">{isAuthor ? 'Delete Your Post' : 'Delete Post'}</span>
+                  <span className="text-xs font-semibold">{isAuthor ? t('Delete Your Post') : t('Delete Post')}</span>
                 </button>
               )}
             </div>
@@ -186,12 +188,12 @@ export const TopicDetailModal: React.FC<TopicDetailModalProps> = ({
           {/* Discussion Replies */}
           <div className="space-y-3">
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Replies & Discussion ({topic.repliesList?.length || 0})
+              {t('Replies & Discussion')} ({formatNumber(topic.repliesList?.length || 0)})
             </h4>
 
             {(!topic.repliesList || topic.repliesList.length === 0) ? (
               <div className="py-6 text-center text-xs text-slate-500 bg-slate-50/60 rounded-2xl border border-dashed border-slate-200">
-                No replies yet. Be the first to share an answer or solution!
+                {t('No replies yet. Be the first to share an answer or solution!')}
               </div>
             ) : (
               topic.repliesList.map((rep) => (
@@ -203,7 +205,7 @@ export const TopicDetailModal: React.FC<TopicDetailModalProps> = ({
                       </div>
                       <span className="text-xs font-semibold text-slate-800">{rep.author}</span>
                     </div>
-                    <span className="text-[11px] text-slate-400">{rep.timeAgo}</span>
+                    <span className="text-[11px] text-slate-400">{formatTimeAgo(rep.timeAgo)}</span>
                   </div>
                   <p className="text-xs text-slate-600 leading-relaxed pl-8">
                     {rep.content}
@@ -217,15 +219,15 @@ export const TopicDetailModal: React.FC<TopicDetailModalProps> = ({
           {currentUser ? (
             <form onSubmit={handleReplySubmit} className="pt-2">
               <div className="flex items-center justify-between mb-2">
-                <h4 className="text-xs font-bold text-slate-800">Leave a Reply</h4>
-                <span className="text-[11px] text-teal-600 font-medium">Replying as {currentUser.name}</span>
+                <h4 className="text-xs font-bold text-slate-800">{t('Leave a Reply')}</h4>
+                <span className="text-[11px] text-teal-600 font-medium">{t('Replying as', 'উত্তর দিচ্ছেন:')} {currentUser.name}</span>
               </div>
               <div className="space-y-3">
                 <textarea
                   rows={3}
                   value={replyText}
                   onChange={(e) => setReplyText(e.target.value)}
-                  placeholder="Type your response here..."
+                  placeholder={t('Type your response here...', 'এখানে আপনার উত্তর লিখুন...')}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-white/80 border border-slate-200/80 text-base sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500 backdrop-blur-md transition-all shadow-xs resize-none"
                 />
                 <div className="flex justify-end">
@@ -235,7 +237,7 @@ export const TopicDetailModal: React.FC<TopicDetailModalProps> = ({
                     className="px-5 py-2.5 min-h-[44px] rounded-full bg-[#00a8b5] hover:bg-[#0096a3] disabled:opacity-50 text-white font-semibold text-xs sm:text-sm flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-teal-500/25 active:scale-95 backdrop-blur-md"
                   >
                     <Send className="w-3.5 h-3.5" />
-                    <span>Post Reply</span>
+                    <span>{t('Submit Reply', 'উত্তর পোস্ট করুন')}</span>
                   </button>
                 </div>
               </div>
@@ -246,10 +248,10 @@ export const TopicDetailModal: React.FC<TopicDetailModalProps> = ({
                 <Lock className="w-3.5 h-3.5" />
               </div>
               <h4 className="text-xs font-bold text-teal-950">
-                Join this Discussion
+                {t('Join this Discussion', 'এই আলোচনায় যোগ দিন')}
               </h4>
               <p className="text-[11px] text-teal-800 max-w-sm mx-auto leading-relaxed">
-                To leave a reply and contribute to this forum topic, you must have an account and be logged in.
+                {t('To leave a reply and contribute to this forum topic, you must have an account and be logged in.', 'এই টপিকে উত্তর দিতে বা অংশ নিতে আপনাকে অবশ্যই লগইন করতে হবে।')}
               </p>
               <button
                 type="button"
@@ -257,7 +259,7 @@ export const TopicDetailModal: React.FC<TopicDetailModalProps> = ({
                 className="inline-flex items-center justify-center gap-2 px-4 py-2 min-h-[40px] rounded-full bg-[#00a8b5] hover:bg-[#0096a3] text-white font-semibold text-xs shadow-md shadow-teal-500/25 active:scale-95 transition-all cursor-pointer"
               >
                 <UserPlus className="w-3.5 h-3.5" />
-                <span>Log In / Sign Up to Reply</span>
+                <span>{t('Log In / Sign Up to Reply', 'উত্তর দিতে লগইন / সাইন আপ করুন')}</span>
               </button>
             </div>
           )}

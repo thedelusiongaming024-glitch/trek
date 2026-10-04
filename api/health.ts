@@ -58,7 +58,7 @@ export default async function handler(_req: VercelRequest, res: VercelResponse) 
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   return res.status(200).json({
     status: isHealthy ? 'healthy' : 'degraded',
-    service: 'Ama Community API',
+    service: 'Trek Consultancy Forum API',
     runtime: 'Vercel Serverless Function',
     timestamp: new Date().toISOString(),
     uptimeSeconds: Math.floor(process.uptime()),

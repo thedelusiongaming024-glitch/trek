@@ -1,135 +1,170 @@
-import React from 'react';
-import { Search, X } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Search, X, ChevronLeft, ChevronRight, TrendingUp, Shield, Users, Sparkles } from 'lucide-react';
+import { HeroSettings } from '../types';
+import { defaultAdminHeroSettings } from './admin/AdminHeroTab';
+import { useLanguage } from '../context/LanguageContext';
 
 interface HeroSectionProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   onSelectTag?: (tag: string) => void;
+  heroSettings?: HeroSettings;
   children?: React.ReactNode;
 }
+
+const DEFAULT_TRENDING_TAGS = [
+  'Cloud Architecture',
+  'React & Vite',
+  'DevOps & CI/CD',
+  'Database Scaling',
+  'Microservices',
+  'Enterprise Security'
+];
 
 export const HeroSection: React.FC<HeroSectionProps> = ({
   searchQuery,
   onSearchChange,
   onSelectTag,
+  heroSettings,
   children
 }) => {
+  const { t } = useLanguage();
+  // Filter active slides from settings or fallback to defaultAdminHeroSettings
+  const activeSlides = useMemo(() => {
+    const raw = heroSettings?.slides && heroSettings.slides.length > 0
+      ? heroSettings.slides
+      : defaultAdminHeroSettings.slides;
+    const list = raw.filter(s => s.isActive !== false);
+    return list.length > 0 ? list : defaultAdminHeroSettings.slides;
+  }, [heroSettings?.slides]);
+
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+
+  // Reset index safely if active slides change
+  useEffect(() => {
+    if (currentIndex >= activeSlides.length && activeSlides.length > 0) {
+      setCurrentIndex(0);
+    }
+  }, [activeSlides.length, currentIndex]);
+
+  // Autoplay slideshow timer: auto change every 2 seconds
+  useEffect(() => {
+    const shouldAutoplay = heroSettings ? heroSettings.autoplay : true;
+    if (!shouldAutoplay || isPaused || activeSlides.length <= 1) return;
+
+    const intervalSeconds = 2;
+    const timer = setInterval(() => {
+      setCurrentIndex(prev => (prev + 1) % activeSlides.length);
+    }, intervalSeconds * 1000);
+
+    return () => clearInterval(timer);
+  }, [heroSettings?.autoplay, isPaused, activeSlides.length]);
+
+  // Determine section height / length
+  const getHeroHeightClasses = (height?: string) => {
+    switch (height) {
+      case 'standard':
+        return 'min-h-[620px] sm:min-h-[680px] md:min-h-[720px] pt-28 sm:pt-36 md:pt-40 pb-20 sm:pb-24';
+      case 'cinematic':
+        return 'min-h-[820px] sm:min-h-[900px] md:min-h-[960px] lg:min-h-[1020px] pt-36 sm:pt-48 md:pt-56 lg:pt-60 pb-32 sm:pb-40 md:pb-44';
+      case 'fullscreen':
+        return 'min-h-screen pt-36 sm:pt-44 md:pt-52 lg:pt-56 pb-28 sm:pb-36';
+      case 'tall':
+      default:
+        return 'min-h-[720px] sm:min-h-[800px] md:min-h-[860px] lg:min-h-[920px] pt-32 sm:pt-42 md:pt-48 lg:pt-52 pb-24 sm:pb-32 md:pb-36';
+    }
+  };
+
+  const isZoomEffect = heroSettings?.transitionEffect === 'zoom';
+  const heroHeightClass = getHeroHeightClasses(heroSettings?.heroHeight);
+
+  const headingText = heroSettings?.title || defaultAdminHeroSettings.title || 'Welcome to Trek Consultancy Forum';
+  const subtitleText = heroSettings?.subtitle !== undefined ? heroSettings.subtitle : defaultAdminHeroSettings.subtitle;
+  const searchPlaceholder = heroSettings?.searchPlaceholder || defaultAdminHeroSettings.searchPlaceholder || 'Search for Topics, Solutions, & Guides....';
+
+  const handleTagClick = (tag: string) => {
+    if (onSelectTag) {
+      onSelectTag(tag);
+    } else {
+      onSearchChange(tag);
+    }
+  };
+
   return (
-    <div className="relative pb-20 md:pb-24 overflow-hidden">
-      {/* Faceted Geometric Polyhedral Purple/Violet Background Mesh matching reference */}
-      <div className="absolute inset-0 pointer-events-none select-none overflow-hidden">
-        {/* Deep purple base gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-[#180933] via-[#2a0f52] to-[#140628]" />
+    <div 
+      className={`relative overflow-hidden select-none flex flex-col justify-between ${heroHeightClass}`}
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+    >
+      {/* Background Slideshow Layer: Clean & Crystal Clear with NO Dimming Overlay */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden bg-slate-950">
+        {/* Render all active slides for instant smooth crossfade transitions */}
+        {activeSlides.map((slide, index) => {
+          const isActive = index === currentIndex;
+          return (
+            <div
+              key={slide.id || index}
+              className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
+                isActive ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
+              }`}
+            >
+              <img
+                src={slide.url}
+                alt={slide.title || 'Hero Background'}
+                className={`w-full h-full object-cover object-center transform-gpu will-change-transform transition-transform duration-[7000ms] ease-out ${
+                  isZoomEffect && isActive ? 'scale-[1.08]' : 'scale-100'
+                }`}
+                loading={index === 0 ? 'eager' : 'lazy'}
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  if (target.src !== defaultAdminHeroSettings.slides[0].url) {
+                    target.src = defaultAdminHeroSettings.slides[0].url;
+                  }
+                }}
+              />
+            </div>
+          );
+        })}
 
-        <svg
-          viewBox="0 0 1440 600"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          className="w-full h-full object-cover"
-          preserveAspectRatio="xMidYMid slice"
-        >
-          <defs>
-            <linearGradient id="pGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#2c1055" stopOpacity="0.95" />
-              <stop offset="100%" stopColor="#16082d" stopOpacity="0.98" />
-            </linearGradient>
-            <linearGradient id="pGrad2" x1="100%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#481a85" stopOpacity="0.9" />
-              <stop offset="100%" stopColor="#240c49" stopOpacity="0.95" />
-            </linearGradient>
-            <linearGradient id="pGrad3" x1="0%" y1="100%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#1b0a36" stopOpacity="0.98" />
-              <stop offset="100%" stopColor="#381467" stopOpacity="0.85" />
-            </linearGradient>
-            <linearGradient id="pGradHighlight" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#5b20a4" stopOpacity="0.75" />
-              <stop offset="100%" stopColor="#290f50" stopOpacity="0.9" />
-            </linearGradient>
-            <linearGradient id="pGradDeep" x1="50%" y1="0%" x2="50%" y2="100%">
-              <stop offset="0%" stopColor="#1c0a38" stopOpacity="0.95" />
-              <stop offset="100%" stopColor="#110522" stopOpacity="0.98" />
-            </linearGradient>
-          </defs>
-
-          {/* Row 1 Top Facets */}
-          <polygon points="0,0 260,0 150,150 0,130" fill="url(#pGrad1)" />
-          <polygon points="260,0 540,0 380,140 150,150" fill="url(#pGrad2)" />
-          <polygon points="540,0 860,0 680,130 380,140" fill="url(#pGradHighlight)" />
-          <polygon points="860,0 1180,0 1020,150 680,130" fill="url(#pGrad2)" />
-          <polygon points="1180,0 1440,0 1440,140 1280,130 1020,150" fill="url(#pGrad1)" />
-
-          {/* Row 2 Center Facets */}
-          <polygon points="0,130 150,150 140,290 0,270" fill="url(#pGrad3)" />
-          <polygon points="150,150 380,140 320,310 140,290" fill="url(#pGradHighlight)" />
-          <polygon points="380,140 680,130 560,280 320,310" fill="url(#pGrad2)" />
-          <polygon points="680,130 1020,150 820,310 560,280" fill="url(#pGradHighlight)" />
-          <polygon points="1020,150 1280,130 1160,290 820,310" fill="url(#pGrad1)" />
-          <polygon points="1280,130 1440,140 1440,280 1160,290" fill="url(#pGrad3)" />
-
-          {/* Row 3 Mid-Bottom Facets */}
-          <polygon points="0,270 140,290 190,460 0,440" fill="url(#pGradDeep)" />
-          <polygon points="140,290 320,310 440,460 190,460" fill="url(#pGrad1)" />
-          <polygon points="320,310 560,280 720,440 440,460" fill="url(#pGrad3)" />
-          <polygon points="560,280 820,310 960,450 720,440" fill="url(#pGradHighlight)" />
-          <polygon points="820,310 1160,290 1220,460 960,450" fill="url(#pGrad2)" />
-          <polygon points="1160,290 1440,280 1440,450 1220,460" fill="url(#pGradDeep)" />
-
-          {/* Row 4 Bottom Edge Facets */}
-          <polygon points="0,440 190,460 260,600 0,600" fill="url(#pGradDeep)" />
-          <polygon points="190,460 440,460 580,600 260,600" fill="url(#pGrad3)" />
-          <polygon points="440,460 720,440 880,600 580,600" fill="url(#pGrad1)" />
-          <polygon points="720,440 960,450 1160,600 880,600" fill="url(#pGrad2)" />
-          <polygon points="960,450 1220,460 1440,600 1160,600" fill="url(#pGrad3)" />
-          <polygon points="1220,460 1440,450 1440,600" fill="url(#pGradDeep)" />
-
-          {/* Facet White Line Overlays for authentic low-poly look */}
-          <line x1="260" y1="0" x2="150" y2="150" stroke="#ffffff" strokeOpacity="0.1" strokeWidth="1" />
-          <line x1="540" y1="0" x2="380" y2="140" stroke="#ffffff" strokeOpacity="0.1" strokeWidth="1" />
-          <line x1="860" y1="0" x2="680" y2="130" stroke="#ffffff" strokeOpacity="0.12" strokeWidth="1" />
-          <line x1="1180" y1="0" x2="1020" y2="150" stroke="#ffffff" strokeOpacity="0.1" strokeWidth="1" />
-
-          <line x1="150" y1="150" x2="380" y2="140" stroke="#ffffff" strokeOpacity="0.1" strokeWidth="1" />
-          <line x1="380" y1="140" x2="680" y2="130" stroke="#ffffff" strokeOpacity="0.12" strokeWidth="1" />
-          <line x1="680" y1="130" x2="1020" y2="150" stroke="#ffffff" strokeOpacity="0.12" strokeWidth="1" />
-          <line x1="1020" y1="150" x2="1280" y2="130" stroke="#ffffff" strokeOpacity="0.1" strokeWidth="1" />
-
-          <line x1="150" y1="150" x2="140" y2="290" stroke="#ffffff" strokeOpacity="0.08" strokeWidth="1" />
-          <line x1="380" y1="140" x2="320" y2="310" stroke="#ffffff" strokeOpacity="0.1" strokeWidth="1" />
-          <line x1="680" y1="130" x2="560" y2="280" stroke="#ffffff" strokeOpacity="0.12" strokeWidth="1" />
-          <line x1="1020" y1="150" x2="820" y2="310" stroke="#ffffff" strokeOpacity="0.1" strokeWidth="1" />
-          <line x1="1280" y1="130" x2="1160" y2="290" stroke="#ffffff" strokeOpacity="0.08" strokeWidth="1" />
-
-          <line x1="140" y1="290" x2="320" y2="310" stroke="#ffffff" strokeOpacity="0.1" strokeWidth="1" />
-          <line x1="320" y1="310" x2="560" y2="280" stroke="#ffffff" strokeOpacity="0.12" strokeWidth="1" />
-          <line x1="560" y1="280" x2="820" y2="310" stroke="#ffffff" strokeOpacity="0.12" strokeWidth="1" />
-          <line x1="820" y1="310" x2="1160" y2="290" stroke="#ffffff" strokeOpacity="0.1" strokeWidth="1" />
-
-          <line x1="320" y1="310" x2="440" y2="460" stroke="#ffffff" strokeOpacity="0.08" strokeWidth="1" />
-          <line x1="560" y1="280" x2="720" y2="440" stroke="#ffffff" strokeOpacity="0.1" strokeWidth="1" />
-          <line x1="820" y1="310" x2="960" y2="450" stroke="#ffffff" strokeOpacity="0.08" strokeWidth="1" />
-          <line x1="440" y1="460" x2="720" y2="440" stroke="#ffffff" strokeOpacity="0.08" strokeWidth="1" />
-          <line x1="720" y1="440" x2="960" y2="450" stroke="#ffffff" strokeOpacity="0.08" strokeWidth="1" />
-        </svg>
-
-        {/* Ambient subtle vignette overlay for depth */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#180933]/40 via-transparent to-[#140628]/30 pointer-events-none" />
+        {/* Fallback base gradient ONLY if no slides configured */}
+        {activeSlides.length === 0 && (
+          <div className="absolute inset-0 bg-gradient-to-br from-[#180933] via-[#2a0f52] to-[#140628]" />
+        )}
       </div>
 
-      {/* Render children (such as Navbar) seamlessly at top of faceted canvas */}
-      {children}
+      {/* Top Region: Render children (e.g. Floating Navbar) */}
+      <div className="relative z-20">
+        {children}
+      </div>
 
-      {/* Content Container */}
-      <div className="relative max-w-4xl mx-auto px-4 sm:px-6 text-center z-10 pt-8 sm:pt-12">
-        {/* Main Heading */}
-        <h1 className="text-2xl sm:text-4xl md:text-5xl font-extrabold text-white tracking-tight mb-5 sm:mb-7 font-heading drop-shadow-sm px-2">
-          Welcome to Ama Support Center
+      {/* Center Region: Main Hero Foreground Content */}
+      <div className="relative max-w-4xl mx-auto px-4 sm:px-6 text-center z-10 my-auto py-8">
+        {/* Slide Title / Category Badge if current slide has one */}
+        {activeSlides.length > 0 && activeSlides[currentIndex]?.title && (
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-black/60 hover:bg-black/75 backdrop-blur-md border border-white/30 text-xs sm:text-sm font-semibold text-white mb-4 animate-fade-in shadow-xl">
+            <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
+            <span>{t(activeSlides[currentIndex].title)}</span>
+          </div>
+        )}
+
+        {/* Main Heading: Crystal Clear with High-Contrast Text Drop Shadow */}
+        <h1 className="text-3xl sm:text-5xl md:text-6xl font-black text-white tracking-tight mb-4 sm:mb-6 font-heading drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)] px-2 leading-tight sm:leading-tight">
+          {t(headingText)}
         </h1>
 
-        {/* Search Bar Container */}
-        <div className="max-w-2xl mx-auto px-1 sm:px-0">
-          <div className="relative flex items-center bg-white/90 dark:bg-white/15 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_0_rgba(31,38,135,0.18)] border border-white/80 dark:border-white/25 transition-all focus-within:ring-2 focus-within:ring-teal-400 focus-within:border-transparent">
-            <div className="pl-4 pr-2 py-3 sm:py-3.5 text-slate-400">
-              <Search className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+        {/* Optional Subtitle */}
+        {subtitleText && (
+          <p className="max-w-2xl mx-auto text-base sm:text-lg text-white font-medium mb-8 sm:mb-10 px-4 drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)] leading-relaxed">
+            {t(subtitleText)}
+          </p>
+        )}
+
+        {/* Enhanced Search Bar Container */}
+        <div className="max-w-2xl sm:max-w-3xl mx-auto px-1 sm:px-0">
+          <div className="relative flex items-center bg-white/95 backdrop-blur-2xl rounded-2xl sm:rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.15)] border border-white/80 transition-all focus-within:ring-3 focus-within:ring-teal-400 focus-within:border-transparent">
+            <div className="pl-4 sm:pl-5 pr-2 py-4 sm:py-5 text-slate-400">
+              <Search className="w-5 h-5 sm:w-6 sm:h-6 text-teal-600" />
             </div>
 
             <input
@@ -137,19 +172,94 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               id="hero-search-input"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Search for Topics...."
-              className="w-full py-3 sm:py-3.5 pr-10 text-slate-900 dark:text-white placeholder-slate-400 text-base font-normal bg-transparent focus:outline-none"
+              placeholder={t(searchPlaceholder)}
+              className="w-full py-4 sm:py-5 pr-12 text-slate-900 placeholder-slate-400 text-base sm:text-lg font-normal bg-transparent focus:outline-none"
             />
 
             {searchQuery && (
               <button
                 onClick={() => onSearchChange('')}
-                className="absolute right-3 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors rounded-full cursor-pointer min-w-[36px] min-h-[36px] flex items-center justify-center"
-                title="Clear search"
+                className="absolute right-4 p-1.5 text-slate-400 hover:text-slate-600 transition-colors rounded-full cursor-pointer min-w-[36px] min-h-[36px] flex items-center justify-center"
+                title={t('Clear search', 'অনুসন্ধান মুছুন')}
               >
                 <X className="w-4 h-4" />
               </button>
             )}
+          </div>
+
+          {/* Quick Trending / Popular Filter Tags */}
+          <div className="flex flex-wrap items-center justify-center gap-2 mt-4 sm:mt-5 px-2">
+            <span className="inline-flex items-center gap-1 text-[11px] sm:text-xs font-bold text-white mr-1 drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]">
+              <TrendingUp className="w-3.5 h-3.5 text-teal-400" />
+              <span>{t('Trending:')}</span>
+            </span>
+            {DEFAULT_TRENDING_TAGS.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => handleTagClick(tag)}
+                className="px-2.5 sm:px-3 py-1 rounded-full text-[11px] sm:text-xs font-semibold bg-black/50 hover:bg-black/75 active:scale-95 text-white border border-white/25 backdrop-blur-md transition-all cursor-pointer shadow-md"
+              >
+                {t(tag)}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom Region: Slide Indicators & Enterprise Highlights Strip */}
+      <div className="relative z-20 max-w-5xl mx-auto px-4 sm:px-6 w-full pt-4 pb-2">
+        {/* Interactive Slide Indicator Dots & Prev/Next Chevrons */}
+        {activeSlides.length > 1 && (
+          <div className="flex items-center justify-center gap-3 mb-6">
+            <button
+              onClick={() => setCurrentIndex(prev => (prev === 0 ? activeSlides.length - 1 : prev - 1))}
+              className="p-1.5 rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur-md transition-colors cursor-pointer border border-white/20 shadow-lg"
+              title={t('Previous slide', 'পূর্ববর্তী স্লাইড')}
+              aria-label="Previous slide"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/20 shadow-lg">
+              {activeSlides.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setCurrentIndex(idx)}
+                  className={`transition-all rounded-full cursor-pointer ${
+                    idx === currentIndex
+                      ? 'w-7 h-2 bg-teal-400 shadow-xs shadow-teal-400/80'
+                      : 'w-2 h-2 bg-white/50 hover:bg-white/80'
+                  }`}
+                  aria-label={`Slide ${idx + 1}`}
+                />
+              ))}
+            </div>
+
+            <button
+              onClick={() => setCurrentIndex(prev => (prev + 1) % activeSlides.length)}
+              className="p-1.5 rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur-md transition-colors cursor-pointer border border-white/20 shadow-lg"
+              title={t('Next slide', 'পরবর্তী স্লাইড')}
+              aria-label="Next slide"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Minimalist Corporate Credibility Badges */}
+        <div className="hidden sm:flex items-center justify-center gap-6 md:gap-10 text-[11px] md:text-xs text-white font-semibold pt-2 border-t border-white/20 drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
+          <div className="flex items-center gap-1.5">
+            <Shield className="w-3.5 h-3.5 text-teal-400" />
+            <span>{t('Trek Enterprise Advisory')}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Users className="w-3.5 h-3.5 text-teal-400" />
+            <span>{t('10,000+ Solutions Discussed')}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-teal-400" />
+            <span>{t('Verified Engineering Insights')}</span>
           </div>
         </div>
       </div>

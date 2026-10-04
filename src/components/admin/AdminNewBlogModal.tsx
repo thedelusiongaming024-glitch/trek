@@ -59,7 +59,7 @@ export const AdminNewBlogModal: React.FC<AdminNewBlogModalProps> = ({
                 Write Technical Knowledge Post
               </h3>
               <p className="text-xs text-slate-500">
-                Publishes directly to the public Ama Blogs & Technical Guides section
+                Publishes directly to the public Trek Consultancy Insights & Guides section
               </p>
             </div>
           </div>

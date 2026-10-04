@@ -405,7 +405,7 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
   return (
     <div className="space-y-6">
       {/* 1. Real-Time Dynamic Database Sync Banner */}
-      <div className="rounded-3xl p-6 bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 text-white shadow-xl border border-slate-700/60 relative overflow-hidden">
+      <div className="rounded-3xl p-6 bg-white/85 backdrop-blur-xl text-slate-800 shadow-xs border border-white/80 relative overflow-hidden">
         <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-64 h-64 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative z-10">
@@ -415,31 +415,31 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
               </span>
-              <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">
+              <span className="text-[11px] font-bold text-teal-700 uppercase tracking-wider">
                 Live PostgreSQL RAG & Multi-Modal File Knowledge Engine
               </span>
             </div>
-            <h3 className="text-lg font-bold font-heading text-white">
+            <h3 className="text-lg font-bold font-heading text-slate-900">
               AI Knowledge Chunks & Document Ingestion System
             </h3>
-            <p className="text-xs text-slate-300 leading-relaxed">
+            <p className="text-xs text-slate-600 leading-relaxed">
               Upload any document (PDF, TXT, Markdown, CSV, JSON, Word, or images with text) to let AI automatically extract structured knowledge chunks. Any chunk added or deleted is synchronized in real time with the PostgreSQL database.
             </p>
           </div>
 
           {/* Quick Metrics from DB */}
           <div className="grid grid-cols-3 gap-2.5 self-stretch lg:self-auto shrink-0">
-            <div className="p-3 rounded-2xl bg-slate-800/80 border border-slate-700/80 text-center">
-              <span className="block text-lg font-bold text-teal-400">{status?.totalChunks ?? docs.length}</span>
-              <span className="text-[10px] text-slate-400 font-semibold uppercase">Knowledge Chunks</span>
+            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 text-center">
+              <span className="block text-lg font-bold text-teal-700">{status?.totalChunks ?? docs.length}</span>
+              <span className="text-[10px] text-slate-500 font-semibold uppercase">Knowledge Chunks</span>
             </div>
-            <div className="p-3 rounded-2xl bg-slate-800/80 border border-slate-700/80 text-center">
-              <span className="block text-lg font-bold text-purple-400">{status?.totalFaqs ?? 7}</span>
-              <span className="text-[10px] text-slate-400 font-semibold uppercase">Live FAQs</span>
+            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 text-center">
+              <span className="block text-lg font-bold text-purple-700">{status?.totalFaqs ?? 7}</span>
+              <span className="text-[10px] text-slate-500 font-semibold uppercase">Live FAQs</span>
             </div>
-            <div className="p-3 rounded-2xl bg-slate-800/80 border border-slate-700/80 text-center">
-              <span className="block text-lg font-bold text-blue-400">{status?.totalTopics ?? 15}</span>
-              <span className="text-[10px] text-slate-400 font-semibold uppercase">Topics Indexed</span>
+            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 text-center">
+              <span className="block text-lg font-bold text-blue-700">{status?.totalTopics ?? 15}</span>
+              <span className="text-[10px] text-slate-500 font-semibold uppercase">Topics Indexed</span>
             </div>
           </div>
         </div>
@@ -757,7 +757,7 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
       {/* MODAL 1: AI FILE INGESTION & CHUNK EXTRACTION */}
       {/* ========================================================================= */}
       {isFileModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-in fade-in overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/25 backdrop-blur-xs animate-in fade-in overflow-y-auto">
           <div className="w-full max-w-2xl rounded-3xl bg-white p-6 shadow-2xl border border-slate-100 space-y-5 my-8">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
@@ -1017,7 +1017,7 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
       {/* MODAL 2: MANUAL CHUNK CREATE / EDIT */}
       {/* ========================================================================= */}
       {isManualModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-in fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/25 backdrop-blur-xs animate-in fade-in">
           <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl border border-slate-100 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h3 className="text-sm font-bold text-slate-900">

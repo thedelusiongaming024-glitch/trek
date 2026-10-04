@@ -95,7 +95,7 @@ export const AdminOverviewTab: React.FC<AdminOverviewTabProps> = ({
               Community Command Center
             </div>
             <h1 className="text-2xl sm:text-3xl font-heading font-bold text-slate-900 tracking-tight">
-              Ama Platform Control Center
+              Trek Consultancy Control Center
             </h1>
             <p className="text-sm text-slate-600 max-w-xl mt-1.5 leading-relaxed">
               Real-time administrative telemetry, discussion moderation, consultancy leads pipeline, and knowledge base publishing.

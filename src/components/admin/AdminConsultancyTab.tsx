@@ -182,7 +182,7 @@ export const AdminConsultancyTab: React.FC<AdminConsultancyTabProps> = ({
 
               <div className="flex items-center gap-2">
                 <a
-                  href={`mailto:${inq.email}?subject=Ama%20Consultancy%20Response%20-%20${encodeURIComponent(inq.company)}`}
+                  href={`mailto:${inq.email}?subject=Trek%20Consultancy%20Response%20-%20${encodeURIComponent(inq.company)}`}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#00a8b5] hover:bg-[#0096a3] text-white text-xs font-semibold shadow-xs transition-all cursor-pointer backdrop-blur-md"
                 >
                   <Mail className="w-3 h-3" />

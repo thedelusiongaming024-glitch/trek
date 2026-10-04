@@ -9,6 +9,21 @@ export interface ForumReply {
   isLiked?: boolean;
 }
 
+export interface DiscussionCategory {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  topicCount?: number;
+}
+
+export interface StaffRoleBadge {
+  id: string;
+  name: string;
+  badgeLabel?: string;
+  color?: string;
+}
+
 export interface ForumTopic {
   id: string;
   title: string;
@@ -73,7 +88,29 @@ export interface BlogPost {
 
 export type FilterCategory = 'all' | 'popular' | 'featured' | 'recent' | 'unloved' | 'loved';
 
-export type AdminTab = 'overview' | 'topics' | 'consultancy' | 'blogs' | 'users' | 'settings' | 'support';
+export type AdminTab = 'overview' | 'topics' | 'consultancy' | 'blogs' | 'users' | 'hero' | 'settings' | 'support';
+
+export interface HeroSlideImage {
+  id: string;
+  url: string;
+  title?: string;
+  subtitle?: string;
+  isActive: boolean;
+}
+
+export interface HeroSettings {
+  slides: HeroSlideImage[];
+  autoplay: boolean;
+  intervalSeconds: number;
+  overlayOpacity: number;
+  overlayGradient?: 'violet-dark' | 'midnight-slate' | 'deep-emerald' | 'pure-dark';
+  transitionEffect?: 'fade' | 'zoom' | 'slide';
+  title?: string;
+  subtitle?: string;
+  searchPlaceholder?: string;
+  enableOverlayMesh?: boolean;
+  heroHeight?: 'standard' | 'tall' | 'cinematic' | 'fullscreen';
+}
 
 export interface ConsultancyInquiry {
   id: string;
@@ -168,6 +205,7 @@ export interface PlatformSettings {
   floatingSupportAiEnabled?: boolean;
   floatingSupportDefaultPriority?: 'Normal' | 'Urgent' | 'Critical';
   floatingSupportMessengerTheme?: string;
+  hero?: HeroSettings;
 }
 
 export interface KnowledgeDocument {

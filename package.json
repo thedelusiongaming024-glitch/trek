@@ -1,5 +1,5 @@
 {
-  "name": "ama-community",
+  "name": "trek-consultancy-forum",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -15,6 +15,7 @@
     "@neondatabase/serverless": "^0.10.4",
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",
+    "build": "^0.1.4",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "lucide-react": "^0.546.0",
@@ -22,6 +23,7 @@
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "react-markdown": "^10.1.0",
+    "resend": "^6.32.0",
     "ws": "^8.21.3"
   },
   "devDependencies": {

@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { AlertTriangle, Trash2, X, Loader2 } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
 interface DeleteConfirmModalProps {
   isOpen: boolean;
@@ -17,13 +18,18 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
   isOpen,
   onClose,
   onConfirm,
-  title = 'Delete Post',
+  title,
   itemTitle,
-  message = 'Are you sure you want to delete this post? This action cannot be undone and will permanently remove this discussion along with all replies.',
-  confirmLabel = 'Delete Post',
-  cancelLabel = 'Cancel',
+  message,
+  confirmLabel,
+  cancelLabel,
   isLoading = false
 }) => {
+  const { t } = useLanguage();
+  const displayTitle = title ? t(title) : t('Delete Post');
+  const displayMessage = message ? t(message) : t('Are you sure you want to delete this post? This action cannot be undone and will permanently remove this discussion along with all replies.');
+  const displayConfirmLabel = confirmLabel ? t(confirmLabel) : t('Delete Post');
+  const displayCancelLabel = cancelLabel ? t(cancelLabel) : t('Cancel');
   // Handle ESC key to dismiss
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -69,10 +75,10 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
 
           <div className="flex-1 pr-6">
             <h3 id="delete-dialog-title" className="text-base sm:text-lg font-bold text-slate-900 font-heading tracking-tight">
-              {title}
+              {displayTitle}
             </h3>
             <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-              {message}
+              {displayMessage}
             </p>
           </div>
         </div>
@@ -81,7 +87,7 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
         {itemTitle && (
           <div className="mt-4 p-3 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs text-slate-700 font-medium line-clamp-2">
             <span className="text-[11px] text-slate-400 block mb-0.5 uppercase tracking-wider font-bold">
-              Target Post
+              {t('Target Post', 'পোস্ট')}
             </span>
             "{itemTitle}"
           </div>
@@ -95,7 +101,7 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
             disabled={isLoading}
             className="w-full sm:w-auto px-4 py-2.5 min-h-[44px] text-xs font-semibold rounded-full border border-slate-200 text-slate-600 hover:text-slate-800 hover:bg-slate-50 disabled:opacity-50 transition-colors cursor-pointer flex items-center justify-center"
           >
-            {cancelLabel}
+            {displayCancelLabel}
           </button>
 
           <button
@@ -107,12 +113,12 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
             {isLoading ? (
               <>
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span>Deleting...</span>
+                <span>{t('Deleting...', 'মুছে ফেলা হচ্ছে...')}</span>
               </>
             ) : (
               <>
                 <Trash2 className="w-3.5 h-3.5" />
-                <span>{confirmLabel}</span>
+                <span>{displayConfirmLabel}</span>
               </>
             )}
           </button>

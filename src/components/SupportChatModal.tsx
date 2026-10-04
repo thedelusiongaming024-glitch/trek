@@ -126,10 +126,10 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
   // Persistent Session ID
   const sessionId = React.useMemo(() => {
     try {
-      let id = localStorage.getItem('ama_chat_session');
+      let id = localStorage.getItem('trek_chat_session') || localStorage.getItem('ama_chat_session');
       if (!id) {
         id = `sess-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
-        localStorage.setItem('ama_chat_session', id);
+        localStorage.setItem('trek_chat_session', id);
       }
       return id;
     } catch {
@@ -151,7 +151,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
         {
           sender: 'bot',
           source: 'AI',
-          text: t('Hello! Welcome to Ama Community Support. I am your intelligent assistant. How can I help you today?'),
+          text: t('Hello! Welcome to Trek Consultancy Forum Support. I am your intelligent assistant. How can I help you today?'),
           time: 'Just now'
         }
       ]);
@@ -356,7 +356,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionId,
-          userEmail: ticketEmail || currentUser?.email || 'guest@amacommunity.io',
+          userEmail: ticketEmail || currentUser?.email || 'guest@trekconsultancy.com',
           subject: ticketSubject || (ticketQuestion.slice(0, 45) + '...'),
           question: ticketQuestion,
           priority: ticketPriority,
@@ -400,7 +400,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <h4 className="text-sm font-bold text-white tracking-tight">
-                {t('Ama Support Assistant')}
+                {t('Trek Support Assistant')}
               </h4>
             </div>
             <p className="text-[11px] text-slate-300 flex items-center gap-1.5 mt-0.5">

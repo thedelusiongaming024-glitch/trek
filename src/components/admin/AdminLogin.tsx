@@ -11,6 +11,7 @@ import {
   LogIn
 } from 'lucide-react';
 import { AdminUser } from '../../types';
+import trekLogo from '../../assets/trek-logo.webp';
 
 interface AdminLoginProps {
   onLogin: (user: { name: string; email: string; role: string }) => void;
@@ -130,11 +131,13 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
         <div className="w-full max-w-md">
           {/* Card container */}
           <div className="rounded-3xl bg-white/90 backdrop-blur-2xl border border-white/80 shadow-[0_20px_50px_rgba(0,168,181,0.08)] p-6 sm:p-8">
-            {/* Header Icon */}
+            {/* Header Icon & Logo */}
             <div className="text-center mb-6">
-              <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-teal-500/15 border border-teal-500/30 text-teal-600 mb-3 shadow-sm backdrop-blur-md">
-                <ShieldCheck className="w-7 h-7" />
-              </div>
+              <img
+                src={trekLogo}
+                alt="Trek Consultancy"
+                className="h-11 sm:h-12 w-auto mx-auto object-contain mb-3"
+              />
               <h1 className="text-xl sm:text-2xl font-bold text-slate-900 font-heading tracking-tight">
                 Administrator Portal
               </h1>
@@ -196,7 +199,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="admin@amacommunity.io"
+                    placeholder="admin@trekconsultancy.com"
                     className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50/80 border border-slate-200/80 text-base sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition-all placeholder:text-slate-400"
                   />
                 </div>
@@ -275,7 +278,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
 
       {/* Footer */}
       <footer className="relative z-20 py-4 text-center text-xs text-slate-400">
-        © 2025 Ama Community Platform — Administrative Security System
+        © 2026 Trek Consultancy Forum — Administrative Security System
       </footer>
     </div>
   );

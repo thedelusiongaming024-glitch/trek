@@ -10,6 +10,7 @@ import {
   LogOut
 } from 'lucide-react';
 import { AdminTab } from '../../types';
+import trekLogo from '../../assets/trek-logo.webp';
 
 interface AdminNavbarProps {
   currentTab: AdminTab;
@@ -33,12 +34,13 @@ export const AdminNavbar: React.FC<AdminNavbarProps> = ({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between gap-4">
         {/* Left: Brand + Admin Pill Badge */}
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <span className="font-heading font-bold text-2xl tracking-tight text-slate-900">
-              Ama
-            </span>
-            <span className="h-2 w-2 rounded-full bg-teal-500" />
-            <span className="ml-1.5 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-teal-500/10 text-teal-700 border border-teal-500/20 backdrop-blur-md">
+          <div className="flex items-center gap-3">
+            <img
+              src={trekLogo}
+              alt="Trek Consultancy"
+              className="h-8 sm:h-9 w-auto object-contain"
+            />
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-teal-500/10 text-teal-700 border border-teal-500/20 backdrop-blur-md">
               <ShieldCheck className="w-3.5 h-3.5 text-teal-600" />
               Admin Portal
             </span>

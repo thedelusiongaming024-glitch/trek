@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, CheckCircle2, Loader2 } from 'lucide-react';
+import { CheckCircle2, Loader2 } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
 interface NewsletterSectionProps {
   currentUser?: { name: string; email: string; role: string; avatar?: string } | null;
@@ -8,6 +9,7 @@ interface NewsletterSectionProps {
 export const NewsletterSection: React.FC<NewsletterSectionProps> = ({
   currentUser
 }) => {
+  const { t } = useLanguage();
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
@@ -61,7 +63,7 @@ export const NewsletterSection: React.FC<NewsletterSectionProps> = ({
   return (
     <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 relative z-20">
       {/* Floating Glassmorphic Card */}
-      <div className="rounded-3xl bg-white/80 dark:bg-white/10 backdrop-blur-2xl border border-white/80 dark:border-white/20 shadow-[0_20px_60px_rgba(31,38,135,0.08)] overflow-hidden text-slate-800 dark:text-slate-100 p-6 sm:p-10 md:p-12 transition-all relative">
+      <div className="rounded-3xl bg-white/80 backdrop-blur-2xl border border-white/80 shadow-[0_20px_60px_rgba(31,38,135,0.08)] overflow-hidden text-slate-800 p-6 sm:p-10 md:p-12 transition-all relative">
         {/* Subtle decorative internal ambient blur */}
         <div className="absolute top-0 right-1/3 w-80 h-36 bg-emerald-500/10 blur-3xl rounded-full pointer-events-none" />
 
@@ -69,19 +71,19 @@ export const NewsletterSection: React.FC<NewsletterSectionProps> = ({
           {/* Left Column: Form & Copy */}
           <div className="md:col-span-7 space-y-4">
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight font-heading">
-                Follow our newsletter
+              <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight font-heading">
+                {t('Follow our newsletter')}
               </h3>
               {currentUser && (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-[11px] font-semibold">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 text-[11px] font-semibold">
                   <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                  <span>Logged in as {currentUser.name}</span>
+                  <span>{t('Logged in as')} {currentUser.name}</span>
                 </span>
               )}
             </div>
 
-            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed max-w-lg">
-              Get weekly updates on WordPress architectural blueprints, support guidelines, theme optimizations, and community answers delivered straight to your inbox.
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed max-w-lg">
+              {t('Get weekly updates on WordPress architectural blueprints, support guidelines, theme optimizations, and community answers delivered straight to your inbox.')}
             </p>
 
             <form onSubmit={handleSubmit} className="pt-2">
@@ -95,8 +97,8 @@ export const NewsletterSection: React.FC<NewsletterSectionProps> = ({
                       setEmail(e.target.value);
                       if (status !== 'idle') setStatus('idle');
                     }}
-                    placeholder="Enter your email address"
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200/80 dark:border-white/20 bg-white/70 dark:bg-white/10 text-slate-900 dark:text-white placeholder-slate-400 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 backdrop-blur-md transition-all shadow-xs"
+                    placeholder={t('Enter your email address')}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200/80 bg-white/70 text-slate-900 placeholder-slate-400 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 backdrop-blur-md transition-all shadow-xs"
                     disabled={status === 'loading' || status === 'success'}
                   />
                 </div>
@@ -110,21 +112,21 @@ export const NewsletterSection: React.FC<NewsletterSectionProps> = ({
                   {status === 'loading' ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Subscribing...</span>
+                      <span>{t('Subscribing...')}</span>
                     </>
                   ) : status === 'success' ? (
                     <>
                       <CheckCircle2 className="w-4 h-4" />
-                      <span>Subscribed!</span>
+                      <span>{t('Subscribed!')}</span>
                     </>
                   ) : (
-                    <span>Subscribe</span>
+                    <span>{t('Subscribe')}</span>
                   )}
                 </button>
               </div>
 
               {message && (
-                <p className={`mt-2.5 text-xs font-medium ${status === 'error' ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
+                <p className={`mt-2.5 text-xs font-medium ${status === 'error' ? 'text-rose-600' : 'text-emerald-700'}`}>
                   {message}
                 </p>
               )}
@@ -134,7 +136,6 @@ export const NewsletterSection: React.FC<NewsletterSectionProps> = ({
           {/* Right Column: Envelope & Celebration Balloons Illustration */}
           <div className="md:col-span-5 flex justify-center md:justify-end">
             <div className="relative w-56 sm:w-64 h-52 flex items-center justify-center select-none">
-              {/* Custom SVG illustration matching the exact visual style in the reference */}
               <svg
                 viewBox="0 0 240 200"
                 fill="none"

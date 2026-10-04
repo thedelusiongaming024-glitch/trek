@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { Navbar } from './components/Navbar';
 import { HeroSection } from './components/HeroSection';
 import { ForumSection } from './components/ForumSection';
@@ -15,6 +15,9 @@ import { SupportChatModal } from './components/SupportChatModal';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal';
 import { AdminPanel } from './components/admin/AdminPanel';
 import { AdminLogin } from './components/admin/AdminLogin';
+import { defaultAdminHeroSettings } from './components/admin/AdminHeroTab';
+import trekSaudiBg from './assets/trek-saudi-bg.png';
+import { useLanguage } from './context/LanguageContext';
 import { 
   ForumTopic, 
   FilterCategory, 
@@ -23,11 +26,15 @@ import {
   AdminUser, 
   ActivityLog, 
   PlatformSettings,
+  HeroSettings,
   RecentTopic,
-  RecentReply
+  RecentReply,
+  DiscussionCategory,
+  StaffRoleBadge
 } from './types';
 
 export default function App() {
+  const { language, t } = useLanguage();
   const [activeNav, setActiveNav] = useState('home');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterCategory>('all');
@@ -39,15 +46,19 @@ export default function App() {
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [platformSettings, setPlatformSettings] = useState<PlatformSettings>({
-    forumName: 'Ama Community',
-    forumTagline: 'The modern community platform for developers and digital nomads',
+    forumName: 'Trek Consultancy Forum',
+    forumTagline: 'The official community forum and support portal for Trek Consultancy',
     enableGuestPosting: true,
     enableAutoModeration: true,
     announcementText: '',
     showAnnouncement: false,
-    primarySupportEmail: 'support@amacommunity.io',
+    primarySupportEmail: 'support@trekconsultancy.com',
     slaHours: 24
   });
+
+  const [heroSettings, setHeroSettings] = useState<HeroSettings>(defaultAdminHeroSettings);
+  const [discussionCategories, setDiscussionCategories] = useState<DiscussionCategory[]>([]);
+  const [staffRoles, setStaffRoles] = useState<StaffRoleBadge[]>([]);
 
   const [isLoadingData, setIsLoadingData] = useState(true);
 
@@ -62,7 +73,7 @@ export default function App() {
   // Community User Authentication State
   const [currentUser, setCurrentUser] = useState<{ id?: string; name: string; email: string; role: string; avatar?: string } | null>(() => {
     try {
-      const saved = localStorage.getItem('ama_current_user');
+      const saved = localStorage.getItem('trek_current_user') || localStorage.getItem('ama_current_user');
       return saved ? JSON.parse(saved) : null;
     } catch {
       return null;
@@ -72,7 +83,7 @@ export default function App() {
   // Admin Authentication State
   const [adminAuthUser, setAdminAuthUser] = useState<{ name: string; email: string; role: string } | null>(() => {
     try {
-      const saved = localStorage.getItem('ama_admin_auth');
+      const saved = localStorage.getItem('trek_admin_auth') || localStorage.getItem('ama_admin_auth');
       return saved ? JSON.parse(saved) : null;
     } catch {
       return null;
@@ -82,7 +93,7 @@ export default function App() {
   // Track topics created locally by this browser user
   const [myCreatedTopicIds, setMyCreatedTopicIds] = useState<string[]>(() => {
     try {
-      const saved = localStorage.getItem('ama_my_created_topics');
+      const saved = localStorage.getItem('trek_my_created_topics') || localStorage.getItem('ama_my_created_topics');
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
@@ -135,9 +146,16 @@ export default function App() {
 
   // Notification / Toast
   const [toastMessage, setToastMessage] = useState('');
+  const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
   const showToast = (msg: string) => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(''), 3000);
+    toastTimerRef.current = setTimeout(() => {
+      setToastMessage('');
+      toastTimerRef.current = null;
+    }, 3000);
   };
 
   // Sync with browser back/forward buttons
@@ -179,13 +197,15 @@ export default function App() {
         return res.json();
       };
 
-      const [topicsRes, blogsRes, inquiriesRes, usersRes, logsRes, settingsRes] = await Promise.allSettled([
+      const [topicsRes, blogsRes, inquiriesRes, usersRes, logsRes, settingsRes, heroRes, discMetaRes] = await Promise.allSettled([
         safeFetch('/api/topics', []),
         safeFetch('/api/blogs', []),
         safeFetch('/api/consultancy', []),
         safeFetch('/api/users', []),
         safeFetch('/api/activity-logs', []),
-        safeFetch('/api/settings', null)
+        safeFetch('/api/settings', null),
+        safeFetch('/api/hero', null),
+        safeFetch('/api/discussion/meta', { categories: [], staffRoles: [] })
       ]);
 
       if (topicsRes.status === 'fulfilled' && Array.isArray(topicsRes.value)) {
@@ -208,6 +228,26 @@ export default function App() {
       if (settingsRes.status === 'fulfilled' && settingsRes.value) {
         setPlatformSettings(settingsRes.value);
       }
+      if (heroRes.status === 'fulfilled' && heroRes.value) {
+        const val = heroRes.value;
+        if (val.slides && val.slides.length > 0) {
+          setHeroSettings(val);
+        } else {
+          setHeroSettings({
+            ...defaultAdminHeroSettings,
+            ...val,
+            slides: defaultAdminHeroSettings.slides
+          });
+        }
+      }
+      if (discMetaRes.status === 'fulfilled' && discMetaRes.value) {
+        if (Array.isArray(discMetaRes.value.categories)) {
+          setDiscussionCategories(discMetaRes.value.categories);
+        }
+        if (Array.isArray(discMetaRes.value.staffRoles)) {
+          setStaffRoles(discMetaRes.value.staffRoles);
+        }
+      }
     } catch (err) {
       console.error('Error fetching database records:', err);
     } finally {
@@ -222,38 +262,39 @@ export default function App() {
   const handleAdminLogin = (user: { name: string; email: string; role: string }) => {
     setAdminAuthUser(user);
     try {
-      localStorage.setItem('ama_admin_auth', JSON.stringify(user));
+      localStorage.setItem('trek_admin_auth', JSON.stringify(user));
     } catch {
       // ignore
     }
-    showToast(`Welcome back, ${user.name}!`);
+    showToast(language === 'bn' ? `স্বাগতম, ${user.name}!` : `Welcome back, ${user.name}!`);
   };
 
   const handleAdminLogout = () => {
     setAdminAuthUser(null);
     try {
+      localStorage.removeItem('trek_admin_auth');
       localStorage.removeItem('ama_admin_auth');
     } catch {
       // ignore
     }
     setIsAuthModalOpen(false);
-    showToast('Signed out of Administrator Portal.');
+    showToast(language === 'bn' ? 'অ্যাডমিনিস্ট্রেটর পোর্টাল থেকে সাইন আউট সম্পন্ন।' : 'Signed out of Administrator Portal.');
   };
 
   const handleUserAuthSuccess = (user: { id?: string; name: string; email: string; role: string; avatar?: string }) => {
     setIsAuthModalOpen(false);
     setCurrentUser(user);
     try {
-      localStorage.setItem('ama_current_user', JSON.stringify(user));
+      localStorage.setItem('trek_current_user', JSON.stringify(user));
       if (user.role === 'Super Admin' || user.role === 'Moderator') {
         const adminData = { name: user.name, email: user.email, role: user.role };
         setAdminAuthUser(adminData);
-        localStorage.setItem('ama_admin_auth', JSON.stringify(adminData));
+        localStorage.setItem('trek_admin_auth', JSON.stringify(adminData));
       }
     } catch {
       // ignore
     }
-    showToast(`Welcome, ${user.name}! Logged into community.`);
+    showToast(language === 'bn' ? `স্বাগতম, ${user.name}! কমিউনিটিতে লগইন সম্পন্ন।` : `Welcome, ${user.name}! Logged into community.`);
 
     // Fulfill any queued action that required auth
     if (pendingAuthAction) {
@@ -278,10 +319,12 @@ export default function App() {
     if (!currentUser) {
       setPendingAuthAction({ type: 'create_topic' });
       triggerAuthModal(
-        'To create a topic and post questions in the forum, you must have an account and be logged in.',
+        language === 'bn'
+          ? 'ফোরামে একটি টপিক তৈরি ও প্রশ্ন পোস্ট করতে, আপনার একটি অ্যাকাউন্ট থাকতে হবে এবং লগইন করতে হবে।'
+          : 'To create a topic and post questions in the forum, you must have an account and be logged in.',
         'login'
       );
-      showToast('Please log in or sign up to create a topic.');
+      showToast(language === 'bn' ? 'টপিক তৈরি করতে অনুগ্রহ করে লগইন বা সাইন আপ করুন।' : 'Please log in or sign up to create a topic.');
       return;
     }
     setIsPostModalOpen(true);
@@ -293,11 +336,12 @@ export default function App() {
     }
     setCurrentUser(null);
     try {
+      localStorage.removeItem('trek_current_user');
       localStorage.removeItem('ama_current_user');
     } catch {
       // ignore
     }
-    showToast('Signed out of Ama Community.');
+    showToast(language === 'bn' ? 'ট্রেক কনসালটেন্সি ফোরাম থেকে লগআউট সম্পন্ন।' : 'Signed out of Trek Consultancy Forum.');
   };
 
   // Modal States
@@ -356,21 +400,29 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newTopicData)
       });
-      if (res.ok) {
-        const saved = await res.json();
-        setTopics(prev => [saved, ...prev]);
-        showToast(`Discussion "${saved.title.slice(0, 30)}..." published!`);
-      } else {
-        setTopics(prev => [newTopicData, ...prev]);
-        showToast('Discussion added.');
+      if (!res.ok) {
+        throw new Error('Failed to create topic in database');
       }
-    } catch {
-      setTopics(prev => [newTopicData, ...prev]);
+      const saved = await res.json();
+      setTopics(prev => [saved, ...prev]);
+      if (saved.id) {
+        setMyCreatedTopicIds(prev => {
+          const updated = [saved.id, ...prev];
+          try {
+            localStorage.setItem('trek_my_created_topics', JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
+      }
+      showToast(`Discussion "${saved.title.slice(0, 30)}..." published and saved to database!`);
+    } catch (err) {
+      console.error('Failed to add admin topic to database:', err);
+      showToast('Error saving discussion to database.');
     }
   };
 
   const handleAdminDeleteTopic = async (id: string) => {
-    const userEmail = adminAuthUser?.email || currentUser?.email || 'admin@amacommunity.io';
+    const userEmail = adminAuthUser?.email || currentUser?.email || 'admin@trekconsultancy.com';
     const userRole = adminAuthUser?.role || currentUser?.role || 'Super Admin';
     try {
       await fetch(`/api/topics/${id}`, {
@@ -389,7 +441,7 @@ export default function App() {
     setMyCreatedTopicIds(prev => {
       const updated = prev.filter(tid => tid !== id);
       try {
-        localStorage.setItem('ama_my_created_topics', JSON.stringify(updated));
+        localStorage.setItem('trek_my_created_topics', JSON.stringify(updated));
       } catch {}
       return updated;
     });
@@ -401,7 +453,11 @@ export default function App() {
     if (!topicToDelete) return;
 
     if (!canDeleteTopic(topicToDelete)) {
-      showToast('Permission denied: Only the administrator or the author who posted can delete this post.');
+      showToast(
+        language === 'bn'
+          ? 'অনুমতি অস্বীকৃত: শুধুমাত্র অ্যাডমিনিস্ট্রেটর বা যিনি পোস্ট করেছেন তিনি এটি মুছতে পারবেন।'
+          : 'Permission denied: Only the administrator or the author who posted can delete this post.'
+      );
       setTopicToDelete(null);
       return;
     }
@@ -426,7 +482,11 @@ export default function App() {
       });
 
       if (res.status === 403) {
-        showToast('Permission denied: Only the administrator or the person who posted can delete this post.');
+        showToast(
+          language === 'bn'
+            ? 'অনুমতি অস্বীকৃত: শুধুমাত্র অ্যাডমিনিস্ট্রেটর বা যিনি পোস্ট করেছেন তিনি এটি মুছতে পারবেন।'
+            : 'Permission denied: Only the administrator or the person who posted can delete this post.'
+        );
         setIsDeletingTopic(false);
         setTopicToDelete(null);
         return;
@@ -436,7 +496,7 @@ export default function App() {
       setMyCreatedTopicIds((prev) => {
         const updated = prev.filter((id) => id !== topicToDelete.id);
         try {
-          localStorage.setItem('ama_my_created_topics', JSON.stringify(updated));
+          localStorage.setItem('trek_my_created_topics', JSON.stringify(updated));
         } catch {}
         return updated;
       });
@@ -445,10 +505,18 @@ export default function App() {
         setIsTopicModalOpen(false);
         setSelectedTopic(null);
       }
-      showToast(`Post "${topicToDelete.title.slice(0, 30)}..." deleted successfully.`);
+      showToast(
+        language === 'bn'
+          ? `পোস্ট "${topicToDelete.title.slice(0, 30)}..." সফলভাবে মুছে ফেলা হয়েছে।`
+          : `Post "${topicToDelete.title.slice(0, 30)}..." deleted successfully.`
+      );
     } catch (err) {
       console.error('Failed to delete topic:', err);
-      showToast('Error deleting post. Please try again.');
+      showToast(
+        language === 'bn'
+          ? 'পোস্ট মুছতে ত্রুটি হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।'
+          : 'Error deleting post. Please try again.'
+      );
     } finally {
       setIsDeletingTopic(false);
       setTopicToDelete(null);
@@ -483,6 +551,122 @@ export default function App() {
       setTopics(prev => prev.map(t => t.id === id ? { ...t, isPopular: !t.isPopular } : t));
     }
     showToast('Topic popularity status updated.');
+  };
+
+  const handleAddDiscussionCategory = async (categoryData: { name: string; description?: string }) => {
+    try {
+      const res = await fetch('/api/discussion/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(categoryData)
+      });
+      if (!res.ok) {
+        throw new Error('Failed to create category');
+      }
+      const newCat: DiscussionCategory = await res.json();
+      setDiscussionCategories((prev) => {
+        const filtered = prev.filter(
+          (c) => c.name.toLowerCase() !== newCat.name.toLowerCase()
+        );
+        return [...filtered, newCat];
+      });
+      showToast(
+        language === 'bn'
+          ? `ক্যাটাগরি "${newCat.name}" সফলভাবে যোগ করা হয়েছে!`
+          : `Category "${newCat.name}" created successfully!`
+      );
+    } catch (err: any) {
+      console.error(err);
+      showToast(
+        language === 'bn'
+          ? 'ক্যাটাগরি তৈরিতে সমস্যা হয়েছে।'
+          : 'Failed to create category.'
+      );
+    }
+  };
+
+  const handleDeleteDiscussionCategory = async (idOrName: string) => {
+    try {
+      const res = await fetch(`/api/discussion/categories/${encodeURIComponent(idOrName)}`, {
+        method: 'DELETE'
+      });
+      if (!res.ok) {
+        throw new Error('Failed to delete category');
+      }
+      setDiscussionCategories((prev) =>
+        prev.filter((c) => c.id !== idOrName && c.name !== idOrName && c.slug !== idOrName)
+      );
+      showToast(
+        language === 'bn'
+          ? 'ক্যাটাগরি সফলভাবে মুছে ফেলা হয়েছে।'
+          : 'Category deleted successfully.'
+      );
+    } catch (err: any) {
+      console.error(err);
+      showToast(
+        language === 'bn'
+          ? 'ক্যাটাগরি মুছতে ব্যর্থ হয়েছে।'
+          : 'Failed to delete category.'
+      );
+    }
+  };
+
+  const handleAddStaffRole = async (roleData: { name: string; badgeLabel?: string; color?: string }) => {
+    try {
+      const res = await fetch('/api/discussion/staff-roles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(roleData)
+      });
+      if (!res.ok) {
+        throw new Error('Failed to create staff role');
+      }
+      const newRole: StaffRoleBadge = await res.json();
+      setStaffRoles((prev) => {
+        const filtered = prev.filter(
+          (r) => r.name.toLowerCase() !== newRole.name.toLowerCase()
+        );
+        return [...filtered, newRole];
+      });
+      showToast(
+        language === 'bn'
+          ? `স্টাফ পদবী "${newRole.name}" সফলভাবে তৈরি হয়েছে!`
+          : `Staff role "${newRole.name}" created successfully!`
+      );
+    } catch (err: any) {
+      console.error(err);
+      showToast(
+        language === 'bn'
+          ? 'স্টাফ ব্যাজ তৈরিতে সমস্যা হয়েছে।'
+          : 'Failed to create staff role.'
+      );
+    }
+  };
+
+  const handleDeleteStaffRole = async (idOrName: string) => {
+    try {
+      const res = await fetch(`/api/discussion/staff-roles/${encodeURIComponent(idOrName)}`, {
+        method: 'DELETE'
+      });
+      if (!res.ok) {
+        throw new Error('Failed to delete staff role');
+      }
+      setStaffRoles((prev) =>
+        prev.filter((r) => r.id !== idOrName && r.name !== idOrName)
+      );
+      showToast(
+        language === 'bn'
+          ? 'স্টাফ ব্যাজ মুছে ফেলা হয়েছে।'
+          : 'Staff role removed successfully.'
+      );
+    } catch (err: any) {
+      console.error(err);
+      showToast(
+        language === 'bn'
+          ? 'স্টাফ ব্যাজ মুছতে ব্যর্থ হয়েছে।'
+          : 'Failed to delete staff role.'
+      );
+    }
   };
 
   const handleAdminAddBlog = async (newBlog: BlogPost) => {
@@ -626,6 +810,25 @@ export default function App() {
     showToast('Platform settings saved.');
   };
 
+  const handleSaveHeroSettings = async (newHeroSettings: HeroSettings) => {
+    try {
+      const res = await fetch('/api/admin/hero', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newHeroSettings)
+      });
+      if (!res.ok) {
+        throw new Error(`Failed to save hero settings: ${res.statusText}`);
+      }
+      const saved = await res.json();
+      setHeroSettings(saved.hero || saved);
+      showToast('Hero slideshow settings updated & synced with database!');
+    } catch (e) {
+      console.error('Failed to save hero settings:', e);
+      showToast('Error saving hero slideshow settings.');
+    }
+  };
+
   const handleNewConsultancyLead = async (data: { company: string; email: string; scope: string }) => {
     try {
       const res = await fetch('/api/consultancy', {
@@ -685,21 +888,19 @@ export default function App() {
     });
   }, [topics, searchQuery, activeFilter]);
 
-  // Topic Like Toggle
+  // Topic Like Toggle directly synced with PostgreSQL
   const handleToggleLike = async (e: React.MouseEvent, topicId: string) => {
     e.stopPropagation();
-    try {
-      fetch(`/api/topics/${topicId}/like`, { method: 'POST' });
-    } catch (err) {
-      console.error(err);
-    }
+    const currentTopic = topics.find((t) => t.id === topicId);
+    const nextIsLiked = !currentTopic?.isLiked;
+    const delta = nextIsLiked ? 1 : -1;
 
+    // Optimistic UI state
     setTopics((prev) =>
       prev.map((t) => {
         if (t.id === topicId) {
-          const isLiked = !t.isLiked;
-          const likes = isLiked ? t.likes + 1 : Math.max(0, t.likes - 1);
-          const updated = { ...t, isLiked, likes };
+          const likes = Math.max(0, (t.likes || 0) + delta);
+          const updated = { ...t, isLiked: nextIsLiked, likes };
           if (selectedTopic?.id === topicId) {
             setSelectedTopic(updated);
           }
@@ -708,6 +909,33 @@ export default function App() {
         return t;
       })
     );
+
+    try {
+      const res = await fetch(`/api/topics/${topicId}/like`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ delta })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (typeof data.likes === 'number') {
+          setTopics((prev) =>
+            prev.map((t) => {
+              if (t.id === topicId) {
+                const updated = { ...t, likes: data.likes };
+                if (selectedTopic?.id === topicId) {
+                  setSelectedTopic(updated);
+                }
+                return updated;
+              }
+              return t;
+            })
+          );
+        }
+      }
+    } catch (err) {
+      console.error('Failed to sync like with database:', err);
+    }
   };
 
   // Topic View Tracker & Selector
@@ -723,57 +951,61 @@ export default function App() {
     }
   };
 
-  // Add Reply
+  // Add Reply directly saved to PostgreSQL
   const handleAddReply = async (topicId: string, replyContent: string, authorName: string) => {
     const actualAuthor = currentUser?.name || authorName || 'Community Contributor';
     const actualAvatar = currentUser?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80';
     const actualRole = currentUser?.role || 'User';
 
-    const tempReply = {
-      id: `rep-${Date.now()}`,
-      author: actualAuthor,
-      authorAvatar: actualAvatar,
-      timeAgo: 'Just now',
-      content: replyContent,
-      likes: 0
-    };
-
-    setTopics((prev) =>
-      prev.map((t) => {
-        if (t.id === topicId) {
-          const updatedReplies = [...(t.repliesList || []), tempReply];
-          const updated = {
-            ...t,
-            replies: updatedReplies.length,
-            repliesList: updatedReplies
-          };
-          if (selectedTopic?.id === topicId) {
-            setSelectedTopic(updated);
-          }
-          return updated;
-        }
-        return t;
-      })
-    );
-
     try {
-      await fetch(`/api/topics/${topicId}/replies`, {
+      const res = await fetch(`/api/topics/${topicId}/replies`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           author: actualAuthor,
           content: replyContent,
-          authorRole: actualRole
+          authorRole: actualRole,
+          authorAvatar: actualAvatar
         })
       });
-    } catch (err) {
-      console.error(err);
-    }
 
-    showToast('Reply published successfully!');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to submit reply');
+      }
+
+      const savedReply = await res.json();
+
+      setTopics((prev) =>
+        prev.map((t) => {
+          if (t.id === topicId) {
+            const updatedReplies = [...(t.repliesList || []), savedReply];
+            const updated = {
+              ...t,
+              replies: updatedReplies.length,
+              repliesList: updatedReplies
+            };
+            if (selectedTopic?.id === topicId) {
+              setSelectedTopic(updated);
+            }
+            return updated;
+          }
+          return t;
+        })
+      );
+
+      showToast(language === 'bn' ? 'উত্তর সফলভাবে যোগ করা হয়েছে!' : 'Reply published and saved successfully!');
+    } catch (err: any) {
+      console.error('Failed to save reply to database:', err);
+      showToast(
+        language === 'bn'
+          ? 'উত্তর যোগ করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।'
+          : 'Failed to post reply to database.'
+      );
+    }
   };
 
-  // Create New Topic
+  // Create New Topic with direct PostgreSQL persistence (no mockdata fallbacks)
   const handleCreateTopic = async (newTopicData: Partial<ForumTopic>) => {
     const topicPayload = {
       ...newTopicData,
@@ -784,8 +1016,6 @@ export default function App() {
       authorAvatar: currentUser?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80'
     };
 
-    let createdTopicId = '';
-
     try {
       const res = await fetch('/api/topics', {
         method: 'POST',
@@ -793,74 +1023,40 @@ export default function App() {
         body: JSON.stringify(topicPayload)
       });
 
-      if (res.ok) {
-        const saved = await res.json();
-        createdTopicId = saved.id;
-        setTopics((prev) => [saved, ...prev]);
-        setSelectedTopic(saved);
-      } else {
-        const fallback: ForumTopic = {
-          id: `topic-${Date.now()}`,
-          title: topicPayload.title || 'Untitled Topic',
-          author: topicPayload.author || 'Guest User',
-          authorEmail: topicPayload.authorEmail,
-          authorId: topicPayload.authorId,
-          authorRole: topicPayload.authorRole || 'Community Member',
-          authorAvatar: topicPayload.authorAvatar,
-          timeAgo: 'Just now',
-          category: topicPayload.category || 'General Discussion',
-          categorySlug: topicPayload.categorySlug || 'general',
-          views: 1,
-          likes: 0,
-          replies: 0,
-          content: topicPayload.content || '',
-          isLiked: false,
-          isFeatured: false,
-          isPopular: false,
-          repliesList: []
-        };
-        createdTopicId = fallback.id;
-        setTopics((prev) => [fallback, ...prev]);
-        setSelectedTopic(fallback);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Database rejected new topic');
       }
-    } catch {
-      const fallback: ForumTopic = {
-        id: `topic-${Date.now()}`,
-        title: topicPayload.title || 'Untitled Topic',
-        author: topicPayload.author || 'Guest User',
-        authorEmail: topicPayload.authorEmail,
-        authorId: topicPayload.authorId,
-        authorRole: topicPayload.authorRole || 'Community Member',
-        authorAvatar: topicPayload.authorAvatar,
-        timeAgo: 'Just now',
-        category: topicPayload.category || 'General Discussion',
-        categorySlug: topicPayload.categorySlug || 'general',
-        views: 1,
-        likes: 0,
-        replies: 0,
-        content: topicPayload.content || '',
-        isLiked: false,
-        isFeatured: false,
-        isPopular: false,
-        repliesList: []
-      };
-      createdTopicId = fallback.id;
-      setTopics((prev) => [fallback, ...prev]);
-      setSelectedTopic(fallback);
-    }
 
-    if (createdTopicId) {
-      setMyCreatedTopicIds((prev) => {
-        const updated = [createdTopicId, ...prev];
-        try {
-          localStorage.setItem('ama_my_created_topics', JSON.stringify(updated));
-        } catch {}
-        return updated;
-      });
-    }
+      const saved = await res.json();
+      setTopics((prev) => [saved, ...prev]);
+      setSelectedTopic(saved);
 
-    setIsTopicModalOpen(true);
-    showToast('Your question has been posted to the forum!');
+      if (saved.id) {
+        setMyCreatedTopicIds((prev) => {
+          const updated = [saved.id, ...prev];
+          try {
+            localStorage.setItem('trek_my_created_topics', JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
+      }
+
+      setIsPostModalOpen(false);
+      setIsTopicModalOpen(true);
+      showToast(
+        language === 'bn'
+          ? 'আপনার প্রশ্নটি ফোরামে সফলভাবে পোস্ট ও ডাটাবেজে সংরক্ষিত হয়েছে!'
+          : 'Your question has been posted and saved to the database!'
+      );
+    } catch (err: any) {
+      console.error('Failed to create topic in database:', err);
+      showToast(
+        language === 'bn'
+          ? 'প্রশ্নটি প্রকাশ করতে ব্যর্থ হয়েছে। ডাটাবেজে সংযোগ চেক করুন।'
+          : 'Failed to post discussion. Could not save to database.'
+      );
+    }
   };
 
   // Tag Selected from Hero
@@ -896,10 +1092,12 @@ export default function App() {
     if (!currentUser) {
       setPendingAuthAction({ type: 'view_blog', blog });
       triggerAuthModal(
-        'To participate in blog activities, like articles, and read discussions, you must have an account and be logged in.',
+        language === 'bn'
+          ? 'ব্লগ কার্যক্রমে অংশ নিতে এবং আলোচনা পড়তে অনুগ্রহ করে অ্যাকাউন্টে লগইন করুন।'
+          : 'To participate in blog activities, like articles, and read discussions, you must have an account and be logged in.',
         'login'
       );
-      showToast('Please log in or sign up to participate in blog activities.');
+      showToast(language === 'bn' ? 'ব্লগ কার্যক্রমে অংশ নিতে অনুগ্রহ করে লগইন বা সাইন আপ করুন।' : 'Please log in or sign up to participate in blog activities.');
       return;
     }
     setSelectedBlog(blog);
@@ -928,6 +1126,14 @@ export default function App() {
             users={adminUsers}
             activityLogs={activityLogs}
             settings={platformSettings}
+            heroSettings={heroSettings}
+            onSaveHeroSettings={handleSaveHeroSettings}
+            categories={discussionCategories}
+            staffRoles={staffRoles}
+            onAddCategory={handleAddDiscussionCategory}
+            onDeleteCategory={handleDeleteDiscussionCategory}
+            onAddStaffRole={handleAddStaffRole}
+            onDeleteStaffRole={handleDeleteStaffRole}
             currentAdminUser={adminAuthUser}
             onLogout={handleAdminLogout}
             onExitAdmin={() => navigate('/')}
@@ -966,86 +1172,119 @@ export default function App() {
         )
       ) : (
         /* Public Community View */
-        <main>
-          {/* 1. Hero Section with seamless embedded Navbar on purple faceted mesh */}
+        <main className="relative">
+          {/* Floating Glassmorphic Pill Navbar matching user reference */}
+          <Navbar
+            onOpenAuth={() => triggerAuthModal(undefined, 'login')}
+            onOpenPostModal={handleOpenPostQuestion}
+            onOpenAdmin={() => navigate('/admin')}
+            activeNav={activeNav}
+            currentUser={currentUser}
+            onSignOut={handleSignOut}
+            setActiveNav={(nav) => {
+              setActiveNav(nav);
+              if (nav === 'home') {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              } else if (nav === 'forum') {
+                document.getElementById('forum')?.scrollIntoView({ behavior: 'smooth' });
+              } else if (nav === 'blog') {
+                document.getElementById('blog')?.scrollIntoView({ behavior: 'smooth' });
+              } else if (nav === 'documentation') {
+                setIsConsultancyModalOpen(true);
+              } else if (nav === 'jobs') {
+                showToast(language === 'bn' ? 'ক্যারিয়ার পোর্টাল: ৪টি ইঞ্জিনিয়ারিং পদ বর্তমানে উন্মুক্ত।' : 'Careers portal: 4 engineering positions currently open.');
+              }
+            }}
+          />
+
+          {/* 1. Hero Section with faceted polyhedral background mesh and dynamic slideshow */}
           <HeroSection
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             onSelectTag={handleSelectTag}
-          >
-            <Navbar
-              onOpenAuth={() => triggerAuthModal(undefined, 'login')}
-              onOpenPostModal={handleOpenPostQuestion}
-              onOpenAdmin={() => navigate('/admin')}
-              activeNav={activeNav}
-              currentUser={currentUser}
-              onSignOut={handleSignOut}
-              setActiveNav={(nav) => {
-                setActiveNav(nav);
-                if (nav === 'forum') {
-                  document.getElementById('forum')?.scrollIntoView({ behavior: 'smooth' });
-                } else if (nav === 'blog') {
-                  document.getElementById('blog')?.scrollIntoView({ behavior: 'smooth' });
-                } else if (nav === 'documentation') {
-                  setIsConsultancyModalOpen(true);
-                } else if (nav === 'jobs') {
-                  showToast('Careers portal: 4 engineering positions currently open.');
-                }
-              }}
-            />
-          </HeroSection>
-
-          {/* 2. Main Forum Discussions Section */}
-          <ForumSection
-            topics={topics}
-            filteredTopics={filteredTopics}
-            activeFilter={activeFilter}
-            onSelectFilter={setActiveFilter}
-            onOpenPostModal={handleOpenPostQuestion}
-            onSelectTopic={handleSelectTopic}
-            onToggleLike={handleToggleLike}
-            onDeleteTopic={(topic) => setTopicToDelete(topic)}
-            canDeleteTopic={canDeleteTopic}
-            isTopicAuthor={isTopicAuthor}
-            recentTopics={recentTopics}
-            recentReplies={recentReplies}
-            onOpenConsultancy={() => setIsConsultancyModalOpen(true)}
-            onSelectRecentTopic={handleSelectRecentTopic}
-            onOpenChat={() => setIsChatOpen(!isChatOpen)}
-            searchQuery={searchQuery}
-            settings={platformSettings}
+            heroSettings={heroSettings}
           />
 
-          {/* 3. "New to Communities?" Callout Banner */}
-          <CalloutBanner onAskQuestion={handleOpenPostQuestion} />
+          {/* Post-Hero Container with On-Scroll Background & Matching Project Gradient */}
+          <div className="relative">
+            {/* Fixed On-Scroll Background Image Layer */}
+            <div 
+              className="absolute inset-0 pointer-events-none overflow-hidden select-none z-0"
+              aria-hidden="true"
+            >
+              {/* Saudi Corporate Partner Background Image with Fixed Scroll (sm:bg-fixed) */}
+              <div 
+                className="absolute inset-0 bg-top bg-no-repeat bg-cover sm:bg-fixed opacity-45 transition-opacity duration-300"
+                style={{ 
+                  backgroundImage: `url(${trekSaudiBg})`,
+                  backgroundPosition: 'center 10%'
+                }}
+              />
 
-          {/* 4. Blog Posts Section: "Ama Blogs" */}
-          <BlogSection
-            posts={blogPosts}
-            onSelectPost={handleSelectBlog}
-            onShowMore={() => {}}
-            hasMore={false}
-            currentUser={currentUser}
-            onRequireAuth={(prompt) => {
-              triggerAuthModal(prompt || 'To participate in blog activities, please log in or create an account.');
-            }}
-          />
+              {/* Seamless Matching Project Gradient */}
+              <div className="absolute inset-0 bg-gradient-to-b from-[#f8f9fd]/75 via-[#f8f9fd]/85 to-[#f8f9fd]/95" />
 
-          {/* 5. Newsletter Subscription Section */}
-          <NewsletterSection currentUser={currentUser} />
+              {/* Ambient Brand Mesh / Glow Accents matching project theme */}
+              <div className="absolute top-10 right-1/4 w-[500px] h-[500px] bg-teal-500/10 rounded-full blur-[100px] pointer-events-none" />
+              <div className="absolute top-1/2 left-10 w-[600px] h-[600px] bg-cyan-500/8 rounded-full blur-[110px] pointer-events-none" />
+              <div className="absolute bottom-20 right-10 w-[500px] h-[400px] bg-emerald-500/8 rounded-full blur-[100px] pointer-events-none" />
+            </div>
 
-          {/* 6. Footer Section */}
-          <Footer
-            onNavigate={(view) => {
-              if (view === 'forum') {
-                document.getElementById('forum')?.scrollIntoView({ behavior: 'smooth' });
-              } else if (view === 'blog') {
-                document.getElementById('blog')?.scrollIntoView({ behavior: 'smooth' });
-              }
-            }}
-            onOpenHelp={() => setIsChatOpen(true)}
-            onOpenAdmin={() => navigate('/admin')}
-          />
+            {/* Foreground Content */}
+            <div className="relative z-10">
+              {/* 2. Main Forum Discussions Section */}
+              <ForumSection
+                topics={topics}
+                filteredTopics={filteredTopics}
+                activeFilter={activeFilter}
+                onSelectFilter={setActiveFilter}
+                onOpenPostModal={handleOpenPostQuestion}
+                onSelectTopic={handleSelectTopic}
+                onToggleLike={handleToggleLike}
+                onDeleteTopic={(topic) => setTopicToDelete(topic)}
+                canDeleteTopic={canDeleteTopic}
+                isTopicAuthor={isTopicAuthor}
+                recentTopics={recentTopics}
+                recentReplies={recentReplies}
+                onOpenConsultancy={() => setIsConsultancyModalOpen(true)}
+                onSelectRecentTopic={handleSelectRecentTopic}
+                onOpenChat={() => setIsChatOpen(!isChatOpen)}
+                searchQuery={searchQuery}
+                settings={platformSettings}
+              />
+
+              {/* 3. "New to Communities?" Callout Banner */}
+              <CalloutBanner onAskQuestion={handleOpenPostQuestion} />
+
+              {/* 4. Blog Posts Section: "Trek Consultancy Insights" */}
+              <BlogSection
+                posts={blogPosts}
+                onSelectPost={handleSelectBlog}
+                onShowMore={() => {}}
+                hasMore={false}
+                currentUser={currentUser}
+                onRequireAuth={(prompt) => {
+                  triggerAuthModal(prompt || 'To participate in blog activities, please log in or create an account.');
+                }}
+              />
+
+              {/* 5. Newsletter Subscription Section */}
+              <NewsletterSection currentUser={currentUser} />
+
+              {/* 6. Footer Section */}
+              <Footer
+                onNavigate={(view) => {
+                  if (view === 'forum') {
+                    document.getElementById('forum')?.scrollIntoView({ behavior: 'smooth' });
+                  } else if (view === 'blog') {
+                    document.getElementById('blog')?.scrollIntoView({ behavior: 'smooth' });
+                  }
+                }}
+                onOpenHelp={() => setIsChatOpen(true)}
+                onOpenAdmin={() => navigate('/admin')}
+              />
+            </div>
+          </div>
         </main>
       )}
 
@@ -1055,8 +1294,14 @@ export default function App() {
         onClose={() => setIsPostModalOpen(false)}
         onSubmit={handleCreateTopic}
         currentUser={currentUser}
+        categories={discussionCategories}
         onRequireAuth={(prompt) => {
-          triggerAuthModal(prompt || 'To create a topic, you must have an account and be logged in.');
+          triggerAuthModal(
+            prompt ||
+              (language === 'bn'
+                ? 'ফোরামে একটি টপিক তৈরি ও প্রশ্ন পোস্ট করতে, আপনার একটি অ্যাকাউন্ট থাকতে হবে এবং লগইন করতে হবে।'
+                : 'To create a topic, you must have an account and be logged in.')
+          );
         }}
       />
 
@@ -1071,7 +1316,12 @@ export default function App() {
         isAuthor={selectedTopic ? isTopicAuthor(selectedTopic) : false}
         currentUser={currentUser}
         onRequireAuth={(prompt) => {
-          triggerAuthModal(prompt || 'To participate in topic discussions, please log in or create an account.');
+          triggerAuthModal(
+            prompt ||
+              (language === 'bn'
+                ? 'আলোচনায় অংশ নিতে এবং উত্তর দিতে অনুগ্রহ করে অ্যাকাউন্টে লগইন করুন।'
+                : 'To participate in topic discussions, please log in or create an account.')
+          );
         }}
       />
 
@@ -1101,7 +1351,12 @@ export default function App() {
         onClose={() => setIsBlogModalOpen(false)}
         currentUser={currentUser}
         onRequireAuth={(prompt) => {
-          triggerAuthModal(prompt || 'To participate in blog activities, please log in or create an account.');
+          triggerAuthModal(
+            prompt ||
+              (language === 'bn'
+                ? 'ব্লগ কার্যক্রমে অংশগ্রহণ করতে অনুগ্রহ করে অ্যাকাউন্টে লগইন করুন।'
+                : 'To participate in blog activities, please log in or create an account.')
+          );
         }}
         onBlogUpdated={(updatedBlog) => {
           setSelectedBlog(updatedBlog);
@@ -1123,10 +1378,14 @@ export default function App() {
           if (!isDeletingTopic) setTopicToDelete(null);
         }}
         onConfirm={handleConfirmDeleteTopic}
-        title="Delete Post"
+        title={language === 'bn' ? 'পোস্ট মুছে ফেলুন' : 'Delete Post'}
         itemTitle={topicToDelete?.title}
-        message="Are you sure you want to delete this post? This action cannot be undone and will permanently remove this discussion along with all replies."
-        confirmLabel="Delete Post"
+        message={
+          language === 'bn'
+            ? 'আপনি কি নিশ্চিত যে এই পোস্টটি মুছে ফেলতে চান? এই অ্যাকশনটি পূর্বাবস্থায় ফিরিয়ে আনা যাবে না এবং এই আলোচনার সাথে সম্পর্কিত সকল উত্তর স্থায়ীভাবে মুছে ফেলা হবে।'
+            : 'Are you sure you want to delete this post? This action cannot be undone and will permanently remove this discussion along with all replies.'
+        }
+        confirmLabel={language === 'bn' ? 'পোস্ট মুছুন' : 'Delete Post'}
         isLoading={isDeletingTopic}
       />
     </div>

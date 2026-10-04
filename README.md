@@ -1,6 +1,6 @@
-# Ama Community
+# Trek Consultancy Forum
 
-A community discussion forum and support center: topics and threaded replies, an
+The official community discussion forum and support center for Trek Consultancy: topics and threaded replies, an
 admin panel, a knowledge base, and an AI support assistant backed by Gemini and a
 Postgres-stored FAQ/knowledge base. Frontend is React + Vite + Tailwind; the API is
 a single Express app shared between local dev and Vercel serverless functions.
@@ -23,6 +23,8 @@ a single Express app shared between local dev and Vercel serverless functions.
 2. Copy `.env.example` to `.env` and fill in:
    - `DATABASE_URL` — your Neon connection string
    - `GEMINI_API_KEY` — for the AI support assistant and knowledge extraction
+   - `RESEND_API_KEY` — for sending real OTP verification emails (optional in dev; falls back to preview auto-fill if not set)
+   - `EMAIL_FROM` — sender address (e.g. `Trek Consultancy Forum <onboarding@resend.dev>`)
 3. Run the app:
    ```
    npm run dev
