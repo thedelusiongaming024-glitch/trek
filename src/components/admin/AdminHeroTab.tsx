@@ -144,51 +144,47 @@ export const AdminHeroTab: React.FC<AdminHeroTabProps> = ({
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-200">
+    <div className="space-y-6">
       {/* 1. Header Banner */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-6 sm:p-7 rounded-3xl bg-white/80 backdrop-blur-xl border border-white/80 shadow-xs">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-5 border-b border-slate-200">
         <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-500/10 text-teal-700 text-xs font-semibold mb-2 border border-teal-500/20">
-            <Image className="w-3.5 h-3.5 text-teal-600" />
-            <span>Hero Background Slideshow</span>
-          </div>
-          <h2 className="text-xl sm:text-2xl font-bold font-heading text-slate-900 tracking-tight">
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">
             Hero Slideshow Settings
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl leading-relaxed">
-            Add web image links to display in the public hero section background slideshow. All changes are stored directly in PostgreSQL.
+          </h1>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Configure background images and copy displayed on the community homepage.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 shrink-0 w-full sm:w-auto">
+        <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
           <button
             onClick={handleResetDefaults}
-            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition-colors cursor-pointer shadow-2xs"
             title="Restore original preset images"
           >
-            <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+            <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
             <span>Reset</span>
           </button>
 
           <button
             onClick={handleSave}
             disabled={isSaving}
-            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-full bg-[#00a8b5] hover:bg-[#0096a3] text-white text-xs sm:text-sm font-semibold shadow-md shadow-teal-500/25 active:scale-95 transition-all cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-medium shadow-xs transition-colors cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
           >
             {isSaving ? (
               <>
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                <span>Saving to Neon...</span>
+                <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span>Saving...</span>
               </>
             ) : saveSuccess ? (
               <>
-                <CheckCircle2 className="w-4 h-4 text-white" />
-                <span>Saved & Live!</span>
+                <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                <span>Saved & Live</span>
               </>
             ) : (
               <>
-                <Save className="w-4 h-4" />
-                <span>Save Hero Settings</span>
+                <Save className="w-3.5 h-3.5" />
+                <span>Save Changes</span>
               </>
             )}
           </button>
@@ -196,90 +192,90 @@ export const AdminHeroTab: React.FC<AdminHeroTabProps> = ({
       </div>
 
       {/* 2. Add New Slide Card */}
-      <div className="rounded-3xl bg-white/80 backdrop-blur-xl border border-white/80 shadow-xs p-6 sm:p-7 space-y-4">
+      <div className="rounded-xl bg-white border border-slate-200/90 shadow-2xs p-5 space-y-4">
         <div className="flex items-center gap-2">
           <Plus className="w-4 h-4 text-teal-600" />
-          <h3 className="text-sm font-bold text-slate-900 font-heading">
-            Add New Background Image
-          </h3>
+          <h2 className="text-sm font-semibold text-slate-900">
+            Add Background Image
+          </h2>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="md:col-span-2 space-y-1">
-            <label className="text-xs font-semibold text-slate-700">Image Web Link (HTTPS URL) *</label>
+            <label className="text-[11px] font-medium text-slate-700">Image URL (HTTPS) *</label>
             <input
               type="url"
               value={newImageUrl}
               onChange={(e) => setNewImageUrl(e.target.value)}
-              placeholder="https://images.unsplash.com/photo-... or your web image URL"
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 bg-white"
+              placeholder="https://images.unsplash.com/photo-..."
+              className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-teal-600/30 focus:border-teal-600 bg-white"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-slate-700">Caption / Category (Optional)</label>
+            <label className="text-[11px] font-medium text-slate-700">Caption / Category (Optional)</label>
             <input
               type="text"
               value={newImageTitle}
               onChange={(e) => setNewImageTitle(e.target.value)}
               placeholder="e.g. Enterprise Cloud Architecture"
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 bg-white"
+              className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-teal-600/30 focus:border-teal-600 bg-white"
             />
           </div>
         </div>
 
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
-          <div className="flex items-center gap-2 text-[11px] text-slate-500">
-            <Info className="w-3.5 h-3.5 text-teal-600 shrink-0" />
-            <span>Enter any web image URL. High-resolution landscape images (1920×1080) look best.</span>
+          <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+            <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <span>Recommended: landscape images (1920×1080) with good contrast.</span>
           </div>
 
           <button
             type="button"
             onClick={handleAddSlide}
             disabled={!newImageUrl.trim()}
-            className="inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold shadow-xs disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-medium shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>Add Slide to Hero</span>
+            <span>Add Slide</span>
           </button>
         </div>
       </div>
 
       {/* 3. Configured Slides List */}
-      <div className="rounded-3xl bg-white/80 backdrop-blur-xl border border-white/80 shadow-xs p-6 sm:p-7 space-y-4">
+      <div className="rounded-xl bg-white border border-slate-200/90 shadow-2xs p-5 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Layers className="w-4 h-4 text-teal-600" />
-            <h3 className="text-sm font-bold text-slate-900 font-heading">
+            <Layers className="w-4 h-4 text-slate-600" />
+            <h2 className="text-sm font-semibold text-slate-900">
               Configured Slides ({settings.slides.length})
-            </h3>
+            </h2>
           </div>
-          <span className="text-xs text-slate-500">
-            {activeSlides.length} active in public rotation
+          <span className="text-xs text-slate-500 font-mono">
+            {activeSlides.length} active
           </span>
         </div>
 
         {settings.slides.length === 0 ? (
-          <div className="py-10 text-center border-2 border-dashed border-slate-200 rounded-2xl p-6">
-            <Image className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-            <p className="text-xs font-bold text-slate-700">No slides configured yet</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">Use the input above to add background images for the hero slideshow.</p>
+          <div className="py-8 text-center border border-dashed border-slate-200 rounded-lg p-6">
+            <Image className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+            <p className="text-xs font-semibold text-slate-700">No slides configured</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Use the form above to add slideshow background images.</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {settings.slides.map((slide, index) => (
               <div
                 key={slide.id}
-                className={`p-3 sm:p-4 rounded-2xl border transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5 ${
+                className={`p-3 rounded-lg border transition-colors flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
                   slide.isActive !== false
-                    ? 'bg-white border-slate-200/90 shadow-2xs'
-                    : 'bg-slate-50/70 border-slate-200/50 opacity-60'
+                    ? 'bg-slate-50/50 border-slate-200 hover:bg-white hover:border-slate-300'
+                    : 'bg-slate-50/30 border-slate-200/60 opacity-60'
                 }`}
               >
                 {/* Thumbnail and Info */}
-                <div className="flex items-center gap-3.5 min-w-0 flex-1 w-full sm:w-auto">
-                  <div className="relative w-20 h-14 rounded-xl overflow-hidden shrink-0 bg-slate-100 border border-slate-200">
+                <div className="flex items-center gap-3 min-w-0 flex-1 w-full sm:w-auto">
+                  <div className="relative w-16 h-11 rounded-md overflow-hidden shrink-0 bg-slate-100 border border-slate-200">
                     <img
                       src={slide.url}
                       alt={slide.title || 'Hero slide'}
@@ -288,18 +284,18 @@ export const AdminHeroTab: React.FC<AdminHeroTabProps> = ({
                         (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=300&q=80';
                       }}
                     />
-                    <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded-md bg-teal-700/85 backdrop-blur-xs text-[9px] font-bold text-white shadow-xs">
+                    <div className="absolute top-1 left-1 px-1 py-0.2 rounded bg-slate-900/80 text-[9px] font-mono font-medium text-white">
                       #{index + 1}
                     </div>
                   </div>
 
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <p className="text-xs font-bold text-slate-900 truncate">
+                      <p className="text-xs font-semibold text-slate-900 truncate">
                         {slide.title || `Slide ${index + 1}`}
                       </p>
                       {slide.isActive === false && (
-                        <span className="px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-amber-100 text-amber-800">
+                        <span className="px-1.5 py-0.2 rounded text-[9px] font-medium bg-amber-50 text-amber-800 border border-amber-200">
                           Hidden
                         </span>
                       )}
@@ -317,34 +313,34 @@ export const AdminHeroTab: React.FC<AdminHeroTabProps> = ({
                 </div>
 
                 {/* Actions: Reorder, Active toggle, Delete */}
-                <div className="flex items-center gap-1.5 self-end sm:self-auto shrink-0">
+                <div className="flex items-center gap-1 self-end sm:self-auto shrink-0">
                   <button
                     type="button"
                     onClick={() => handleMoveSlide(index, 'up')}
                     disabled={index === 0}
-                    className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 disabled:opacity-20 disabled:hover:bg-transparent cursor-pointer transition-colors"
-                    title="Move slide up"
+                    className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 disabled:opacity-20 disabled:hover:bg-transparent cursor-pointer transition-colors"
+                    title="Move up"
                   >
-                    <ArrowUp className="w-4 h-4" />
+                    <ArrowUp className="w-3.5 h-3.5" />
                   </button>
 
                   <button
                     type="button"
                     onClick={() => handleMoveSlide(index, 'down')}
                     disabled={index === settings.slides.length - 1}
-                    className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 disabled:opacity-20 disabled:hover:bg-transparent cursor-pointer transition-colors"
-                    title="Move slide down"
+                    className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 disabled:opacity-20 disabled:hover:bg-transparent cursor-pointer transition-colors"
+                    title="Move down"
                   >
-                    <ArrowDown className="w-4 h-4" />
+                    <ArrowDown className="w-3.5 h-3.5" />
                   </button>
 
                   <button
                     type="button"
                     onClick={() => handleToggleSlideActive(slide.id)}
-                    className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
+                    className={`px-2 py-1 rounded-md text-xs font-medium cursor-pointer transition-colors border ${
                       slide.isActive !== false
-                        ? 'bg-teal-50 text-teal-700 hover:bg-teal-100'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        ? 'bg-white text-teal-700 border-teal-200 hover:bg-teal-50'
+                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                     }`}
                     title={slide.isActive !== false ? 'Hide from public hero' : 'Show in public hero'}
                   >
@@ -354,10 +350,10 @@ export const AdminHeroTab: React.FC<AdminHeroTabProps> = ({
                   <button
                     type="button"
                     onClick={() => handleDeleteSlide(slide.id)}
-                    className="p-2 rounded-xl text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition-colors cursor-pointer"
+                    className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                     title="Delete slide"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
@@ -367,31 +363,31 @@ export const AdminHeroTab: React.FC<AdminHeroTabProps> = ({
       </div>
 
       {/* 4. Hero Headline & Search Text Copywriting */}
-      <div className="rounded-3xl bg-white/80 backdrop-blur-xl border border-white/80 shadow-xs p-6 sm:p-7 space-y-4">
-        <h3 className="text-sm font-bold text-slate-900 font-heading">
+      <div className="rounded-xl bg-white border border-slate-200/90 shadow-2xs p-5 space-y-4">
+        <h2 className="text-sm font-semibold text-slate-900">
           Headline & Search Copywriting
-        </h3>
+        </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
           <div className="space-y-1">
-            <label className="font-semibold text-slate-700">Main Hero Headline</label>
+            <label className="font-medium text-slate-700">Main Hero Headline</label>
             <input
               type="text"
               value={settings.title || ''}
               onChange={(e) => setSettings(prev => ({ ...prev, title: e.target.value }))}
               placeholder="Welcome to Trek Consultancy Forum"
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 bg-white"
+              className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-teal-600/30 focus:border-teal-600 bg-white"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="font-semibold text-slate-700">Search Bar Placeholder</label>
+            <label className="font-medium text-slate-700">Search Placeholder</label>
             <input
               type="text"
               value={settings.searchPlaceholder || ''}
               onChange={(e) => setSettings(prev => ({ ...prev, searchPlaceholder: e.target.value }))}
               placeholder="Search for Topics, Solutions, & Guides...."
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 bg-white"
+              className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-teal-600/30 focus:border-teal-600 bg-white"
             />
           </div>
         </div>

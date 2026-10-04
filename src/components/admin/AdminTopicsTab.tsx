@@ -9,7 +9,6 @@ import {
   Eye, 
   MessageSquare, 
   ThumbsUp, 
-  Sparkles,
   Layers,
   Tag,
   ShieldCheck,
@@ -156,75 +155,73 @@ export const AdminTopicsTab: React.FC<AdminTopicsTabProps> = ({
   return (
     <div className="space-y-6">
       {/* Header with Title & Action */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-5 border-b border-slate-200">
         <div>
-          <h2 className="text-2xl font-heading font-bold text-slate-900 tracking-tight">
-            Forum Topics & Discussions
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-600 mt-1">
-            Moderate discussions, configure user question categories, and customize staff role badges.
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+            Discussions & Moderation
+          </h1>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Moderate community discussions, configure question categories, and assign staff badges.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setIsManagerOpen(!isManagerOpen)}
-            className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-xs font-semibold border transition-all cursor-pointer backdrop-blur-md ${
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer shadow-2xs ${
               isManagerOpen
-                ? 'bg-teal-600 text-white border-teal-600 shadow-md shadow-teal-500/25'
-                : 'bg-white/80 hover:bg-white text-slate-700 hover:text-slate-900 border-slate-200/80 shadow-xs'
+                ? 'bg-slate-900 text-white border-slate-900'
+                : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
             }`}
           >
             <SlidersHorizontal className="w-3.5 h-3.5 text-teal-600" />
-            <span>Manage Categories & Badges</span>
-            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/15 text-teal-700 border border-teal-500/25">
-              {categories.length} cats • {staffRoles.length} roles
+            <span>Categories & Roles</span>
+            <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-slate-100 text-slate-700 border border-slate-200">
+              {categories.length + staffRoles.length}
             </span>
             {isManagerOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </button>
 
           <button
             onClick={onOpenNewTopicModal}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#00a8b5] hover:bg-[#0096a3] text-white text-xs font-semibold shadow-md shadow-teal-500/25 active:scale-95 transition-all cursor-pointer backdrop-blur-md"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-medium shadow-xs transition-colors cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
-            <span>Post Official Topic</span>
+            <Plus className="w-3.5 h-3.5" />
+            <span>New Discussion</span>
           </button>
         </div>
       </div>
 
       {/* Discussion Category & Staff Badge Management Section */}
       {isManagerOpen && (
-        <div className="rounded-3xl p-6 bg-white/85 backdrop-blur-xl border border-teal-500/30 shadow-lg animate-in fade-in slide-in-from-top-2 duration-200 space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-200/70 gap-4">
+        <div className="rounded-xl p-5 bg-white border border-slate-200 shadow-2xs space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
             <div>
               <div className="flex items-center gap-2">
-                <span className="p-1.5 rounded-lg bg-teal-500/10 text-teal-600">
-                  <SlidersHorizontal className="w-4 h-4" />
-                </span>
-                <h3 className="font-heading font-bold text-base text-slate-900">
-                  Discussion Customization Manager
+                <SlidersHorizontal className="w-4 h-4 text-teal-600" />
+                <h3 className="font-semibold text-sm text-slate-900">
+                  Discussion Customization
                 </h3>
               </div>
-              <p className="text-xs text-slate-500 mt-1">
-                Categories created here directly populate the community "Post Question" modal and board filters. Staff badges appear in official topics.
+              <p className="text-xs text-slate-500 mt-0.5">
+                Categories are available when users post questions. Staff badges designate official responses.
               </p>
             </div>
 
             {/* Sub-tabs switch */}
-            <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-100 border border-slate-200/60 self-start sm:self-auto">
+            <div className="flex items-center gap-1 p-1 rounded-lg bg-slate-100 border border-slate-200/80 self-start sm:self-auto">
               <button
                 type="button"
                 onClick={() => setManagerTab('categories')}
-                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
                   managerTab === 'categories'
-                    ? 'bg-white text-teal-700 shadow-xs'
+                    ? 'bg-white text-slate-900 shadow-2xs'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 <Tag className="w-3.5 h-3.5 text-teal-600" />
                 <span>Categories</span>
-                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200/70 text-slate-700">
+                <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-slate-200/80 text-slate-700">
                   {categories.length}
                 </span>
               </button>
@@ -232,15 +229,15 @@ export const AdminTopicsTab: React.FC<AdminTopicsTabProps> = ({
               <button
                 type="button"
                 onClick={() => setManagerTab('roles')}
-                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
                   managerTab === 'roles'
-                    ? 'bg-white text-teal-700 shadow-xs'
+                    ? 'bg-white text-slate-900 shadow-2xs'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 <ShieldCheck className="w-3.5 h-3.5 text-teal-600" />
-                <span>Staff Badges / Roles</span>
-                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200/70 text-slate-700">
+                <span>Staff Badges</span>
+                <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-slate-200/80 text-slate-700">
                   {staffRoles.length}
                 </span>
               </button>
@@ -249,41 +246,41 @@ export const AdminTopicsTab: React.FC<AdminTopicsTabProps> = ({
 
           {/* TAB 1: Categories Management */}
           {managerTab === 'categories' && (
-            <div className="space-y-6">
+            <div className="space-y-5">
               {/* Add Category Form */}
-              <form onSubmit={handleCreateCategory} className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/70">
+              <form onSubmit={handleCreateCategory} className="p-4 rounded-lg bg-slate-50 border border-slate-200">
                 <div className="flex items-center gap-2 mb-3">
-                  <FolderPlus className="w-4 h-4 text-teal-600" />
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                    Add New Discussion Category
+                  <FolderPlus className="w-4 h-4 text-slate-600" />
+                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-700">
+                    Add Category
                   </span>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
                   <div className="md:col-span-5">
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                    <label className="block text-[11px] font-medium text-slate-700 mb-1">
                       Category Name <span className="text-rose-500">*</span>
                     </label>
                     <input
                       type="text"
                       value={newCatName}
                       onChange={(e) => setNewCatName(e.target.value)}
-                      placeholder="e.g. AI & Automation, DevOps, Mobile..."
-                      className="w-full px-3 py-2 text-xs rounded-xl bg-white border border-slate-200 focus:border-teal-500 focus:outline-none text-slate-800 placeholder:text-slate-400"
+                      placeholder="e.g. Cloud Architecture, DevOps..."
+                      className="w-full px-3 py-1.5 text-xs rounded-lg bg-white border border-slate-200 focus:border-teal-600 focus:ring-1 focus:ring-teal-600/30 focus:outline-none text-slate-800 placeholder:text-slate-400"
                       required
                     />
                   </div>
 
                   <div className="md:col-span-5">
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                      Brief Description (Optional)
+                    <label className="block text-[11px] font-medium text-slate-700 mb-1">
+                      Description (Optional)
                     </label>
                     <input
                       type="text"
                       value={newCatDescription}
                       onChange={(e) => setNewCatDescription(e.target.value)}
-                      placeholder="Short summary of discussions in this category"
-                      className="w-full px-3 py-2 text-xs rounded-xl bg-white border border-slate-200 focus:border-teal-500 focus:outline-none text-slate-800 placeholder:text-slate-400"
+                      placeholder="Short summary for this category"
+                      className="w-full px-3 py-1.5 text-xs rounded-lg bg-white border border-slate-200 focus:border-teal-600 focus:ring-1 focus:ring-teal-600/30 focus:outline-none text-slate-800 placeholder:text-slate-400"
                     />
                   </div>
 
@@ -291,10 +288,10 @@ export const AdminTopicsTab: React.FC<AdminTopicsTabProps> = ({
                     <button
                       type="submit"
                       disabled={isSavingCategory || !newCatName.trim()}
-                      className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white shadow-xs transition-all cursor-pointer active:scale-95"
+                      className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white shadow-2xs transition-colors cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" />
-                      <span>{isSavingCategory ? 'Adding...' : 'Add Category'}</span>
+                      <span>{isSavingCategory ? 'Saving...' : 'Add'}</span>
                     </button>
                   </div>
                 </div>
@@ -303,11 +300,11 @@ export const AdminTopicsTab: React.FC<AdminTopicsTabProps> = ({
               {/* Categories List */}
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-semibold text-slate-600">
-                    Available Community Categories ({categories.length})
+                  <span className="text-xs font-semibold text-slate-700">
+                    Existing Categories ({categories.length})
                   </span>
                   <span className="text-[11px] text-slate-400">
-                    Users choose from these when clicking "Post Question"
+                    Displayed in "Post Question" and filter dropdowns
                   </span>
                 </div>
 
@@ -321,11 +318,11 @@ export const AdminTopicsTab: React.FC<AdminTopicsTabProps> = ({
                     return (
                       <div
                         key={catObj.id || catObj.name}
-                        className="group flex items-start justify-between p-3.5 rounded-2xl bg-white border border-slate-200/80 hover:border-teal-500/40 hover:shadow-sm transition-all"
+                        className="group flex items-start justify-between p-3 rounded-lg bg-slate-50/50 border border-slate-200 hover:border-slate-300 transition-colors"
                       >
                         <div className="min-w-0 pr-2">
-                          <div className="flex items-center gap-2">
-                            <Tag className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                          <div className="flex items-center gap-1.5">
+                            <Tag className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                             <h4 className="font-semibold text-xs text-slate-900 truncate">
                               {catObj.name}
                             </h4>
@@ -338,7 +335,7 @@ export const AdminTopicsTab: React.FC<AdminTopicsTabProps> = ({
                           )}
 
                           <div className="flex items-center gap-2 mt-2">
-                            <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 text-slate-600">
+                            <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-white border border-slate-200 text-slate-600">
                               {topicCount} {topicCount === 1 ? 'topic' : 'topics'}
                             </span>
                             <span className="text-[10px] text-slate-400 font-mono truncate">
@@ -351,7 +348,7 @@ export const AdminTopicsTab: React.FC<AdminTopicsTabProps> = ({
                           type="button"
                           onClick={() => setCategoryToDelete(catObj)}
                           title="Remove category"
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors shrink-0 cursor-pointer"
+                          className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors shrink-0 cursor-pointer"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -365,47 +362,47 @@ export const AdminTopicsTab: React.FC<AdminTopicsTabProps> = ({
 
           {/* TAB 2: Staff Roles & Badges Management */}
           {managerTab === 'roles' && (
-            <div className="space-y-6">
+            <div className="space-y-5">
               {/* Add Staff Role Form */}
-              <form onSubmit={handleCreateStaffRole} className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/70">
+              <form onSubmit={handleCreateStaffRole} className="p-4 rounded-lg bg-slate-50 border border-slate-200">
                 <div className="flex items-center gap-2 mb-3">
-                  <ShieldCheck className="w-4 h-4 text-teal-600" />
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                    Add New Staff Role & Custom Badge
+                  <ShieldCheck className="w-4 h-4 text-slate-600" />
+                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-700">
+                    Add Staff Role & Badge
                   </span>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
                   <div className="md:col-span-4">
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                      Staff Role Title <span className="text-rose-500">*</span>
+                    <label className="block text-[11px] font-medium text-slate-700 mb-1">
+                      Role Title <span className="text-rose-500">*</span>
                     </label>
                     <input
                       type="text"
                       value={newRoleName}
                       onChange={(e) => setNewRoleName(e.target.value)}
-                      placeholder="e.g. Senior Cloud Architect, Security Lead"
-                      className="w-full px-3 py-2 text-xs rounded-xl bg-white border border-slate-200 focus:border-teal-500 focus:outline-none text-slate-800 placeholder:text-slate-400"
+                      placeholder="e.g. Lead Architect"
+                      className="w-full px-3 py-1.5 text-xs rounded-lg bg-white border border-slate-200 focus:border-teal-600 focus:ring-1 focus:ring-teal-600/30 focus:outline-none text-slate-800 placeholder:text-slate-400"
                       required
                     />
                   </div>
 
                   <div className="md:col-span-3">
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                      Badge Label Text
+                    <label className="block text-[11px] font-medium text-slate-700 mb-1">
+                      Badge Text
                     </label>
                     <input
                       type="text"
                       value={newRoleBadgeLabel}
                       onChange={(e) => setNewRoleBadgeLabel(e.target.value)}
-                      placeholder="e.g. ARCHITECT, LEAD, MOD"
-                      className="w-full px-3 py-2 text-xs rounded-xl bg-white border border-slate-200 focus:border-teal-500 focus:outline-none text-slate-800 placeholder:text-slate-400"
+                      placeholder="e.g. LEAD, MOD"
+                      className="w-full px-3 py-1.5 text-xs rounded-lg bg-white border border-slate-200 focus:border-teal-600 focus:ring-1 focus:ring-teal-600/30 focus:outline-none text-slate-800 placeholder:text-slate-400"
                     />
                   </div>
 
                   <div className="md:col-span-3">
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                      Badge Color Theme
+                    <label className="block text-[11px] font-medium text-slate-700 mb-1">
+                      Color
                     </label>
                     <div className="flex items-center gap-1.5 flex-wrap">
                       {COLOR_OPTIONS.map((col) => (
@@ -413,8 +410,8 @@ export const AdminTopicsTab: React.FC<AdminTopicsTabProps> = ({
                           key={col.id}
                           type="button"
                           onClick={() => setNewRoleColor(col.id)}
-                          className={`w-6 h-6 rounded-full transition-transform cursor-pointer ${col.swatch} ${
-                            newRoleColor === col.id ? 'ring-2 ring-offset-2 ring-teal-500 scale-110' : 'opacity-80 hover:opacity-100'
+                          className={`w-5 h-5 rounded-md transition-transform cursor-pointer ${col.swatch} ${
+                            newRoleColor === col.id ? 'ring-2 ring-offset-1 ring-slate-900 scale-105' : 'opacity-70 hover:opacity-100'
                           }`}
                           title={col.label}
                         />
@@ -426,20 +423,20 @@ export const AdminTopicsTab: React.FC<AdminTopicsTabProps> = ({
                     <button
                       type="submit"
                       disabled={isSavingRole || !newRoleName.trim()}
-                      className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white shadow-xs transition-all cursor-pointer active:scale-95"
+                      className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white shadow-2xs transition-colors cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" />
-                      <span>{isSavingRole ? 'Adding...' : 'Add Badge'}</span>
+                      <span>{isSavingRole ? 'Saving...' : 'Add'}</span>
                     </button>
                   </div>
                 </div>
 
                 {/* Live Preview */}
-                <div className="mt-3 pt-3 border-t border-slate-200/60 flex items-center gap-3">
-                  <span className="text-[11px] text-slate-500">Live Badge Preview:</span>
+                <div className="mt-3 pt-3 border-t border-slate-200 flex items-center gap-3">
+                  <span className="text-[11px] text-slate-500">Preview:</span>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-semibold text-slate-800">
-                      {newRoleName.trim() || 'Custom Staff Role'}
+                      {newRoleName.trim() || 'Role Title'}
                     </span>
                     {renderBadge(newRoleBadgeLabel.trim() || newRoleName.trim() || 'BADGE', newRoleColor)}
                   </div>
@@ -449,11 +446,11 @@ export const AdminTopicsTab: React.FC<AdminTopicsTabProps> = ({
               {/* Staff Roles List */}
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-semibold text-slate-600">
-                    Configured Staff Badges & Roles ({staffRoles.length})
+                  <span className="text-xs font-semibold text-slate-700">
+                    Configured Badges ({staffRoles.length})
                   </span>
                   <span className="text-[11px] text-slate-400">
-                    Used when posting official topics or marking verified responses
+                    Available in official topics
                   </span>
                 </div>
 
@@ -466,13 +463,13 @@ export const AdminTopicsTab: React.FC<AdminTopicsTabProps> = ({
                     return (
                       <div
                         key={roleObj.id || roleObj.name}
-                        className="group flex items-center justify-between p-3.5 rounded-2xl bg-white border border-slate-200/80 hover:border-teal-500/40 hover:shadow-sm transition-all"
+                        className="group flex items-center justify-between p-3 rounded-lg bg-slate-50/50 border border-slate-200 hover:border-slate-300 transition-colors"
                       >
                         <div className="min-w-0 pr-2">
                           <h4 className="font-semibold text-xs text-slate-900 truncate">
                             {roleObj.name}
                           </h4>
-                          <div className="mt-1.5">
+                          <div className="mt-1">
                             {renderBadge(roleObj.badgeLabel || roleObj.name, roleObj.color)}
                           </div>
                         </div>
@@ -480,8 +477,8 @@ export const AdminTopicsTab: React.FC<AdminTopicsTabProps> = ({
                         <button
                           type="button"
                           onClick={() => setStaffRoleToDelete(roleObj)}
-                          title="Remove staff role"
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors shrink-0 cursor-pointer"
+                          title="Remove badge"
+                          className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors shrink-0 cursor-pointer"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -496,33 +493,33 @@ export const AdminTopicsTab: React.FC<AdminTopicsTabProps> = ({
       )}
 
       {/* Filter and Search Bar */}
-      <div className="rounded-2xl p-4 bg-white/75 backdrop-blur-xl border border-white/80 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
+      <div className="rounded-xl p-3 bg-white border border-slate-200/90 shadow-2xs flex flex-col md:flex-row items-center justify-between gap-3">
         {/* Search */}
         <div className="relative w-full md:w-80">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Filter topics by keyword..."
-            className="w-full pl-9 pr-4 py-2 text-xs rounded-xl bg-white/80 border border-slate-200/80 focus:border-teal-500 focus:outline-none text-slate-800 placeholder:text-slate-400"
+            placeholder="Search discussions by title or author..."
+            className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg bg-slate-50 border border-slate-200 focus:bg-white focus:border-teal-600 focus:ring-1 focus:ring-teal-600/30 focus:outline-none text-slate-800 placeholder:text-slate-400 transition-colors"
           />
         </div>
 
-        {/* Dynamic Category Pills */}
-        <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-1 md:pb-0 scrollbar-none">
+        {/* Dynamic Category Buttons */}
+        <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0 scrollbar-none">
           <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider shrink-0 flex items-center gap-1">
-            <Filter className="w-3 h-3 text-teal-600" />
-            Board:
+            <Filter className="w-3 h-3 text-slate-400" />
+            Category:
           </span>
           {boardCategories.map((cat) => (
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors cursor-pointer capitalize ${
+              className={`px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap transition-colors cursor-pointer capitalize border ${
                 selectedCategory === cat
-                  ? 'bg-teal-500/15 text-teal-700 font-semibold border border-teal-500/30'
-                  : 'bg-white/60 text-slate-600 hover:bg-white hover:text-slate-900 border border-slate-200/60'
+                  ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
+                  : 'bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 border-slate-200'
               }`}
             >
               {cat === 'all' ? 'All Boards' : cat}
@@ -532,53 +529,53 @@ export const AdminTopicsTab: React.FC<AdminTopicsTabProps> = ({
       </div>
 
       {/* Topics Table Card */}
-      <div className="rounded-3xl bg-white/80 backdrop-blur-xl border border-white/80 shadow-xs overflow-hidden">
+      <div className="rounded-xl bg-white border border-slate-200/90 shadow-2xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-slate-200/70 bg-slate-50/50 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                <th className="py-3.5 px-6">Topic / Author</th>
-                <th className="py-3.5 px-4">Board Category</th>
-                <th className="py-3.5 px-4 text-center">Stats</th>
-                <th className="py-3.5 px-4 text-center">Flags</th>
-                <th className="py-3.5 px-6 text-right">Moderation Actions</th>
+              <tr className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                <th className="py-3 px-5">Topic / Author</th>
+                <th className="py-3 px-4">Category</th>
+                <th className="py-3 px-4 text-center">Engagement</th>
+                <th className="py-3 px-4 text-center">Status</th>
+                <th className="py-3 px-5 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
               {filteredTopics.map((topic) => (
-                <tr key={topic.id} className="hover:bg-teal-500/5 transition-colors group">
+                <tr key={topic.id} className="hover:bg-slate-50/70 transition-colors group">
                   {/* Topic Title & Author */}
-                  <td className="py-4 px-6 max-w-sm">
-                    <div className="flex items-start gap-3">
+                  <td className="py-3.5 px-5 max-w-sm">
+                    <div className="flex items-start gap-2.5">
                       <img
                         src={topic.authorAvatar}
                         alt={topic.author}
-                        className="w-8 h-8 rounded-full ring-1 ring-slate-200 object-cover shrink-0 mt-0.5"
+                        className="w-7 h-7 rounded-lg ring-1 ring-slate-200 object-cover shrink-0 mt-0.5"
                       />
                       <div className="min-w-0">
                         <button
                           onClick={() => onViewTopic(topic)}
-                          className="font-heading font-bold text-sm text-slate-900 hover:text-teal-600 transition-colors text-left line-clamp-1 cursor-pointer"
+                          className="font-semibold text-xs text-slate-900 hover:text-teal-700 transition-colors text-left line-clamp-1 cursor-pointer"
                         >
                           {topic.title}
                         </button>
                         <p className="text-[11px] text-slate-500 mt-0.5">
-                          By <span className="font-semibold text-slate-700">{topic.author}</span> • {topic.timeAgo}
+                          By <span className="font-medium text-slate-700">{topic.author}</span> • {topic.timeAgo}
                         </p>
                       </div>
                     </div>
                   </td>
 
                   {/* Category */}
-                  <td className="py-4 px-4">
-                    <span className="inline-block px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-100 text-slate-700">
+                  <td className="py-3.5 px-4">
+                    <span className="inline-block px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200/60">
                       {topic.category}
                     </span>
                   </td>
 
-                  {/* Stats */}
-                  <td className="py-4 px-4 text-center">
-                    <div className="flex items-center justify-center gap-3 text-slate-500 text-[11px]">
+                  {/* Engagement */}
+                  <td className="py-3.5 px-4 text-center">
+                    <div className="flex items-center justify-center gap-3 text-slate-500 text-[11px] font-mono">
                       <span className="flex items-center gap-1" title="Views">
                         <Eye className="w-3.5 h-3.5 text-slate-400" />
                         {topic.views}
@@ -595,35 +592,35 @@ export const AdminTopicsTab: React.FC<AdminTopicsTabProps> = ({
                   </td>
 
                   {/* Badges / Flags */}
-                  <td className="py-4 px-4 text-center">
+                  <td className="py-3.5 px-4 text-center">
                     <div className="flex items-center justify-center gap-1.5">
                       {topic.isFeatured && (
-                        <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-700 border border-amber-500/20">
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
                           <Pin className="w-2.5 h-2.5" /> Pinned
                         </span>
                       )}
                       {topic.isPopular && (
-                        <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/15 text-teal-700 border border-teal-500/20">
-                          <Sparkles className="w-2.5 h-2.5" /> Hot
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-teal-50 text-teal-700 border border-teal-200">
+                          <Star className="w-2.5 h-2.5" /> Hot
                         </span>
                       )}
                       {!topic.isFeatured && !topic.isPopular && (
-                        <span className="text-[11px] text-slate-400">Standard</span>
+                        <span className="text-[11px] text-slate-400 font-mono">-</span>
                       )}
                     </div>
                   </td>
 
                   {/* Actions */}
-                  <td className="py-4 px-6 text-right">
+                  <td className="py-3.5 px-5 text-right">
                     <div className="flex items-center justify-end gap-1.5">
                       {/* Toggle Pin/Featured */}
                       <button
                         onClick={() => onToggleFeature(topic.id)}
                         title={topic.isFeatured ? "Unpin Topic" : "Pin Topic to Top"}
-                        className={`p-2 rounded-xl border transition-all cursor-pointer ${
+                        className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
                           topic.isFeatured 
-                            ? 'bg-amber-500/20 border-amber-500/30 text-amber-700' 
-                            : 'bg-white/80 border-slate-200/80 text-slate-500 hover:text-amber-600 hover:bg-amber-50'
+                            ? 'bg-amber-50 border-amber-200 text-amber-700' 
+                            : 'bg-white border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-50'
                         }`}
                       >
                         <Pin className="w-3.5 h-3.5" />
@@ -633,10 +630,10 @@ export const AdminTopicsTab: React.FC<AdminTopicsTabProps> = ({
                       <button
                         onClick={() => onTogglePopular(topic.id)}
                         title={topic.isPopular ? "Remove Hot status" : "Mark as Hot Topic"}
-                        className={`p-2 rounded-xl border transition-all cursor-pointer ${
+                        className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
                           topic.isPopular 
-                            ? 'bg-teal-500/20 border-teal-500/30 text-teal-700' 
-                            : 'bg-white/80 border-slate-200/80 text-slate-500 hover:text-teal-600 hover:bg-teal-50'
+                            ? 'bg-teal-50 border-teal-200 text-teal-700' 
+                            : 'bg-white border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-50'
                         }`}
                       >
                         <Star className="w-3.5 h-3.5" />
@@ -646,7 +643,7 @@ export const AdminTopicsTab: React.FC<AdminTopicsTabProps> = ({
                       <button
                         onClick={() => onViewTopic(topic)}
                         title="Preview Discussion"
-                        className="p-2 rounded-xl bg-white/80 border border-slate-200/80 text-slate-500 hover:text-teal-600 hover:bg-teal-50 transition-all cursor-pointer"
+                        className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer"
                       >
                         <Eye className="w-3.5 h-3.5" />
                       </button>
@@ -655,7 +652,7 @@ export const AdminTopicsTab: React.FC<AdminTopicsTabProps> = ({
                       <button
                         onClick={() => setTopicToDelete(topic)}
                         title="Delete Discussion"
-                        className="p-2 rounded-xl bg-white/80 border border-slate-200/80 text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-all cursor-pointer"
+                        className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -671,7 +668,7 @@ export const AdminTopicsTab: React.FC<AdminTopicsTabProps> = ({
           <div className="py-12 text-center text-slate-500">
             <Layers className="w-8 h-8 text-slate-300 mx-auto mb-2" />
             <p className="text-sm font-semibold">No discussions matching your filter criteria</p>
-            <p className="text-xs text-slate-400 mt-1">Try refining your search terms or board selection</p>
+            <p className="text-xs text-slate-400 mt-1">Try refining your search terms or category selection</p>
           </div>
         )}
       </div>

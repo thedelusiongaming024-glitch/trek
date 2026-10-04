@@ -19,7 +19,7 @@ import {
   Eye, 
   Bot, 
   User, 
-  Sparkles,
+  Layers,
   ExternalLink,
   ShieldCheck,
   Check,
@@ -319,62 +319,58 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
     <div className="space-y-6">
       {/* Toast notification banner */}
       {actionSuccess && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-800 text-xs font-semibold shadow-xs animate-in fade-in slide-in-from-top-2">
+        <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium shadow-2xs">
           <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
           <span>{actionSuccess}</span>
         </div>
       )}
 
-      {/* Top Header Card with Quick Stats */}
-      <div className="rounded-3xl p-6 bg-white/75 backdrop-blur-xl border border-white/80 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+      {/* Top Header with Quick Stats */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-5 border-b border-slate-200">
         <div>
-          <div className="flex items-center gap-2 text-xs font-bold text-teal-600 uppercase tracking-wider mb-1">
-            <Headphones className="w-4 h-4" />
-            <span>Support & Help Desk Central</span>
-          </div>
-          <h2 className="text-xl font-bold font-heading text-slate-900">
-            Floating Messenger & AI Support Hub
-          </h2>
-          <p className="text-xs text-slate-500 mt-1 max-w-xl">
-            Manage public ticket queues, bilingual knowledge FAQs, real-time user chat sessions, and the bottom-right floating messenger widget from one connected control center.
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+            Support & Messenger Desk
+          </h1>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Manage user ticket queues, knowledge base FAQs, and floating messenger settings.
           </p>
         </div>
 
         {/* Quick Stats Grid */}
-        <div className="flex items-center gap-3 self-stretch md:self-auto overflow-x-auto pb-1 md:pb-0">
-          <div className="px-4 py-2.5 rounded-2xl bg-teal-50 border border-teal-100 flex flex-col items-center justify-center shrink-0 min-w-[90px]">
-            <span className="text-lg font-bold text-teal-700">{openTicketsCount}</span>
-            <span className="text-[10px] font-semibold text-teal-600 uppercase tracking-tight">Open Tickets</span>
+        <div className="flex items-center gap-2 self-stretch md:self-auto overflow-x-auto pb-1 md:pb-0">
+          <div className="px-3 py-1.5 rounded-lg bg-white border border-slate-200/90 shadow-2xs flex flex-col items-center justify-center shrink-0 min-w-[75px]">
+            <span className="text-base font-bold font-mono text-slate-900">{openTicketsCount}</span>
+            <span className="text-[10px] font-medium text-slate-500 uppercase tracking-tight">Open</span>
           </div>
-          <div className="px-4 py-2.5 rounded-2xl bg-blue-50 border border-blue-100 flex flex-col items-center justify-center shrink-0 min-w-[90px]">
-            <span className="text-lg font-bold text-blue-700">{answeredTicketsCount}</span>
-            <span className="text-[10px] font-semibold text-blue-600 uppercase tracking-tight">Answered</span>
+          <div className="px-3 py-1.5 rounded-lg bg-white border border-slate-200/90 shadow-2xs flex flex-col items-center justify-center shrink-0 min-w-[75px]">
+            <span className="text-base font-bold font-mono text-slate-900">{answeredTicketsCount}</span>
+            <span className="text-[10px] font-medium text-slate-500 uppercase tracking-tight">Answered</span>
           </div>
-          <div className="px-4 py-2.5 rounded-2xl bg-purple-50 border border-purple-100 flex flex-col items-center justify-center shrink-0 min-w-[90px]">
-            <span className="text-lg font-bold text-purple-700">{faqs.length}</span>
-            <span className="text-[10px] font-semibold text-purple-600 uppercase tracking-tight">Live FAQs</span>
+          <div className="px-3 py-1.5 rounded-lg bg-white border border-slate-200/90 shadow-2xs flex flex-col items-center justify-center shrink-0 min-w-[75px]">
+            <span className="text-base font-bold font-mono text-slate-900">{faqs.length}</span>
+            <span className="text-[10px] font-medium text-slate-500 uppercase tracking-tight">FAQs</span>
           </div>
-          <div className="px-4 py-2.5 rounded-2xl bg-amber-50 border border-amber-100 flex flex-col items-center justify-center shrink-0 min-w-[90px]">
-            <span className="text-lg font-bold text-amber-700">{conversations.length}</span>
-            <span className="text-[10px] font-semibold text-amber-600 uppercase tracking-tight">Live Chats</span>
+          <div className="px-3 py-1.5 rounded-lg bg-white border border-slate-200/90 shadow-2xs flex flex-col items-center justify-center shrink-0 min-w-[75px]">
+            <span className="text-base font-bold font-mono text-slate-900">{conversations.length}</span>
+            <span className="text-[10px] font-medium text-slate-500 uppercase tracking-tight">Chats</span>
           </div>
         </div>
       </div>
 
       {/* Sub-Tabs Selector */}
-      <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-200/60 backdrop-blur-md max-w-fit overflow-x-auto">
+      <div className="flex items-center gap-1 p-1 rounded-lg bg-slate-100 border border-slate-200/80 max-w-fit overflow-x-auto">
         <button
           onClick={() => setSubTab('tickets')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
             subTab === 'tickets'
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'
+              ? 'bg-white text-slate-900 shadow-2xs font-semibold'
+              : 'text-slate-600 hover:text-slate-900'
           }`}
         >
           <MessageCircle className="w-3.5 h-3.5 text-blue-500" />
-          <span>Ticket Queue</span>
+          <span>Tickets</span>
           {openTicketsCount > 0 && (
-            <span className="px-1.5 py-0.5 rounded-full bg-blue-500 text-white text-[10px] font-bold">
+            <span className="px-1.5 py-0.2 rounded font-mono bg-blue-100 text-blue-700 text-[10px]">
               {openTicketsCount}
             </span>
           )}
@@ -382,57 +378,53 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
 
         <button
           onClick={() => setSubTab('faqs')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
             subTab === 'faqs'
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'
+              ? 'bg-white text-slate-900 shadow-2xs font-semibold'
+              : 'text-slate-600 hover:text-slate-900'
           }`}
         >
           <HelpCircle className="w-3.5 h-3.5 text-purple-500" />
           <span>Knowledge & FAQs</span>
-          <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold">
+          <span className="px-1.5 py-0.2 rounded font-mono bg-slate-200/70 text-slate-700 text-[10px]">
             {faqs.length}
           </span>
         </button>
 
         <button
           onClick={() => setSubTab('knowledge-chunks')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
             subTab === 'knowledge-chunks'
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'
+              ? 'bg-white text-slate-900 shadow-2xs font-semibold'
+              : 'text-slate-600 hover:text-slate-900'
           }`}
         >
-          <Sparkles className="w-3.5 h-3.5 text-teal-500" />
-          <span>AI Knowledge & RAG Chunks</span>
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-          </span>
+          <Layers className="w-3.5 h-3.5 text-slate-600" />
+          <span>Knowledge Chunks</span>
         </button>
 
         <button
           onClick={() => setSubTab('conversations')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
             subTab === 'conversations'
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'
+              ? 'bg-white text-slate-900 shadow-2xs font-semibold'
+              : 'text-slate-600 hover:text-slate-900'
           }`}
         >
           <MessagesSquare className="w-3.5 h-3.5 text-amber-500" />
-          <span>Live Chat Logs</span>
+          <span>Live Chats</span>
         </button>
 
         <button
           onClick={() => setSubTab('widget-settings')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
             subTab === 'widget-settings'
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'
+              ? 'bg-white text-slate-900 shadow-2xs font-semibold'
+              : 'text-slate-600 hover:text-slate-900'
           }`}
         >
-          <Sliders className="w-3.5 h-3.5 text-teal-500" />
-          <span>Floating Messenger Config</span>
+          <Sliders className="w-3.5 h-3.5 text-teal-600" />
+          <span>Widget Config</span>
         </button>
       </div>
 
@@ -440,41 +432,41 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
       {subTab === 'tickets' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Left: Tickets List */}
-          <div className="lg:col-span-7 space-y-4">
+          <div className="lg:col-span-7 space-y-3.5">
             {/* Filter & Search Bar */}
-            <div className="rounded-3xl p-4 bg-white/75 backdrop-blur-xl border border-white/80 shadow-xs space-y-3">
-              <div className="flex flex-col sm:flex-row items-center gap-3">
-                <div className="relative flex-1 w-full">
-                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <div className="rounded-xl p-3 bg-white border border-slate-200/90 shadow-2xs space-y-2.5">
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                   <input
                     type="text"
                     value={ticketSearch}
                     onChange={(e) => setTicketSearch(e.target.value)}
                     placeholder="Search tickets by subject, user, or #TKT..."
-                    className="w-full pl-9 pr-4 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200/80 focus:border-teal-500 focus:outline-none text-slate-800 placeholder:text-slate-400"
+                    className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg bg-slate-50 border border-slate-200 focus:bg-white focus:border-teal-600 focus:ring-1 focus:ring-teal-600/30 focus:outline-none text-slate-800 placeholder:text-slate-400 transition-colors"
                   />
                 </div>
                 <button
                   onClick={fetchData}
-                  className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/80 text-slate-600 transition-colors cursor-pointer"
+                  className="p-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 transition-colors cursor-pointer shadow-2xs"
                   title="Refresh ticket queue"
                 >
-                  <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                  <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
                 </button>
               </div>
 
-              {/* Status & Priority Pills */}
+              {/* Status & Priority Filter Row */}
               <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 text-xs">
-                <div className="flex items-center gap-1.5 overflow-x-auto">
+                <div className="flex items-center gap-1 overflow-x-auto">
                   <span className="text-[11px] font-semibold text-slate-400 mr-1">Status:</span>
                   {['all', 'open', 'in_progress', 'answered', 'closed'].map(st => (
                     <button
                       key={st}
                       onClick={() => setTicketStatusFilter(st)}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-medium capitalize transition-all cursor-pointer ${
+                      className={`px-2 py-0.5 rounded-md text-[11px] font-medium capitalize transition-colors cursor-pointer border ${
                         ticketStatusFilter === st
-                          ? 'bg-teal-500 text-white shadow-xs'
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
+                          ? 'bg-slate-900 text-white border-slate-900'
+                          : 'bg-white text-slate-600 hover:text-slate-900 border-slate-200'
                       }`}
                     >
                       {st.replace('_', ' ')}
@@ -482,16 +474,16 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
                   ))}
                 </div>
 
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1">
                   <span className="text-[11px] font-semibold text-slate-400 mr-1">Priority:</span>
                   {['all', 'Normal', 'Urgent', 'Critical'].map(pr => (
                     <button
                       key={pr}
                       onClick={() => setTicketPriorityFilter(pr)}
-                      className={`px-2 py-0.5 rounded-lg text-[10px] font-medium transition-all cursor-pointer ${
+                      className={`px-2 py-0.5 rounded-md text-[10px] font-medium transition-colors cursor-pointer border ${
                         ticketPriorityFilter === pr
-                          ? 'bg-teal-600 text-white shadow-xs'
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          ? 'bg-teal-600 text-white border-teal-600'
+                          : 'bg-white text-slate-600 hover:text-slate-900 border-slate-200'
                       }`}
                     >
                       {pr}
@@ -503,13 +495,13 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
 
             {/* Tickets Cards */}
             {filteredTickets.length === 0 ? (
-              <div className="rounded-3xl p-10 bg-white/75 backdrop-blur-xl border border-white/80 shadow-xs text-center">
-                <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-2 opacity-80" />
-                <h4 className="text-sm font-bold text-slate-800">No Support Tickets Found</h4>
-                <p className="text-xs text-slate-500 mt-1">There are no support tickets matching your current search or status filters.</p>
+              <div className="rounded-xl p-8 bg-white border border-slate-200 text-center">
+                <CheckCircle2 className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                <h4 className="text-xs font-semibold text-slate-700">No Support Tickets Found</h4>
+                <p className="text-[11px] text-slate-400 mt-0.5">There are no tickets matching your current search or filter criteria.</p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 {filteredTickets.map((t) => {
                   const isSelected = selectedTicket?.id === t.id;
                   const isAnswered = t.status === 'ANSWERED';
@@ -518,56 +510,56 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
                     <div
                       key={t.id}
                       onClick={() => setSelectedTicket(t)}
-                      className={`rounded-2xl p-4 transition-all cursor-pointer border ${
+                      className={`rounded-xl p-3.5 transition-colors cursor-pointer border ${
                         isSelected
-                          ? 'bg-teal-50/70 border-teal-400 shadow-md ring-2 ring-teal-500/20'
-                          : 'bg-white/80 hover:bg-white border-white/90 shadow-xs hover:border-slate-200'
+                          ? 'bg-teal-50/50 border-teal-500 shadow-xs'
+                          : 'bg-white border-slate-200/90 shadow-2xs hover:border-slate-300'
                       }`}
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-xs font-bold text-teal-700 bg-teal-100/70 px-2 py-0.5 rounded-md">
+                      <div className="flex items-start justify-between gap-2.5">
+                        <div className="space-y-0.5 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-mono text-[11px] font-semibold text-teal-700 bg-teal-50 border border-teal-200/80 px-1.5 py-0.2 rounded">
                               #{t.ticketNumber}
                             </span>
-                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                            <span className={`text-[10px] px-1.5 py-0.2 rounded font-medium uppercase tracking-wider ${
                               t.priority === 'Critical'
-                                ? 'bg-rose-100 text-rose-700 border border-rose-200'
+                                ? 'bg-rose-50 text-rose-700 border border-rose-200'
                                 : t.priority === 'Urgent'
-                                ? 'bg-amber-100 text-amber-700 border border-amber-200'
-                                : 'bg-slate-100 text-slate-600'
+                                ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                : 'bg-slate-100 text-slate-600 border border-slate-200'
                             }`}>
                               {t.priority}
                             </span>
-                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                            <span className={`text-[10px] px-1.5 py-0.2 rounded font-medium uppercase tracking-wider ${
                               isAnswered
-                                ? 'bg-emerald-100 text-emerald-700'
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                 : isClosed
-                                ? 'bg-slate-200 text-slate-700'
-                                : 'bg-blue-100 text-blue-700 animate-pulse'
+                                ? 'bg-slate-100 text-slate-600 border border-slate-200'
+                                : 'bg-blue-50 text-blue-700 border border-blue-200'
                             }`}>
                               {t.status}
                             </span>
                           </div>
-                          <h4 className="text-xs font-bold text-slate-900 line-clamp-1">{t.subject}</h4>
+                          <h4 className="text-xs font-semibold text-slate-900 truncate mt-1">{t.subject}</h4>
                         </div>
-                        <span className="text-[10px] text-slate-400 shrink-0">
+                        <span className="text-[10px] font-mono text-slate-400 shrink-0">
                           {new Date(t.createdAt).toLocaleDateString()}
                         </span>
                       </div>
 
-                      <p className="text-xs text-slate-600 mt-2 line-clamp-2 leading-relaxed">
+                      <p className="text-xs text-slate-600 mt-1.5 line-clamp-2 leading-normal">
                         {t.question}
                       </p>
 
-                      <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-slate-100 text-[11px] text-slate-500">
+                      <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-slate-100 text-[11px] text-slate-500">
                         <div className="flex items-center gap-1.5">
-                          <User className="w-3.5 h-3.5 text-slate-400" />
+                          <User className="w-3 h-3 text-slate-400" />
                           <span className="font-medium text-slate-700 truncate max-w-[160px]">{t.userEmail}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           {t.adminAnswer && (
-                            <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md">
+                            <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-medium bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded">
                               <Check className="w-3 h-3" /> Answered
                             </span>
                           )}
@@ -582,101 +574,99 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
           </div>
 
           {/* Right: Selected Ticket Detail & Action Console */}
-          <div className="lg:col-span-5 sticky top-24">
+          <div className="lg:col-span-5 sticky top-20">
             {selectedTicket ? (
-              <div className="rounded-3xl p-5 bg-white/85 backdrop-blur-xl border border-white/90 shadow-lg space-y-4">
+              <div className="rounded-xl p-4 bg-white border border-slate-200/90 shadow-2xs space-y-3.5">
                 {/* Header info */}
                 <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-bold text-teal-700 bg-teal-100 px-2.5 py-0.5 rounded-md">
+                      <span className="font-mono text-[11px] font-semibold text-teal-700 bg-teal-50 border border-teal-200 px-1.5 py-0.2 rounded">
                         #{selectedTicket.ticketNumber}
                       </span>
-                      <span className="text-xs font-bold text-slate-800">{selectedTicket.priority} Priority</span>
+                      <span className="text-xs font-semibold text-slate-800">{selectedTicket.priority} Priority</span>
                     </div>
-                    <h3 className="text-sm font-bold text-slate-900 mt-1.5">{selectedTicket.subject}</h3>
+                    <h3 className="text-sm font-semibold text-slate-900 mt-1">{selectedTicket.subject}</h3>
                     <p className="text-[11px] text-slate-500">From: <span className="font-medium text-slate-700">{selectedTicket.userEmail}</span></p>
                   </div>
                   <button
                     onClick={() => handleDeleteTicket(selectedTicket.id)}
-                    className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+                    className="p-1 text-slate-400 hover:text-rose-600 rounded-md hover:bg-rose-50 transition-colors cursor-pointer"
                     title="Delete ticket"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
 
                 {/* Question Body */}
-                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70 space-y-1.5">
-                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                    <span>User Inquiry</span>
-                    <span className="text-slate-400 font-normal">{new Date(selectedTicket.createdAt).toLocaleTimeString()}</span>
+                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200/80 space-y-1">
+                  <div className="flex items-center justify-between text-[11px] font-semibold text-slate-600 uppercase tracking-wider">
+                    <span>Inquiry</span>
+                    <span className="text-slate-400 font-mono text-[10px]">{new Date(selectedTicket.createdAt).toLocaleTimeString()}</span>
                   </div>
-                  <p className="text-xs text-slate-800 whitespace-pre-wrap leading-relaxed">
+                  <p className="text-xs text-slate-800 whitespace-pre-wrap leading-normal">
                     {selectedTicket.question}
                   </p>
                 </div>
 
                 {/* Existing Admin Answer if present */}
                 {selectedTicket.adminAnswer && (
-                  <div className="p-3.5 rounded-2xl bg-emerald-50/80 border border-emerald-200 space-y-1.5">
-                    <div className="flex items-center justify-between text-[11px] font-bold text-emerald-800 uppercase tracking-wider">
+                  <div className="p-3 rounded-lg bg-emerald-50/70 border border-emerald-200 space-y-1">
+                    <div className="flex items-center justify-between text-[11px] font-semibold text-emerald-800 uppercase tracking-wider">
                       <div className="flex items-center gap-1.5">
                         <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                         <span>Staff Answer ({selectedTicket.assignedTo || 'Specialist'})</span>
                       </div>
-                      <span className="text-emerald-600 font-normal text-[10px]">
+                      <span className="text-emerald-600 font-mono text-[10px]">
                         {selectedTicket.answeredAt ? new Date(selectedTicket.answeredAt).toLocaleDateString() : 'Answered'}
                       </span>
                     </div>
-                    <p className="text-xs text-emerald-950 whitespace-pre-wrap leading-relaxed">
+                    <p className="text-xs text-slate-800 whitespace-pre-wrap leading-normal">
                       {selectedTicket.adminAnswer}
                     </p>
                   </div>
                 )}
 
                 {/* Response / Resolution Box */}
-                <div className="space-y-3 pt-2">
-                  <label className="block text-xs font-bold text-slate-700">
-                    {selectedTicket.adminAnswer ? 'Update Official Response' : 'Compose Official Response & Sync to User Widget'}
+                <div className="space-y-2.5 pt-1">
+                  <label className="block text-[11px] font-semibold text-slate-700">
+                    {selectedTicket.adminAnswer ? 'Update Official Response' : 'Compose Official Response'}
                   </label>
                   <textarea
                     rows={3}
                     value={adminReplyText}
                     onChange={(e) => setAdminReplyText(e.target.value)}
-                    placeholder="Type official support answer here. This will update the database and display in the user's My Tickets tracker..."
-                    className="w-full px-3.5 py-2.5 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:border-teal-500 focus:outline-none text-slate-800 placeholder:text-slate-400 leading-relaxed"
+                    placeholder="Type official support answer here..."
+                    className="w-full px-3 py-1.5 text-xs rounded-lg bg-slate-50 border border-slate-200 focus:bg-white focus:border-teal-600 focus:ring-1 focus:ring-teal-600/30 focus:outline-none text-slate-800 placeholder:text-slate-400 leading-normal"
                   />
 
                   <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={selectedTicket.status}
-                        onChange={(e) => handleUpdateTicket(selectedTicket.id, e.target.value)}
-                        className="text-xs font-semibold px-2.5 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 focus:outline-none"
-                      >
-                        <option value="OPEN">Status: OPEN</option>
-                        <option value="IN_PROGRESS">Status: IN PROGRESS</option>
-                        <option value="ANSWERED">Status: ANSWERED</option>
-                        <option value="CLOSED">Status: CLOSED</option>
-                      </select>
-                    </div>
+                    <select
+                      value={selectedTicket.status}
+                      onChange={(e) => handleUpdateTicket(selectedTicket.id, e.target.value)}
+                      className="text-xs font-medium px-2 py-1 rounded-md bg-white border border-slate-200 text-slate-700 focus:outline-none cursor-pointer"
+                    >
+                      <option value="OPEN">Status: OPEN</option>
+                      <option value="IN_PROGRESS">Status: IN PROGRESS</option>
+                      <option value="ANSWERED">Status: ANSWERED</option>
+                      <option value="CLOSED">Status: CLOSED</option>
+                    </select>
 
                     <button
                       onClick={() => handleUpdateTicket(selectedTicket.id, 'ANSWERED', adminReplyText || selectedTicket.adminAnswer)}
                       disabled={replySubmitting || (!adminReplyText.trim() && !selectedTicket.adminAnswer)}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white text-xs font-bold shadow-md shadow-teal-600/20 active:scale-95 transition-all cursor-pointer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white text-xs font-medium shadow-2xs transition-colors cursor-pointer"
                     >
-                      <Send className="w-3.5 h-3.5" />
+                      <Send className="w-3 h-3" />
                       <span>{replySubmitting ? 'Sending...' : 'Publish Answer'}</span>
                     </button>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="rounded-3xl p-8 bg-white/60 backdrop-blur-xl border border-white/80 shadow-xs text-center text-slate-400 space-y-2">
-                <MessageCircle className="w-8 h-8 mx-auto opacity-50 text-slate-400" />
-                <p className="text-xs font-medium">Select a ticket from the list to view inquiry details, change status, or publish an official response.</p>
+              <div className="rounded-xl p-8 bg-white border border-slate-200 text-center text-slate-400 space-y-2">
+                <MessageCircle className="w-7 h-7 mx-auto text-slate-300" />
+                <p className="text-xs">Select a ticket from the list to view inquiry details and publish an official response.</p>
               </div>
             )}
           </div>
@@ -686,10 +676,10 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
       {/* SUB-VIEW 2: KNOWLEDGE BASE & FAQS */}
       {subTab === 'faqs' && (
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-3xl bg-white/75 backdrop-blur-xl border border-white/80 shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-white border border-slate-200/90 shadow-2xs">
             <div>
-              <h3 className="text-sm font-bold text-slate-900">Community Knowledge & FAQs</h3>
-              <p className="text-xs text-slate-500">Manage questions and bilingual English & Bengali answers shown in the Support Hub & RAG AI.</p>
+              <h2 className="text-sm font-semibold text-slate-900">Community Knowledge & FAQs</h2>
+              <p className="text-xs text-slate-500">Manage bilingual English & Bengali questions and answers shown in the Support Hub.</p>
             </div>
             <button
               onClick={() => {
@@ -704,10 +694,10 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
                 });
                 setIsFaqModalOpen(true);
               }}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-md shadow-purple-600/20 active:scale-95 transition-all cursor-pointer shrink-0"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-medium shadow-2xs transition-colors cursor-pointer shrink-0"
             >
-              <Plus className="w-4 h-4" />
-              <span>Add New FAQ Article</span>
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add FAQ Article</span>
             </button>
           </div>
 
@@ -717,11 +707,11 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
               return (
                 <div
                   key={faq.id}
-                  className="rounded-2xl p-4 bg-white/85 backdrop-blur-xl border border-white/90 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-3"
+                  className="rounded-xl p-4 bg-white border border-slate-200/90 shadow-2xs hover:border-slate-300 transition-colors flex flex-col justify-between space-y-3"
                 >
                   <div className="space-y-2">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-100 uppercase tracking-tight">
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 uppercase">
                         {catName}
                       </span>
                       <div className="flex items-center gap-1">
@@ -738,14 +728,14 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
                             });
                             setIsFaqModalOpen(true);
                           }}
-                          className="p-1.5 text-slate-400 hover:text-purple-600 rounded-lg hover:bg-purple-50 transition-colors cursor-pointer"
+                          className="p-1 text-slate-400 hover:text-slate-800 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
                           title="Edit FAQ"
                         >
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => handleDeleteFaq(faq.id)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+                          className="p-1 text-slate-400 hover:text-rose-600 rounded-md hover:bg-rose-50 transition-colors cursor-pointer"
                           title="Delete FAQ"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -754,20 +744,20 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
                     </div>
 
                     <div>
-                      <h4 className="text-xs font-bold text-slate-900 leading-snug">{faq.question}</h4>
-                      <p className="text-xs text-slate-600 mt-1 leading-relaxed">{faq.answer}</p>
+                      <h3 className="text-xs font-semibold text-slate-900 leading-snug">{faq.question}</h3>
+                      <p className="text-xs text-slate-600 mt-1 leading-normal">{faq.answer}</p>
                     </div>
 
                     {faq.questionBn && (
                       <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-500 space-y-0.5">
-                        <span className="text-[9px] font-bold uppercase text-teal-600">বাংলা অনুবাদ:</span>
+                        <span className="text-[9px] font-semibold uppercase text-teal-700">বাংলা:</span>
                         <p className="font-medium text-slate-700">{faq.questionBn}</p>
                         <p className="text-slate-500 text-[11px]">{faq.answerBn}</p>
                       </div>
                     )}
                   </div>
 
-                  <div className="flex items-center justify-between text-[10px] text-slate-400 pt-2 border-t border-slate-50">
+                  <div className="flex items-center justify-between text-[10px] text-slate-400 pt-2 border-t border-slate-50 font-mono">
                     <span>Status: <span className="font-semibold text-emerald-600 uppercase">{faq.status}</span></span>
                     <span>ID: {faq.id}</span>
                   </div>
@@ -788,22 +778,22 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Left: Chat Sessions List */}
           <div className="lg:col-span-5 space-y-3">
-            <div className="p-4 rounded-3xl bg-white/75 backdrop-blur-xl border border-white/80 shadow-xs flex items-center justify-between">
+            <div className="p-3.5 rounded-xl bg-white border border-slate-200/90 shadow-2xs flex items-center justify-between">
               <div>
-                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Active Chat Sessions</h3>
-                <p className="text-[11px] text-slate-500">{conversations.length} unique visitor conversations logged</p>
+                <h3 className="text-xs font-semibold text-slate-900">Active Chat Sessions</h3>
+                <p className="text-[11px] text-slate-500">{conversations.length} visitor conversations</p>
               </div>
               <button
                 onClick={fetchData}
-                className="p-1.5 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100"
+                className="p-1 text-slate-500 hover:text-slate-800 rounded-md hover:bg-slate-100 cursor-pointer"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
               </button>
             </div>
 
             {conversations.length === 0 ? (
-              <div className="p-8 text-center text-slate-400 bg-white/60 rounded-2xl border border-white/80">
-                <MessagesSquare className="w-8 h-8 mx-auto opacity-40 mb-1" />
+              <div className="p-8 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
+                <MessagesSquare className="w-7 h-7 mx-auto opacity-40 mb-1" />
                 <p className="text-xs">No active chat sessions recorded yet.</p>
               </div>
             ) : (
@@ -814,27 +804,27 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
                     <div
                       key={c.sessionId}
                       onClick={() => handleOpenConversation(c.sessionId)}
-                      className={`p-3.5 rounded-2xl transition-all cursor-pointer border ${
+                      className={`p-3 rounded-xl transition-colors cursor-pointer border ${
                         isActive
-                          ? 'bg-amber-50/80 border-amber-300 shadow-md ring-2 ring-amber-500/20'
-                          : 'bg-white/80 hover:bg-white border-white/80 shadow-xs'
+                          ? 'bg-amber-50/50 border-amber-300 shadow-2xs'
+                          : 'bg-white hover:bg-slate-50 border-slate-200/90 shadow-2xs'
                       }`}
                     >
                       <div className="flex items-center justify-between text-xs">
-                        <span className="font-mono font-bold text-slate-700 truncate max-w-[150px]">
-                          Session: {c.sessionId}
+                        <span className="font-mono font-medium text-slate-800 truncate max-w-[150px]">
+                          {c.sessionId}
                         </span>
-                        <span className="text-[10px] text-slate-400">
+                        <span className="text-[10px] text-slate-400 font-mono">
                           {new Date(c.lastActive).toLocaleTimeString()}
                         </span>
                       </div>
                       <p className="text-xs text-slate-600 mt-1 line-clamp-1">
-                        <span className="font-semibold text-slate-800">{c.lastSender}: </span>
+                        <span className="font-semibold text-slate-700">{c.lastSender}: </span>
                         {c.lastMessage}
                       </p>
-                      <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-slate-100 text-[10px] text-slate-400">
+                      <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-slate-100 text-[10px] text-slate-400 font-mono">
                         <span>{c.messageCount} messages</span>
-                        <span className="text-amber-600 font-semibold">Inspect Live &rarr;</span>
+                        <span className="text-amber-700 font-medium font-sans">Inspect &rarr;</span>
                       </div>
                     </div>
                   );
@@ -846,19 +836,19 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
           {/* Right: Message Transcripts & Staff Intervention */}
           <div className="lg:col-span-7">
             {activeSessionId ? (
-              <div className="rounded-3xl p-5 bg-white/85 backdrop-blur-xl border border-white/90 shadow-lg space-y-4">
+              <div className="rounded-xl p-4 bg-white border border-slate-200/90 shadow-2xs space-y-4">
                 <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                   <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600">Live Transcript</span>
-                    <h3 className="text-xs font-mono font-bold text-slate-900">Session ID: {activeSessionId}</h3>
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-700">Transcript</span>
+                    <h3 className="text-xs font-mono font-semibold text-slate-900">Session: {activeSessionId}</h3>
                   </div>
-                  <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
-                    Connected in DB
+                  <span className="px-2 py-0.5 rounded text-emerald-800 bg-emerald-50 border border-emerald-200 text-[10px] font-medium font-mono">
+                    Connected
                   </span>
                 </div>
 
                 {/* Messages stream */}
-                <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-1">
+                <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
                   {sessionMessages.map((m, idx) => {
                     const isUser = m.sender === 'user';
                     const isStaff = m.source === 'STAFF';
@@ -868,22 +858,22 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
                         className={`flex gap-2.5 ${isUser ? 'justify-end' : 'justify-start'}`}
                       >
                         {!isUser && (
-                          <div className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 text-white ${
+                          <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 text-white ${
                             isStaff ? 'bg-amber-600' : 'bg-teal-600'
                           }`}>
                             {isStaff ? <ShieldCheck className="w-3.5 h-3.5" /> : <Bot className="w-3.5 h-3.5" />}
                           </div>
                         )}
-                        <div className={`p-3 rounded-2xl max-w-[80%] text-xs leading-relaxed ${
+                        <div className={`p-2.5 rounded-lg max-w-[80%] text-xs leading-normal ${
                           isUser
-                            ? 'bg-[#0084FF] text-white rounded-tr-xs'
+                            ? 'bg-teal-600 text-white'
                             : isStaff
-                            ? 'bg-amber-50 border border-amber-200 text-amber-950 rounded-tl-xs'
-                            : 'bg-slate-100 text-slate-800 rounded-tl-xs'
+                            ? 'bg-amber-50 border border-amber-200 text-amber-950'
+                            : 'bg-slate-100 text-slate-800'
                         }`}>
                           <p className="whitespace-pre-wrap">{m.message}</p>
-                          <div className={`text-[9px] mt-1 flex items-center justify-between gap-2 ${
-                            isUser ? 'text-blue-100' : 'text-slate-400'
+                          <div className={`text-[9px] mt-1 flex items-center justify-between gap-2 font-mono ${
+                            isUser ? 'text-teal-100' : 'text-slate-400'
                           }`}>
                             <span>{m.source || (isUser ? 'USER' : 'AI')}</span>
                             <span>{m.createdAt ? new Date(m.createdAt).toLocaleTimeString() : ''}</span>
@@ -895,9 +885,9 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
                 </div>
 
                 {/* Staff intervention reply box */}
-                <div className="pt-2 border-t border-slate-100 space-y-2">
-                  <label className="block text-xs font-bold text-slate-700">
-                    Live Specialist Intervention:
+                <div className="pt-2 border-t border-slate-100 space-y-1.5">
+                  <label className="block text-[11px] font-semibold text-slate-700">
+                    Live Specialist Message:
                   </label>
                   <div className="flex items-center gap-2">
                     <input
@@ -905,13 +895,13 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
                       value={staffReplyText}
                       onChange={(e) => setStaffReplyText(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleSendStaffReply()}
-                      placeholder="Type direct staff message to this visitor session..."
-                      className="flex-1 px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:border-amber-500 focus:outline-none text-slate-800"
+                      placeholder="Type staff response to visitor..."
+                      className="flex-1 px-3 py-1.5 text-xs rounded-lg bg-slate-50 border border-slate-200 focus:bg-white focus:border-teal-600 focus:ring-1 focus:ring-teal-600/30 focus:outline-none text-slate-800"
                     />
                     <button
                       onClick={handleSendStaffReply}
                       disabled={sendingStaffReply || !staffReplyText.trim()}
-                      className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-bold shadow-sm transition-all cursor-pointer shrink-0"
+                      className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-medium shadow-2xs transition-colors cursor-pointer shrink-0"
                     >
                       {sendingStaffReply ? 'Sending...' : 'Send'}
                     </button>
@@ -919,31 +909,31 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
                 </div>
               </div>
             ) : (
-              <div className="rounded-3xl p-8 bg-white/60 backdrop-blur-xl border border-white/80 shadow-xs text-center text-slate-400 space-y-2">
-                <MessagesSquare className="w-8 h-8 mx-auto opacity-50" />
-                <p className="text-xs font-medium">Select a visitor chat session from the left to read conversation history or step in with a staff reply.</p>
+              <div className="rounded-xl p-8 bg-white border border-slate-200 text-center text-slate-400 space-y-2">
+                <MessagesSquare className="w-7 h-7 mx-auto text-slate-300" />
+                <p className="text-xs">Select a visitor chat session from the left to read transcript or intervene.</p>
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* SUB-VIEW 4: FLOATING MESSENGER & INDICATOR TAG CONFIGURATION */}
+      {/* SUB-VIEW 5: FLOATING MESSENGER CONFIGURATION */}
       {subTab === 'widget-settings' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Settings Form */}
-          <div className="lg:col-span-7 space-y-5 rounded-3xl p-6 bg-white/80 backdrop-blur-xl border border-white/90 shadow-xs">
+          <div className="lg:col-span-7 space-y-4 rounded-xl p-5 bg-white border border-slate-200/90 shadow-2xs">
             <div>
-              <h3 className="text-sm font-bold text-slate-900">Floating Messenger Widget Customizer</h3>
-              <p className="text-xs text-slate-500">Configure the bottom-right action button, hover indicator tags, greeting prompts, and AI routing.</p>
+              <h2 className="text-sm font-semibold text-slate-900">Floating Messenger Customizer</h2>
+              <p className="text-xs text-slate-500 mt-0.5">Configure the bottom-right action button, greeting prompts, and automated AI assistance.</p>
             </div>
 
-            <div className="space-y-4 text-xs">
+            <div className="space-y-3.5 text-xs">
               {/* Toggle Enable */}
-              <div className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200">
                 <div>
-                  <h4 className="font-bold text-slate-800">Display Floating Support Button</h4>
-                  <p className="text-[11px] text-slate-500">Show or hide the floating messenger bubble in the forum screen</p>
+                  <h3 className="font-semibold text-slate-800">Display Floating Support Button</h3>
+                  <p className="text-[11px] text-slate-500">Show or hide the floating messenger bubble in public view</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
@@ -952,71 +942,71 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
                     onChange={(e) => setWidgetSettings(prev => ({ ...prev, floatingSupportEnabled: e.target.checked }))}
                     className="sr-only peer"
                   />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-500" />
+                  <div className="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-teal-600" />
                 </label>
               </div>
 
               {/* Hover Tag Text English */}
               <div>
-                <label className="block font-bold text-slate-700 mb-1">
-                  Hover Indicator Tag Text (English):
+                <label className="block font-medium text-slate-700 mb-1">
+                  Hover Tag (English):
                 </label>
                 <input
                   type="text"
                   value={widgetSettings.floatingSupportTagTextEn}
                   onChange={(e) => setWidgetSettings(prev => ({ ...prev, floatingSupportTagTextEn: e.target.value }))}
                   placeholder="e.g. Support Assistant & FAQs"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:border-teal-500 focus:outline-none text-slate-800 font-medium"
+                  className="w-full px-3 py-1.5 rounded-lg bg-white border border-slate-200 focus:border-teal-600 focus:ring-1 focus:ring-teal-600/30 focus:outline-none text-slate-800"
                 />
               </div>
 
               {/* Hover Tag Text Bengali */}
               <div>
-                <label className="block font-bold text-slate-700 mb-1">
-                  Hover Indicator Tag Text (বাংলা অনুবাদ):
+                <label className="block font-medium text-slate-700 mb-1">
+                  Hover Tag (বাংলা অনুবাদ):
                 </label>
                 <input
                   type="text"
                   value={widgetSettings.floatingSupportTagTextBn}
                   onChange={(e) => setWidgetSettings(prev => ({ ...prev, floatingSupportTagTextBn: e.target.value }))}
                   placeholder="e.g. ২৪/৭ সাপোর্ট চ্যাট ও হেল্প"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:border-teal-500 focus:outline-none text-slate-800 font-medium"
+                  className="w-full px-3 py-1.5 rounded-lg bg-white border border-slate-200 focus:border-teal-600 focus:ring-1 focus:ring-teal-600/30 focus:outline-none text-slate-800"
                 />
               </div>
 
               {/* Welcome Prompt English */}
               <div>
-                <label className="block font-bold text-slate-700 mb-1">
-                  Assistant Welcome Greeting (English):
+                <label className="block font-medium text-slate-700 mb-1">
+                  Welcome Greeting (English):
                 </label>
                 <textarea
                   rows={2}
                   value={widgetSettings.floatingSupportGreetingEn}
                   onChange={(e) => setWidgetSettings(prev => ({ ...prev, floatingSupportGreetingEn: e.target.value }))}
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:border-teal-500 focus:outline-none text-slate-800"
+                  className="w-full px-3 py-1.5 rounded-lg bg-white border border-slate-200 focus:border-teal-600 focus:ring-1 focus:ring-teal-600/30 focus:outline-none text-slate-800"
                 />
               </div>
 
               {/* Welcome Prompt Bengali */}
               <div>
-                <label className="block font-bold text-slate-700 mb-1">
-                  Assistant Welcome Greeting (বাংলা):
+                <label className="block font-medium text-slate-700 mb-1">
+                  Welcome Greeting (বাংলা):
                 </label>
                 <textarea
                   rows={2}
                   value={widgetSettings.floatingSupportGreetingBn}
                   onChange={(e) => setWidgetSettings(prev => ({ ...prev, floatingSupportGreetingBn: e.target.value }))}
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:border-teal-500 focus:outline-none text-slate-800"
+                  className="w-full px-3 py-1.5 rounded-lg bg-white border border-slate-200 focus:border-teal-600 focus:ring-1 focus:ring-teal-600/30 focus:outline-none text-slate-800"
                 />
               </div>
 
               {/* AI Auto-reply switch */}
-              <div className="flex items-center justify-between p-3.5 rounded-2xl bg-teal-50/50 border border-teal-100">
-                <div className="flex items-center gap-2.5">
-                  <Bot className="w-5 h-5 text-teal-600 shrink-0" />
+              <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200">
+                <div className="flex items-center gap-2">
+                  <Bot className="w-4 h-4 text-slate-600 shrink-0" />
                   <div>
-                    <h4 className="font-bold text-teal-900">Automated AI & RAG Responses</h4>
-                    <p className="text-[11px] text-teal-700">Allow AI assistant to query PostgreSQL FAQs and answer member inquiries instantly</p>
+                    <h3 className="font-semibold text-slate-800">Automated AI Assistant</h3>
+                    <p className="text-[11px] text-slate-500">Allow assistant to answer common questions from FAQs</p>
                   </div>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
@@ -1026,18 +1016,18 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
                     onChange={(e) => setWidgetSettings(prev => ({ ...prev, floatingSupportAiEnabled: e.target.checked }))}
                     className="sr-only peer"
                   />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-500" />
+                  <div className="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-teal-600" />
                 </label>
               </div>
 
               {/* Default Priority & Email */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Default Ticket Priority:</label>
+                  <label className="block font-medium text-slate-700 mb-1">Default Priority:</label>
                   <select
                     value={widgetSettings.floatingSupportDefaultPriority}
                     onChange={(e: any) => setWidgetSettings(prev => ({ ...prev, floatingSupportDefaultPriority: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 focus:outline-none"
+                    className="w-full px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-800 focus:outline-none cursor-pointer"
                   >
                     <option value="Normal">Normal</option>
                     <option value="Urgent">Urgent</option>
@@ -1045,12 +1035,12 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Primary Support Email:</label>
+                  <label className="block font-medium text-slate-700 mb-1">Support Email:</label>
                   <input
                     type="email"
                     value={widgetSettings.primarySupportEmail}
                     onChange={(e) => setWidgetSettings(prev => ({ ...prev, primarySupportEmail: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 focus:outline-none"
+                    className="w-full px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-800 focus:outline-none"
                   />
                 </div>
               </div>
@@ -1061,70 +1051,53 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
               <button
                 onClick={handleSaveWidgetSettings}
                 disabled={savingSettings}
-                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white text-xs font-bold shadow-md shadow-teal-600/25 active:scale-95 transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white text-xs font-medium shadow-2xs transition-colors cursor-pointer"
               >
-                <Save className="w-4 h-4" />
-                <span>{savingSettings ? 'Saving to Database...' : 'Save & Sync to Live Database'}</span>
+                <Save className="w-3.5 h-3.5" />
+                <span>{savingSettings ? 'Saving...' : 'Save Settings'}</span>
               </button>
             </div>
           </div>
 
           {/* Live Preview Panel */}
-          <div className="lg:col-span-5 sticky top-24 rounded-3xl p-6 bg-white/85 backdrop-blur-xl border border-white/80 shadow-xs space-y-4 text-slate-800">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200/80">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-teal-600" />
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">Real-Time UI Preview</h4>
-              </div>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-700 font-semibold border border-teal-500/25">
-                Live Simulator
+          <div className="lg:col-span-5 sticky top-20 rounded-xl p-4 bg-white border border-slate-200/90 shadow-2xs space-y-3 text-slate-800">
+            <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
+              <h3 className="text-xs font-semibold text-slate-800">Widget Simulator</h3>
+              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                Preview
               </span>
             </div>
 
             <p className="text-xs text-slate-500">
-              This interactive simulation shows exactly how the floating messenger action button and its hover indicator tag appear on the forum screen:
+              Preview of floating button and hover indicator tag as seen by visitors:
             </p>
 
             {/* Mock Screen Surface */}
-            <div className="h-52 rounded-2xl bg-[#f8f9fd] border border-slate-200/80 relative overflow-hidden flex flex-col justify-end p-4">
-              <div className="text-[10px] text-slate-400 font-mono absolute top-3 left-3">
-                [Forum Bottom-Right Corner]
+            <div className="h-44 rounded-lg bg-slate-50 border border-slate-200 relative overflow-hidden flex flex-col justify-end p-4">
+              <div className="text-[10px] text-slate-400 font-mono absolute top-2.5 left-2.5">
+                [Viewport Corner]
               </div>
 
               {widgetSettings.floatingSupportEnabled ? (
-                <div className="flex items-center justify-end gap-3 group">
+                <div className="flex items-center justify-end gap-2.5">
                   {/* Hover Tag simulation */}
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white text-slate-800 text-xs font-medium shadow-md border border-slate-200">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                    </span>
-                    <span className="tracking-tight text-slate-700 whitespace-nowrap text-[11px]">
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white text-slate-800 text-[11px] font-medium shadow-2xs border border-slate-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    <span className="truncate max-w-[150px]">
                       {widgetSettings.floatingSupportTagTextEn || 'Support Assistant & FAQs'}
                     </span>
                   </div>
 
                   {/* Messenger Button simulation */}
-                  <div className="relative w-12 h-12 rounded-full bg-gradient-to-tr from-[#006AFF] via-[#0084FF] to-[#00C6FF] text-white shadow-lg border-2 border-white/50 flex items-center justify-center cursor-pointer">
-                    <svg className="w-6 h-6 text-white fill-white drop-shadow-xs" viewBox="0 0 24 24">
-                      <path d="M12 2C6.477 2 2 6.145 2 11.258c0 2.91 1.455 5.517 3.735 7.185V22l3.418-1.875c.91.252 1.872.39 2.847.39 5.523 0 10-4.145 10-9.257C22 6.145 17.523 2 12 2zm1.047 12.443l-2.55-2.72-4.975 2.72 5.473-5.81 2.613 2.72 4.912-2.72-5.473 5.81z" />
-                    </svg>
-                    <span className="absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 border-2 border-white" />
-                    </span>
+                  <div className="w-10 h-10 rounded-full bg-teal-600 text-white shadow-xs border border-white flex items-center justify-center cursor-pointer">
+                    <Headphones className="w-5 h-5 text-white" />
                   </div>
                 </div>
               ) : (
-                <div className="text-center text-xs text-rose-500 font-semibold py-8">
-                  Floating Messenger Widget is currently DISABLED.
+                <div className="text-center py-6 text-slate-400 text-xs">
+                  Widget currently disabled.
                 </div>
               )}
-            </div>
-
-            <div className="text-[11px] text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200/80 space-y-1">
-              <span className="font-bold text-slate-800">Database Sync Status:</span>
-              <p>Changes saved here update the PostgreSQL <code className="text-teal-700 bg-teal-50 px-1 py-0.5 rounded font-mono">settings</code> table and apply globally in real-time across all client sessions.</p>
             </div>
           </div>
         </div>
@@ -1132,27 +1105,27 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
 
       {/* FAQ Create / Edit Modal */}
       {isFaqModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/25 backdrop-blur-xs animate-in fade-in">
-          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl border border-slate-100 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-lg rounded-xl bg-white p-5 shadow-xl border border-slate-200 space-y-3.5">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="text-sm font-bold text-slate-900">
-                {editingFaq ? 'Edit FAQ Article' : 'Create New Knowledge FAQ'}
+              <h3 className="text-sm font-semibold text-slate-900">
+                {editingFaq ? 'Edit FAQ Article' : 'Create FAQ Article'}
               </h3>
               <button
                 onClick={() => setIsFaqModalOpen(false)}
-                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg"
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-md cursor-pointer"
               >
-                &times;
+                ✕
               </button>
             </div>
 
             <form onSubmit={handleSaveFaq} className="space-y-3 text-xs">
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Category:</label>
+                <label className="block font-medium text-slate-700 mb-1">Category:</label>
                 <select
                   value={faqForm.categoryId}
                   onChange={(e) => setFaqForm(prev => ({ ...prev, categoryId: e.target.value }))}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 focus:outline-none"
+                  className="w-full px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-800 focus:outline-none cursor-pointer"
                 >
                   {categories.map(c => (
                     <option key={c.id} value={c.id}>{c.name}</option>
@@ -1161,48 +1134,48 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Question (English):</label>
+                <label className="block font-medium text-slate-700 mb-1">Question (English):</label>
                 <input
                   type="text"
                   required
                   value={faqForm.question}
                   onChange={(e) => setFaqForm(prev => ({ ...prev, question: e.target.value }))}
                   placeholder="e.g. How do I delete my discussion post?"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 focus:outline-none"
+                  className="w-full px-3 py-1.5 rounded-lg bg-white border border-slate-200 focus:border-teal-600 focus:ring-1 focus:ring-teal-600/30 focus:outline-none text-slate-800"
                 />
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Answer (English):</label>
+                <label className="block font-medium text-slate-700 mb-1">Answer (English):</label>
                 <textarea
                   rows={3}
                   required
                   value={faqForm.answer}
                   onChange={(e) => setFaqForm(prev => ({ ...prev, answer: e.target.value }))}
                   placeholder="Provide clear, step-by-step guidance..."
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 focus:outline-none"
+                  className="w-full px-3 py-1.5 rounded-lg bg-white border border-slate-200 focus:border-teal-600 focus:ring-1 focus:ring-teal-600/30 focus:outline-none text-slate-800"
                 />
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Question (বাংলা অনুবাদ - ঐচ্ছিক):</label>
+                <label className="block font-medium text-slate-700 mb-1">Question (বাংলা অনুবাদ - ঐচ্ছিক):</label>
                 <input
                   type="text"
                   value={faqForm.questionBn}
                   onChange={(e) => setFaqForm(prev => ({ ...prev, questionBn: e.target.value }))}
                   placeholder="যেমন: কীভাবে আমার পোস্ট ডিলিট করব?"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 focus:outline-none"
+                  className="w-full px-3 py-1.5 rounded-lg bg-white border border-slate-200 focus:border-teal-600 focus:ring-1 focus:ring-teal-600/30 focus:outline-none text-slate-800"
                 />
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Answer (বাংলা অনুবাদ - ঐচ্ছিক):</label>
+                <label className="block font-medium text-slate-700 mb-1">Answer (বাংলা অনুবাদ - ঐচ্ছিক):</label>
                 <textarea
                   rows={2}
                   value={faqForm.answerBn}
                   onChange={(e) => setFaqForm(prev => ({ ...prev, answerBn: e.target.value }))}
                   placeholder="সহজ ভাষায় সমাধান লিখুন..."
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 focus:outline-none"
+                  className="w-full px-3 py-1.5 rounded-lg bg-white border border-slate-200 focus:border-teal-600 focus:ring-1 focus:ring-teal-600/30 focus:outline-none text-slate-800"
                 />
               </div>
 
@@ -1210,13 +1183,13 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsFaqModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 transition-colors"
+                  className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 font-medium hover:bg-slate-50 transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold transition-all shadow-md"
+                  className="px-3.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-medium shadow-2xs transition-colors cursor-pointer"
                 >
                   {editingFaq ? 'Update FAQ' : 'Publish FAQ'}
                 </button>

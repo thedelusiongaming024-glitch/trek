@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BookOpen, Sparkles } from 'lucide-react';
+import { BookOpen, X } from 'lucide-react';
 import { BlogPost } from '../../types';
 
 interface AdminNewBlogModalProps {
@@ -47,35 +47,37 @@ export const AdminNewBlogModal: React.FC<AdminNewBlogModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/25 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto">
-      <div className="relative w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white/95 backdrop-blur-2xl border border-white/80 shadow-2xl p-5 sm:p-8 text-slate-800">
-        <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600">
-              <BookOpen className="w-5 h-5" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto">
+      <div className="relative w-full max-w-xl bg-white rounded-xl border border-slate-200 shadow-xl text-slate-800 overflow-hidden my-6">
+        {/* Modal Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/50">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-lg bg-slate-100 text-slate-700 border border-slate-200">
+              <BookOpen className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-lg font-heading font-bold text-slate-900">
-                Write Technical Knowledge Post
+              <h3 className="text-sm font-semibold text-slate-900">
+                New Knowledge Base Article
               </h3>
               <p className="text-xs text-slate-500">
-                Publishes directly to the public Trek Consultancy Insights & Guides section
+                Draft and publish technical guides to the public insights library
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded-full text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
             aria-label="Close dialog"
           >
-            ✕
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-5 space-y-4 text-xs">
+        {/* Modal Form */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className="font-bold text-slate-700 block mb-1">
-              Article Title
+            <label className="block text-xs font-medium text-slate-700 mb-1.5">
+              Article Title <span className="text-rose-500">*</span>
             </label>
             <input
               type="text"
@@ -83,19 +85,19 @@ export const AdminNewBlogModal: React.FC<AdminNewBlogModalProps> = ({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Architecting Distributed Redis Cache Leases for High-Traffic Support"
-              className="w-full p-3 rounded-2xl border border-slate-200 focus:border-teal-500 focus:outline-none text-slate-800 text-base sm:text-xs"
+              className="w-full px-3 py-2 text-xs rounded-lg bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition-colors shadow-2xs"
             />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="font-bold text-slate-700 block mb-1">
-                Category Pillar
+              <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                Category
               </label>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full p-2.5 rounded-2xl border border-slate-200 focus:border-teal-500 focus:outline-none text-slate-800 text-base sm:text-xs min-h-[44px]"
+                className="w-full px-3 py-2 text-xs rounded-lg bg-white border border-slate-300 text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition-colors shadow-2xs"
               >
                 <option value="Architecture">Architecture</option>
                 <option value="Design">Design & UI</option>
@@ -106,58 +108,59 @@ export const AdminNewBlogModal: React.FC<AdminNewBlogModalProps> = ({
             </div>
 
             <div>
-              <label className="font-bold text-slate-700 block mb-1">
-                Featured Cover Image URL
+              <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                Cover Image URL
               </label>
               <input
                 type="url"
                 value={imageUrl}
                 onChange={(e) => setImageUrl(e.target.value)}
                 placeholder="https://images.unsplash.com/..."
-                className="w-full p-2.5 rounded-2xl border border-slate-200 focus:border-teal-500 focus:outline-none text-slate-800 text-base sm:text-xs min-h-[44px]"
+                className="w-full px-3 py-2 text-xs rounded-lg bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition-colors shadow-2xs"
               />
             </div>
           </div>
 
           <div>
-            <label className="font-bold text-slate-700 block mb-1">
-              Brief Excerpt (Shown on Cards)
+            <label className="block text-xs font-medium text-slate-700 mb-1.5">
+              Summary / Excerpt <span className="text-rose-500">*</span>
             </label>
             <textarea
               rows={2}
               required
               value={excerpt}
               onChange={(e) => setExcerpt(e.target.value)}
-              placeholder="Summary of the key technical takeaways or architectural trade-offs..."
-              className="w-full p-3 rounded-2xl border border-slate-200 focus:border-teal-500 focus:outline-none text-slate-800 text-base sm:text-xs"
+              placeholder="Brief summary displayed on article preview cards..."
+              className="w-full px-3 py-2 text-xs rounded-lg bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition-colors shadow-2xs resize-y"
             />
           </div>
 
           <div>
-            <label className="font-bold text-slate-700 block mb-1">
-              Full Article Body
+            <label className="block text-xs font-medium text-slate-700 mb-1.5">
+              Full Article Body <span className="text-rose-500">*</span>
             </label>
             <textarea
-              rows={4}
+              rows={5}
               required
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              placeholder="Draft complete technical breakdown, step-by-step guides, code recommendations..."
-              className="w-full p-3 rounded-2xl border border-slate-200 focus:border-teal-500 focus:outline-none text-slate-800 text-base sm:text-xs"
+              placeholder="Write the full technical content, architectural recommendations, and code snippets..."
+              className="w-full px-3 py-2 text-xs rounded-lg bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition-colors shadow-2xs resize-y font-mono text-[11px]"
             />
           </div>
 
-          <div className="pt-4 border-t border-slate-100 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2.5">
+          {/* Footer Actions */}
+          <div className="pt-4 border-t border-slate-200 flex items-center justify-end gap-2.5">
             <button
               type="button"
               onClick={onClose}
-              className="w-full sm:w-auto px-4 py-2.5 min-h-[44px] rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium cursor-pointer flex items-center justify-center"
+              className="px-4 py-2 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-medium cursor-pointer transition-colors shadow-2xs"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="w-full sm:w-auto px-5 py-2.5 min-h-[44px] rounded-full bg-[#007a64] hover:bg-[#006956] text-white font-semibold shadow-md shadow-emerald-500/20 cursor-pointer flex items-center justify-center"
+              className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium cursor-pointer transition-colors shadow-xs"
             >
               Publish Article
             </button>

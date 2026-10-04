@@ -10,7 +10,6 @@ import {
   Search, 
   Bot, 
   Send, 
-  Sparkles, 
   ShieldCheck, 
   BookOpen, 
   Zap,
@@ -404,42 +403,37 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
 
   return (
     <div className="space-y-6">
-      {/* 1. Real-Time Dynamic Database Sync Banner */}
-      <div className="rounded-3xl p-6 bg-white/85 backdrop-blur-xl text-slate-800 shadow-xs border border-white/80 relative overflow-hidden">
-        <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-64 h-64 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative z-10">
-          <div className="space-y-2 max-w-2xl">
+      {/* 1. Header & Live Telemetry Summary */}
+      <div className="bg-white border border-slate-200/90 rounded-xl p-5 shadow-2xs">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5">
+          <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
-              </span>
-              <span className="text-[11px] font-bold text-teal-700 uppercase tracking-wider">
-                Live PostgreSQL RAG & Multi-Modal File Knowledge Engine
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                PostgreSQL Knowledge Index
               </span>
             </div>
-            <h3 className="text-lg font-bold font-heading text-slate-900">
-              AI Knowledge Chunks & Document Ingestion System
-            </h3>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Upload any document (PDF, TXT, Markdown, CSV, JSON, Word, or images with text) to let AI automatically extract structured knowledge chunks. Any chunk added or deleted is synchronized in real time with the PostgreSQL database.
+            <h2 className="text-lg font-bold text-slate-900 font-heading">
+              Knowledge Base Chunks
+            </h2>
+            <p className="text-xs text-slate-500 max-w-2xl leading-relaxed">
+              Structured documentation and FAQ chunks indexed for automated customer support. Upload reference documents or create manual chunks synchronized directly with the database.
             </p>
           </div>
 
           {/* Quick Metrics from DB */}
-          <div className="grid grid-cols-3 gap-2.5 self-stretch lg:self-auto shrink-0">
-            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 text-center">
-              <span className="block text-lg font-bold text-teal-700">{status?.totalChunks ?? docs.length}</span>
-              <span className="text-[10px] text-slate-500 font-semibold uppercase">Knowledge Chunks</span>
+          <div className="grid grid-cols-3 gap-3 self-stretch lg:self-auto shrink-0">
+            <div className="px-4 py-2.5 rounded-lg bg-slate-50 border border-slate-200/80 text-center">
+              <span className="block text-base font-bold text-slate-900 font-mono">{status?.totalChunks ?? docs.length}</span>
+              <span className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">Chunks</span>
             </div>
-            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 text-center">
-              <span className="block text-lg font-bold text-purple-700">{status?.totalFaqs ?? 7}</span>
-              <span className="text-[10px] text-slate-500 font-semibold uppercase">Live FAQs</span>
+            <div className="px-4 py-2.5 rounded-lg bg-slate-50 border border-slate-200/80 text-center">
+              <span className="block text-base font-bold text-slate-900 font-mono">{status?.totalFaqs ?? 7}</span>
+              <span className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">FAQs</span>
             </div>
-            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 text-center">
-              <span className="block text-lg font-bold text-blue-700">{status?.totalTopics ?? 15}</span>
-              <span className="text-[10px] text-slate-500 font-semibold uppercase">Topics Indexed</span>
+            <div className="px-4 py-2.5 rounded-lg bg-slate-50 border border-slate-200/80 text-center">
+              <span className="block text-base font-bold text-slate-900 font-mono">{status?.totalTopics ?? 15}</span>
+              <span className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">Topics</span>
             </div>
           </div>
         </div>
@@ -449,30 +443,29 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left 7 Cols: Knowledge Document Chunks */}
         <div className="lg:col-span-7 space-y-4">
-          <div className="p-4 rounded-3xl bg-white/75 backdrop-blur-xl border border-white/80 shadow-xs space-y-3">
+          <div className="p-4 rounded-xl bg-white border border-slate-200/90 shadow-2xs space-y-3">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
               <div className="relative flex-1 w-full">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search chunk knowledge by title, content, or category..."
-                  className="w-full pl-9 pr-4 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:border-teal-500 focus:outline-none text-slate-800 placeholder:text-slate-400"
+                  placeholder="Filter chunks by title, content, or category..."
+                  className="w-full pl-9 pr-3 py-2 text-xs rounded-lg bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900 focus:border-slate-900 shadow-2xs"
                 />
               </div>
 
-              {/* Action Buttons: AI File Ingestion & Manual Add */}
-              <div className="flex items-center gap-2 w-full sm:w-auto">
+              {/* Action Buttons: Document Ingestion & Manual Add */}
+              <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
                 <button
                   onClick={fetchKnowledgeData}
-                  className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 cursor-pointer"
+                  className="p-2 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-slate-600 cursor-pointer shadow-2xs transition-colors"
                   title="Refresh knowledge chunks"
                 >
-                  <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                  <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
                 </button>
 
-                {/* AI File Ingestion Button */}
                 <button
                   onClick={() => {
                     setSelectedFile(null);
@@ -480,13 +473,12 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
                     setAnalysisError(null);
                     setIsFileModalOpen(true);
                   }}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-bold shadow-md shadow-indigo-600/20 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-medium shadow-2xs cursor-pointer transition-colors whitespace-nowrap"
                 >
-                  <UploadCloud className="w-3.5 h-3.5" />
-                  <span>AI Ingest File</span>
+                  <UploadCloud className="w-3.5 h-3.5 text-slate-600" />
+                  <span>Ingest File</span>
                 </button>
 
-                {/* Manual Add Chunk Button */}
                 <button
                   onClick={() => {
                     setEditingDoc(null);
@@ -498,22 +490,22 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
                     });
                     setIsManualModalOpen(true);
                   }}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-md shadow-teal-600/20 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium shadow-xs cursor-pointer transition-colors whitespace-nowrap"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>Manual Chunk</span>
+                  <span>New Chunk</span>
                 </button>
               </div>
             </div>
 
-            {/* Category Filter Pills & Bulk Actions */}
+            {/* Category Filter Buttons & Bulk Actions */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pt-2 border-t border-slate-100">
               <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs max-w-full">
                 <button
                   onClick={() => setSelectedCategory('all')}
-                  className={`px-3 py-1 rounded-lg font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${
                     selectedCategory === 'all'
-                      ? 'bg-teal-600 text-white shadow-xs'
+                      ? 'bg-slate-900 text-white'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
@@ -523,9 +515,9 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
                   <button
                     key={cat}
                     onClick={() => setSelectedCategory(cat)}
-                    className={`px-3 py-1 rounded-lg font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${
                       selectedCategory === cat
-                        ? 'bg-teal-600 text-white shadow-xs'
+                        ? 'bg-slate-900 text-white'
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
@@ -539,7 +531,7 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
                 <div className="flex items-center gap-2 text-xs shrink-0 self-end sm:self-auto">
                   <button
                     onClick={handleSelectAll}
-                    className="text-[11px] text-slate-500 hover:text-slate-800 font-semibold cursor-pointer underline underline-offset-2"
+                    className="text-[11px] text-slate-500 hover:text-slate-900 font-medium cursor-pointer"
                   >
                     {selectedDocIds.length === filteredDocs.length ? 'Deselect All' : 'Select All'}
                   </button>
@@ -548,10 +540,10 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
                     <button
                       onClick={handleBulkDelete}
                       disabled={isBulkDeleting}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold shadow-xs transition-all cursor-pointer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-medium shadow-2xs transition-colors cursor-pointer"
                     >
                       <Trash2 className="w-3 h-3" />
-                      <span>Delete Selected ({selectedDocIds.length})</span>
+                      <span>Delete ({selectedDocIds.length})</span>
                     </button>
                   )}
                 </div>
@@ -562,10 +554,10 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
           {/* Chunks List */}
           <div className="space-y-3">
             {filteredDocs.length === 0 ? (
-              <div className="p-8 text-center text-slate-400 bg-white/60 rounded-3xl border border-white/80 space-y-2">
-                <BookOpen className="w-8 h-8 mx-auto opacity-40" />
-                <p className="text-xs font-semibold">No knowledge chunks found matching your search.</p>
-                <p className="text-[11px] text-slate-400">Click &quot;AI Ingest File&quot; to upload any document and have Gemini extract structured chunks automatically!</p>
+              <div className="p-8 text-center text-slate-400 bg-white rounded-xl border border-slate-200 space-y-2">
+                <BookOpen className="w-7 h-7 mx-auto text-slate-300" />
+                <p className="text-xs font-medium text-slate-600">No knowledge chunks found matching filter.</p>
+                <p className="text-[11px] text-slate-400">Upload a reference document or create a new chunk manually.</p>
               </div>
             ) : (
               filteredDocs.map(doc => {
@@ -573,10 +565,10 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
                 return (
                   <div
                     key={doc.id}
-                    className={`rounded-3xl p-5 backdrop-blur-xl border transition-all space-y-2.5 ${
+                    className={`rounded-xl p-4.5 border transition-all space-y-2.5 ${
                       isSelected 
-                        ? 'bg-rose-50/70 border-rose-200 shadow-sm' 
-                        : 'bg-white/85 hover:bg-white border-white/90 shadow-xs hover:shadow-md'
+                        ? 'bg-rose-50/50 border-rose-300 shadow-2xs' 
+                        : 'bg-white border-slate-200/90 shadow-2xs hover:border-slate-300'
                     }`}
                   >
                     <div className="flex items-center justify-between gap-3">
@@ -585,13 +577,13 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => handleToggleSelectDoc(doc.id)}
-                          className="w-4 h-4 rounded text-teal-600 focus:ring-teal-500 border-slate-300 cursor-pointer"
+                          className="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900 cursor-pointer"
                           title="Select to delete"
                         />
-                        <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-100 uppercase tracking-tight">
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 uppercase tracking-wider font-mono">
                           {doc.category || 'General'}
                         </span>
-                        <span className="text-[10px] text-slate-400 font-mono">
+                        <span className="text-[11px] text-slate-400 font-mono">
                           {doc.id}
                         </span>
                       </div>
@@ -608,15 +600,15 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
                             });
                             setIsManualModalOpen(true);
                           }}
-                          className="p-1.5 text-slate-400 hover:text-teal-600 rounded-lg hover:bg-teal-50 transition-colors cursor-pointer"
+                          className="p-1.5 text-slate-400 hover:text-slate-700 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
                           title="Edit Chunk"
                         >
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => handleDeleteDoc(doc.id, doc.title)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
-                          title="Delete Unnecessary Chunk"
+                          className="p-1.5 text-slate-400 hover:text-rose-600 rounded-md hover:bg-rose-50 transition-colors cursor-pointer"
+                          title="Delete Chunk"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -624,15 +616,15 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
                     </div>
 
                     <div>
-                      <h4 className="text-xs font-bold text-slate-900">{doc.title}</h4>
-                      <div className="text-xs text-slate-600 mt-1.5 leading-relaxed bg-slate-50/80 p-3 rounded-2xl border border-slate-100 font-mono text-[11px] max-h-36 overflow-y-auto whitespace-pre-wrap">
+                      <h4 className="text-xs font-semibold text-slate-900">{doc.title}</h4>
+                      <div className="text-xs text-slate-700 mt-2 leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-200/80 font-mono text-[11px] max-h-36 overflow-y-auto whitespace-pre-wrap">
                         {doc.content}
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1">
-                      <span className="flex items-center gap-1 text-emerald-600 font-semibold">
-                        <CheckCircle2 className="w-3 h-3" /> Real-Time RAG Synchronized
+                    <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-100">
+                      <span className="flex items-center gap-1.5 text-emerald-600 font-medium">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Database Synchronized
                       </span>
                       <span>{doc.createdAt ? new Date(doc.createdAt).toLocaleDateString() : 'Active'}</span>
                     </div>
@@ -643,49 +635,49 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
           </div>
         </div>
 
-        {/* Right 5 Cols: AI Live Sandbox & Prompt Tester */}
+        {/* Right 5 Cols: Knowledge Retrieval Sandbox & Tester */}
         <div className="lg:col-span-5 sticky top-24 space-y-4">
-          <div className="rounded-3xl p-5 bg-white/85 backdrop-blur-xl border border-white/90 shadow-md space-y-4">
+          <div className="rounded-xl p-5 bg-white border border-slate-200/90 shadow-2xs space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
-                <Bot className="w-4 h-4 text-indigo-600" />
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900">
-                  AI Knowledge Sandbox & Live Tester
+                <Bot className="w-4 h-4 text-slate-700" />
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-900">
+                  Retrieval Simulator & Tester
                 </h4>
               </div>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
-                Real-Time RAG
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                Live Query
               </span>
             </div>
 
             <p className="text-xs text-slate-500">
-              Test queries to verify how the AI responds based on your newly uploaded file chunks, FAQs, or brand promotion directives:
+              Test queries against currently saved document chunks and FAQs to verify system responses:
             </p>
 
             {/* Quick Test Preset Buttons */}
             <div className="space-y-1.5">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Quick Presets:</span>
-              <div className="flex flex-wrap gap-1.5 text-[11px]">
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Presets:</span>
+              <div className="flex flex-wrap gap-1.5 text-xs">
                 <button
                   type="button"
                   onClick={() => setTestQuestion('How do I import demo content in Docly theme?')}
-                  className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium cursor-pointer transition-colors"
+                  className="px-2 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium cursor-pointer transition-colors"
                 >
                   Demo Import (FAQ)
                 </button>
                 <button
                   type="button"
                   onClick={() => setTestQuestion('Who has permission to delete discussion posts?')}
-                  className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium cursor-pointer transition-colors"
+                  className="px-2 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium cursor-pointer transition-colors"
                 >
-                  Delete Permission (DB)
+                  Permissions (DB)
                 </button>
                 <button
                   type="button"
                   onClick={() => setTestQuestion('What is quantum astrophysics and rocket propulsion?')}
-                  className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 font-medium cursor-pointer transition-colors border border-amber-200"
+                  className="px-2 py-1 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-800 text-[11px] font-medium cursor-pointer transition-colors border border-amber-200"
                 >
-                  Out of Scope (Brand & Escalation)
+                  Out of Scope
                 </button>
               </div>
             </div>
@@ -693,19 +685,19 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
             {/* Test Input Form */}
             <form onSubmit={handleTestQuery} className="space-y-3">
               <div className="flex items-center justify-between">
-                <label className="text-[11px] font-bold text-slate-700">Test Inquiry:</label>
-                <div className="flex items-center gap-1.5 text-[10px]">
+                <label className="text-xs font-medium text-slate-700">Test Query:</label>
+                <div className="flex items-center gap-1 text-[11px]">
                   <button
                     type="button"
                     onClick={() => setTestLang('en')}
-                    className={`px-2 py-0.5 rounded font-bold cursor-pointer ${testLang === 'en' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'}`}
+                    className={`px-2 py-0.5 rounded text-xs font-medium cursor-pointer ${testLang === 'en' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
                   >
                     EN
                   </button>
                   <button
                     type="button"
                     onClick={() => setTestLang('bn')}
-                    className={`px-2 py-0.5 rounded font-bold cursor-pointer ${testLang === 'bn' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'}`}
+                    className={`px-2 py-0.5 rounded text-xs font-medium cursor-pointer ${testLang === 'bn' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
                   >
                     বাংলা
                   </button>
@@ -716,36 +708,36 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
                 rows={2}
                 value={testQuestion}
                 onChange={(e) => setTestQuestion(e.target.value)}
-                placeholder="Type a question to verify that AI retrieves your latest file chunks..."
-                className="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:outline-none text-slate-800 placeholder:text-slate-400"
+                placeholder="Enter sample question to test chunk retrieval..."
+                className="w-full px-3 py-2 text-xs rounded-lg bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900 focus:border-slate-900 shadow-2xs"
               />
 
               <button
                 type="submit"
                 disabled={testLoading || !testQuestion.trim()}
-                className="w-full inline-flex items-center justify-center gap-2 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold shadow-md shadow-indigo-600/20 active:scale-95 transition-all cursor-pointer"
+                className="w-full inline-flex items-center justify-center gap-2 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-medium shadow-xs transition-colors cursor-pointer"
               >
                 <Send className="w-3.5 h-3.5" />
-                <span>{testLoading ? 'Querying AI & Database...' : 'Run Real-Time AI Test'}</span>
+                <span>{testLoading ? 'Querying Knowledge Base...' : 'Run Query Test'}</span>
               </button>
             </form>
 
             {/* Test Output Box */}
             {testResponse && (
-              <div className="p-4 rounded-2xl bg-indigo-50/60 border border-indigo-100 space-y-2 animate-in fade-in">
-                <div className="flex items-center justify-between text-[10px] font-bold">
-                  <span className="flex items-center gap-1 text-indigo-700 uppercase">
-                    <Sparkles className="w-3 h-3" /> Live Assistant Reply
+              <div className="p-4 rounded-lg bg-slate-50 border border-slate-200 space-y-2 animate-in fade-in">
+                <div className="flex items-center justify-between text-[11px] font-medium">
+                  <span className="text-slate-900 font-semibold">
+                    Simulated Response
                   </span>
-                  <span className="px-1.5 py-0.5 rounded bg-indigo-200/70 text-indigo-900">
+                  <span className="px-2 py-0.5 rounded bg-slate-200 text-slate-700 font-mono text-[10px]">
                     Source: {testResponse.source}
                   </span>
                 </div>
-                <p className="text-xs text-slate-800 whitespace-pre-wrap leading-relaxed">
+                <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">
                   {testResponse.reply}
                 </p>
-                <div className="text-[10px] text-slate-400 text-right">
-                  Tested at {testResponse.time}
+                <div className="text-[10px] text-slate-400 text-right font-mono">
+                  Completed at {testResponse.time}
                 </div>
               </div>
             )}
@@ -754,22 +746,22 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
       </div>
 
       {/* ========================================================================= */}
-      {/* MODAL 1: AI FILE INGESTION & CHUNK EXTRACTION */}
+      {/* MODAL 1: FILE INGESTION & CHUNK EXTRACTION */}
       {/* ========================================================================= */}
       {isFileModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/25 backdrop-blur-xs animate-in fade-in overflow-y-auto">
-          <div className="w-full max-w-2xl rounded-3xl bg-white p-6 shadow-2xl border border-slate-100 space-y-5 my-8">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600">
-                  <UploadCloud className="w-5 h-5" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in overflow-y-auto">
+          <div className="w-full max-w-2xl rounded-xl bg-white border border-slate-200 shadow-xl overflow-hidden my-8">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/50">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-lg bg-slate-100 text-slate-700 border border-slate-200">
+                  <UploadCloud className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900">
-                    AI Document & Knowledge Ingestion
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    Ingest Reference Document
                   </h3>
-                  <p className="text-[11px] text-slate-500">
-                    Upload any file to extract and save structured knowledge chunks directly into the database.
+                  <p className="text-xs text-slate-500">
+                    Extract structured knowledge chunks from uploaded files into PostgreSQL
                   </p>
                 </div>
               </div>
@@ -779,15 +771,15 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
                   setSelectedFile(null);
                   setExtractedDrafts([]);
                 }}
-                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* If no drafts extracted yet, show the File Upload Zone */}
             {extractedDrafts.length === 0 ? (
-              <div className="space-y-4">
+              <div className="p-6 space-y-4">
                 {/* Drag and Drop Zone */}
                 <div
                   onDragEnter={handleDrag}
@@ -795,12 +787,12 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
                   onDragOver={handleDrag}
                   onDrop={handleDrop}
                   onClick={() => fileInputRef.current?.click()}
-                  className={`border-2 border-dashed rounded-3xl p-8 text-center transition-all cursor-pointer flex flex-col items-center justify-center space-y-3 ${
+                  className={`border border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer flex flex-col items-center justify-center space-y-3 ${
                     dragActive 
-                      ? 'border-indigo-500 bg-indigo-50/50 scale-[0.99]' 
+                      ? 'border-slate-900 bg-slate-100/70' 
                       : selectedFile
                         ? 'border-emerald-500 bg-emerald-50/30'
-                        : 'border-slate-200 hover:border-indigo-400 bg-slate-50/60'
+                        : 'border-slate-300 hover:border-slate-400 bg-slate-50/50'
                   }`}
                 >
                   <input
@@ -811,56 +803,56 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
                     accept=".pdf,.txt,.md,.json,.csv,.doc,.docx,image/*"
                   />
 
-                  <div className="w-12 h-12 rounded-2xl bg-indigo-100 text-indigo-600 flex items-center justify-center shadow-xs">
-                    {selectedFile ? <FileText className="w-6 h-6 text-emerald-600" /> : <UploadCloud className="w-6 h-6" />}
+                  <div className="w-10 h-10 rounded-lg bg-white border border-slate-200 text-slate-700 flex items-center justify-center shadow-2xs">
+                    {selectedFile ? <FileText className="w-5 h-5 text-emerald-600" /> : <UploadCloud className="w-5 h-5" />}
                   </div>
 
                   {selectedFile ? (
                     <div>
-                      <p className="text-xs font-bold text-slate-800">{selectedFile.name}</p>
+                      <p className="text-xs font-semibold text-slate-900">{selectedFile.name}</p>
                       <p className="text-[11px] text-emerald-600 font-medium">
-                        {(selectedFile.size / 1024).toFixed(1)} KB &bull; Ready for AI analysis
+                        {(selectedFile.size / 1024).toFixed(1)} KB &bull; Ready for extraction
                       </p>
                     </div>
                   ) : (
                     <div>
-                      <p className="text-xs font-bold text-slate-700">
-                        Drag and drop your file here, or <span className="text-indigo-600 underline">browse files</span>
+                      <p className="text-xs font-medium text-slate-700">
+                        Drop document here, or <span className="text-slate-900 underline font-semibold">browse files</span>
                       </p>
                       <p className="text-[11px] text-slate-400 mt-1">
-                        Supports PDF, Markdown (.md), TXT, JSON, CSV, Word (.doc/.docx), and Screenshots/Images
+                        PDF, Markdown (.md), TXT, JSON, CSV, Word (.doc/.docx), or screenshot images
                       </p>
                     </div>
                   )}
                 </div>
 
                 {/* Category hint */}
-                <div className="space-y-1">
-                  <label className="block text-xs font-bold text-slate-700">
-                    Preferred Category Tag (Optional):
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-medium text-slate-700">
+                    Category Tag (Optional)
                   </label>
                   <input
                     type="text"
                     value={fileCategoryHint}
                     onChange={(e) => setFileCategoryHint(e.target.value)}
-                    placeholder="e.g. Documentation, Themes, Policies, Billing, Troubleshooting..."
-                    className="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:outline-none text-slate-800"
+                    placeholder="e.g. Documentation, Platform, Billing, Support..."
+                    className="w-full px-3 py-2 text-xs rounded-lg bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900 focus:border-slate-900 shadow-2xs"
                   />
                 </div>
 
                 {analysisError && (
-                  <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                  <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4 shrink-0" />
                     <span>{analysisError}</span>
                   </div>
                 )}
 
                 {/* Submit button */}
-                <div className="pt-2 flex items-center justify-end gap-2">
+                <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-2.5">
                   <button
                     type="button"
                     onClick={() => setIsFileModalOpen(false)}
-                    className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 text-xs transition-colors cursor-pointer"
+                    className="px-4 py-2 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-medium cursor-pointer shadow-2xs transition-colors"
                   >
                     Cancel
                   </button>
@@ -868,35 +860,35 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
                     type="button"
                     disabled={!selectedFile || isAnalyzingFile}
                     onClick={handleAnalyzeFile}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 text-white font-bold text-xs shadow-md transition-all cursor-pointer active:scale-95"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-medium shadow-xs transition-colors cursor-pointer"
                   >
                     {isAnalyzingFile ? (
                       <>
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        <span>Analyzing & Extracting Chunks with Gemini AI...</span>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Extracting Chunks...</span>
                       </>
                     ) : (
                       <>
-                        <Sparkles className="w-4 h-4" />
-                        <span>Analyze & Extract Knowledge Chunks</span>
+                        <Layers className="w-3.5 h-3.5" />
+                        <span>Extract Knowledge Chunks</span>
                       </>
                     )}
                   </button>
                 </div>
               </div>
             ) : (
-              /* If drafts are extracted, show the Review & Unnecessary Chunk Deletion Step */
-              <div className="space-y-4">
-                <div className="p-3 rounded-2xl bg-indigo-50/70 border border-indigo-100 flex items-center justify-between text-xs">
+              /* If drafts are extracted, show Review step */
+              <div className="p-6 space-y-4">
+                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-between text-xs">
                   <div>
-                    <span className="font-bold text-indigo-900">Extracted {extractedDrafts.length} Knowledge Chunks</span>
-                    <p className="text-[11px] text-indigo-700">
-                      Review the chunks below. Uncheck or remove any unnecessary chunks before saving to the database.
+                    <span className="font-semibold text-slate-900">Extracted {extractedDrafts.length} Chunks</span>
+                    <p className="text-[11px] text-slate-500">
+                      Review chunks before saving. Deselect or edit any chunk.
                     </p>
                   </div>
                   <button
                     onClick={() => setExtractedDrafts([])}
-                    className="text-[11px] font-bold text-indigo-600 hover:underline cursor-pointer"
+                    className="text-[11px] font-medium text-slate-700 hover:underline cursor-pointer"
                   >
                     Upload another file
                   </button>
@@ -904,13 +896,13 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
 
                 {/* List of Extracted Chunks to Edit / Deselect */}
                 <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
-                  {extractedDrafts.map((draft, idx) => (
+                  {extractedDrafts.map((draft) => (
                     <div
                       key={draft.id}
-                      className={`p-4 rounded-2xl border transition-all space-y-2.5 ${
+                      className={`p-3.5 rounded-lg border transition-all space-y-2.5 ${
                         draft.selected 
-                          ? 'bg-slate-50 border-slate-200' 
-                          : 'bg-slate-100/60 border-slate-200 opacity-50'
+                          ? 'bg-white border-slate-200 shadow-2xs' 
+                          : 'bg-slate-50 border-slate-200 opacity-60'
                       }`}
                     >
                       <div className="flex items-center justify-between gap-2">
@@ -922,7 +914,7 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
                               const isChecked = e.target.checked;
                               setExtractedDrafts(prev => prev.map(d => d.id === draft.id ? { ...d, selected: isChecked } : d));
                             }}
-                            className="w-4 h-4 rounded text-teal-600 focus:ring-teal-500 cursor-pointer"
+                            className="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900 cursor-pointer"
                           />
                           <input
                             type="text"
@@ -932,7 +924,7 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
                               setExtractedDrafts(prev => prev.map(d => d.id === draft.id ? { ...d, title: newTitle } : d));
                             }}
                             placeholder="Chunk Title"
-                            className="flex-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-bold text-slate-800"
+                            className="flex-1 px-2.5 py-1 rounded-md bg-white border border-slate-300 text-xs font-semibold text-slate-900"
                           />
                         </div>
 
@@ -945,15 +937,15 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
                               setExtractedDrafts(prev => prev.map(d => d.id === draft.id ? { ...d, category: newCat } : d));
                             }}
                             placeholder="Category"
-                            className="w-28 px-2 py-1 rounded-lg bg-white border border-slate-200 text-[10px] font-bold uppercase text-teal-700"
+                            className="w-24 px-2 py-1 rounded-md bg-white border border-slate-300 text-[10px] font-mono uppercase text-slate-700"
                           />
                           <button
                             type="button"
                             onClick={() => {
                               setExtractedDrafts(prev => prev.filter(d => d.id !== draft.id));
                             }}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 cursor-pointer"
-                            title="Discard this chunk"
+                            className="p-1 text-slate-400 hover:text-rose-600 rounded-md hover:bg-rose-50 cursor-pointer"
+                            title="Discard chunk"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -968,22 +960,22 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
                           setExtractedDrafts(prev => prev.map(d => d.id === draft.id ? { ...d, content: newContent } : d));
                         }}
                         placeholder="Extracted knowledge content..."
-                        className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-700 font-mono leading-relaxed"
+                        className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 font-mono leading-relaxed"
                       />
                     </div>
                   ))}
                 </div>
 
                 {/* Footer Save Action */}
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                <div className="pt-3 border-t border-slate-200 flex items-center justify-between text-xs">
                   <span className="text-slate-500 text-[11px]">
-                    {extractedDrafts.filter(d => d.selected).length} of {extractedDrafts.length} chunks selected for database insertion.
+                    {extractedDrafts.filter(d => d.selected).length} of {extractedDrafts.length} selected for commit.
                   </span>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => setIsFileModalOpen(false)}
-                      className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 cursor-pointer"
+                      className="px-4 py-2 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-medium cursor-pointer shadow-2xs"
                     >
                       Cancel
                     </button>
@@ -991,7 +983,7 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
                       type="button"
                       disabled={isSavingDrafts || extractedDrafts.filter(d => d.selected).length === 0}
                       onClick={handleSaveSelectedDrafts}
-                      className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-bold shadow-md cursor-pointer transition-all active:scale-95"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-medium shadow-xs cursor-pointer transition-colors"
                     >
                       {isSavingDrafts ? (
                         <>
@@ -1001,7 +993,7 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
                       ) : (
                         <>
                           <Check className="w-3.5 h-3.5" />
-                          <span>Save Selected Chunks to Database</span>
+                          <span>Commit Selected Chunks</span>
                         </>
                       )}
                     </button>
@@ -1017,70 +1009,76 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
       {/* MODAL 2: MANUAL CHUNK CREATE / EDIT */}
       {/* ========================================================================= */}
       {isManualModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/25 backdrop-blur-xs animate-in fade-in">
-          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl border border-slate-100 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="text-sm font-bold text-slate-900">
-                {editingDoc ? 'Edit Knowledge Chunk' : 'Add New RAG Knowledge Chunk'}
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-lg rounded-xl bg-white border border-slate-200 shadow-xl overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/50">
+              <h3 className="text-sm font-semibold text-slate-900">
+                {editingDoc ? 'Edit Knowledge Chunk' : 'New Knowledge Chunk'}
               </h3>
               <button
                 onClick={() => setIsManualModalOpen(false)}
-                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
               >
-                &times;
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveManualDoc} className="space-y-3 text-xs">
+            <form onSubmit={handleSaveManualDoc} className="p-6 space-y-4 text-xs">
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Category:</label>
+                <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                  Category Tag <span className="text-rose-500">*</span>
+                </label>
                 <input
                   type="text"
                   required
                   value={docForm.category}
                   onChange={(e) => setDocForm(prev => ({ ...prev, category: e.target.value }))}
-                  placeholder="e.g. Themes, Community, Consultancy, Security..."
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 focus:outline-none"
+                  placeholder="e.g. Platform, Themes, Consultancy, Billing..."
+                  className="w-full px-3 py-2 text-xs rounded-lg bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900 focus:border-slate-900 shadow-2xs"
                 />
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Document Chunk Title:</label>
+                <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                  Chunk Title <span className="text-rose-500">*</span>
+                </label>
                 <input
                   type="text"
                   required
                   value={docForm.title}
                   onChange={(e) => setDocForm(prev => ({ ...prev, title: e.target.value }))}
                   placeholder="e.g. Docly WordPress Theme Installation Guide"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 focus:outline-none"
+                  className="w-full px-3 py-2 text-xs rounded-lg bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900 focus:border-slate-900 shadow-2xs"
                 />
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Knowledge Chunk Content:</label>
+                <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                  Knowledge Content <span className="text-rose-500">*</span>
+                </label>
                 <textarea
-                  rows={4}
+                  rows={5}
                   required
                   value={docForm.content}
                   onChange={(e) => setDocForm(prev => ({ ...prev, content: e.target.value }))}
-                  placeholder="Enter detailed factual instructions, architecture summaries, or support rules that the AI will use to formulate responses..."
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 focus:outline-none leading-relaxed font-sans"
+                  placeholder="Enter detailed facts, technical specifications, or support procedures..."
+                  className="w-full px-3 py-2 text-xs rounded-lg bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900 focus:border-slate-900 shadow-2xs leading-relaxed font-mono resize-y"
                 />
               </div>
 
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+              <div className="pt-4 border-t border-slate-200 flex items-center justify-end gap-2.5">
                 <button
                   type="button"
                   onClick={() => setIsManualModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 transition-colors cursor-pointer"
+                  className="px-4 py-2 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-medium cursor-pointer shadow-2xs transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold transition-all shadow-md cursor-pointer"
+                  className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium shadow-xs cursor-pointer transition-colors"
                 >
-                  {editingDoc ? 'Update Knowledge Chunk' : 'Save & Sync to AI'}
+                  {editingDoc ? 'Update Chunk' : 'Save Chunk'}
                 </button>
               </div>
             </form>

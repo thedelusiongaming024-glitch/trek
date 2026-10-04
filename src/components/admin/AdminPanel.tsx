@@ -8,7 +8,6 @@ import {
   Settings, 
   ShieldCheck, 
   ArrowLeft,
-  Sparkles,
   Headphones,
   Image as ImageIcon
 } from 'lucide-react';
@@ -125,14 +124,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   ];
 
   return (
-    <div className="min-h-screen bg-[#f8f9fd] text-slate-900 relative selection:bg-teal-500 selection:text-white flex flex-col">
-      {/* Ambient background mesh gradient matching the reference */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-        <div className="absolute top-0 left-1/4 w-[600px] h-[500px] bg-teal-500/10 blur-[130px] rounded-full" />
-        <div className="absolute top-1/3 right-10 w-[500px] h-[500px] bg-emerald-500/10 blur-[130px] rounded-full" />
-        <div className="absolute -bottom-10 left-1/3 w-[600px] h-[400px] bg-cyan-500/10 blur-[120px] rounded-full" />
-      </div>
-
+    <div className="min-h-screen bg-slate-50 text-slate-900 relative selection:bg-teal-600 selection:text-white flex flex-col font-sans">
       {/* Top Navigation */}
       <AdminNavbar
         currentTab={activeTab}
@@ -144,15 +136,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       />
 
       {/* Main Admin Body */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-1 relative z-10 flex flex-col md:flex-row gap-8 items-start">
-        {/* Left Sticky Glassmorphic Sidebar */}
-        <aside className="w-full md:w-64 shrink-0 md:sticky md:top-24">
-          <div className="rounded-3xl p-2.5 sm:p-3 bg-white/75 backdrop-blur-xl border border-white/80 shadow-xs">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-7 w-full flex-1 flex flex-col md:flex-row gap-6 items-start">
+        {/* Left Sticky Sidebar */}
+        <aside className="w-full md:w-60 shrink-0 md:sticky md:top-20">
+          <div className="bg-white border border-slate-200/90 rounded-xl shadow-2xs p-2">
             <div className="hidden md:block px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              Admin Navigation
+              Workspace
             </div>
 
-            <div className="flex md:flex-col overflow-x-auto md:overflow-x-visible no-scrollbar pb-1 md:pb-0 gap-1.5 md:gap-1">
+            <nav className="flex md:flex-col overflow-x-auto md:overflow-x-visible no-scrollbar pb-1 md:pb-0 gap-1" aria-label="Admin Navigation">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
@@ -160,22 +152,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <button
                     key={item.id}
                     onClick={() => setActiveTab(item.id)}
-                    className={`shrink-0 md:w-full flex items-center justify-between gap-2 px-3.5 py-2 sm:py-2.5 min-h-[40px] rounded-2xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                    className={`shrink-0 md:w-full flex items-center justify-between gap-2.5 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-colors cursor-pointer text-left ${
                       isActive
-                        ? 'bg-teal-500 text-white shadow-md shadow-teal-500/25'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
+                        ? 'bg-slate-900 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
                     }`}
                   >
-                    <div className="flex items-center gap-2">
-                      <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-500'}`} />
-                      <span>{item.label}</span>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-teal-400' : 'text-slate-400'}`} />
+                      <span className="truncate">{item.label}</span>
                     </div>
                     {item.badge !== undefined && (
                       <span
-                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                        className={`text-[11px] font-mono px-1.5 py-0.5 rounded ${
                           isActive
-                            ? 'bg-white/25 text-white'
-                            : item.badgeColor || 'bg-slate-100 text-slate-600'
+                            ? 'bg-slate-800 text-teal-300 border border-slate-700'
+                            : 'bg-slate-100 text-slate-600 border border-slate-200/70'
                         }`}
                       >
                         {item.badge}
@@ -184,27 +176,30 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </button>
                 );
               })}
-            </div>
+            </nav>
 
-            <div className="hidden md:block pt-3 mt-2 border-t border-slate-200/70">
+            <div className="hidden md:block pt-2 mt-2 border-t border-slate-100">
               <button
                 onClick={onExitAdmin}
-                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl text-xs font-medium text-slate-600 hover:text-teal-700 hover:bg-teal-50/50 transition-colors cursor-pointer"
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer text-left"
               >
-                <ArrowLeft className="w-4 h-4 text-teal-600" />
+                <ArrowLeft className="w-3.5 h-3.5 text-slate-400" />
                 <span>Return to Live Forum</span>
               </button>
             </div>
           </div>
 
-          {/* Quick Help Card */}
-          <div className="mt-4 rounded-3xl p-4 bg-gradient-to-br from-teal-500/10 to-emerald-500/10 backdrop-blur-xl border border-white/80 shadow-xs text-xs space-y-1.5">
-            <div className="flex items-center gap-1.5 font-bold text-teal-800">
-              <Sparkles className="w-3.5 h-3.5 text-teal-600" />
-              <span>Live Admin Sync</span>
+          {/* System Status Info Card */}
+          <div className="mt-3 p-3 rounded-xl bg-white border border-slate-200/80 shadow-2xs text-xs space-y-1.5 hidden md:block">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-slate-700">Database Sync</span>
+              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/70">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                Live
+              </span>
             </div>
-            <p className="text-[11px] text-slate-600 leading-relaxed">
-              Modifications made in this portal directly update public forum discussions, knowledge articles, and consultancy queues.
+            <p className="text-[11px] text-slate-500 leading-normal">
+              Direct connection to PostgreSQL. Changes reflect instantly on the public portal.
             </p>
           </div>
         </aside>
