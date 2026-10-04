@@ -77,8 +77,8 @@ export const Navbar: React.FC<NavbarProps> = ({
         <nav
           className={`pointer-events-auto w-full rounded-full transition-[background-color,border-color,box-shadow,padding] duration-200 ease-out flex items-center justify-between transform-gpu ${
             isScrolled
-              ? 'py-2 sm:py-2.5 px-3.5 sm:px-6 glass-navbar-scrolled bg-white/70 border border-white/80 shadow-[0_14px_45px_rgba(0,0,0,0.12),inset_0_1px_2px_rgba(255,255,255,0.95)]'
-              : 'py-2.5 sm:py-3 px-4 sm:px-7 glass-navbar bg-white/60 border border-white/75 shadow-[0_10px_35px_rgba(0,0,0,0.08),inset_0_1px_1.5px_rgba(255,255,255,0.9)]'
+              ? 'py-2 sm:py-2.5 px-3.5 sm:px-6 glass-navbar-scrolled bg-white/92 border border-white/90 shadow-[0_14px_45px_rgba(0,0,0,0.12),inset_0_1px_2px_rgba(255,255,255,0.98)]'
+              : 'py-2.5 sm:py-3 px-4 sm:px-7 glass-navbar bg-white/85 border border-white/85 shadow-[0_10px_35px_rgba(0,0,0,0.08),inset_0_1px_1.5px_rgba(255,255,255,0.95)]'
           }`}
         >
           {/* Left: Brand Logo */}
@@ -123,7 +123,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <div className="relative" ref={dropdownRef}>
                 <button
                   onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                  className="inline-flex items-center gap-1.5 sm:gap-2 pl-1.5 pr-2.5 sm:pr-3 py-1 rounded-full bg-white/45 hover:bg-white/70 border border-white/70 text-slate-800 text-xs font-semibold backdrop-blur-md transition-all cursor-pointer shadow-xs"
+                  className="inline-flex items-center gap-1.5 sm:gap-2 pl-1.5 pr-2.5 sm:pr-3 py-1 rounded-full bg-white/80 hover:bg-white border border-white/80 text-slate-800 text-xs font-semibold backdrop-blur-md transition-all cursor-pointer shadow-xs"
                 >
                   <img
                     src={currentUser.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80'}
@@ -183,7 +183,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             ) : (
               <button
                 onClick={onOpenAuth}
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-full bg-white/45 hover:bg-white/70 text-slate-800 hover:text-slate-950 text-xs font-semibold border border-white/70 backdrop-blur-md transition-all cursor-pointer shadow-xs"
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-full bg-white/80 hover:bg-white text-slate-800 hover:text-slate-950 text-xs font-semibold border border-white/80 backdrop-blur-md transition-all cursor-pointer shadow-xs"
               >
                 <User className="w-3.5 h-3.5 text-slate-600" />
                 <span>{language === 'bn' ? 'সাইন ইন' : 'Sign In'}</span>
@@ -193,7 +193,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             {/* 2. Bilingual Language Switcher (matching reference design: 🌐 EN | বাং) */}
             <button
               onClick={toggleLanguage}
-              className="inline-flex items-center gap-1 p-0.5 px-1.5 sm:px-2 rounded-full bg-white/45 hover:bg-white/70 border border-white/70 backdrop-blur-md transition-all text-xs font-semibold text-slate-800 cursor-pointer shadow-xs"
+              className="inline-flex items-center gap-1 p-0.5 px-1.5 sm:px-2 rounded-full bg-white/80 hover:bg-white border border-white/80 backdrop-blur-md transition-all text-xs font-semibold text-slate-800 cursor-pointer shadow-xs"
               title={language === 'en' ? 'বাংলা ভাষায় পরিবর্তন করুন' : 'Switch to English'}
               aria-label="Toggle language"
             >
