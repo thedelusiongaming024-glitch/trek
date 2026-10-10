@@ -116,20 +116,44 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     const cleanPass = password.trim();
 
     if (!cleanEmail) {
-      setErrorMessage(language === 'bn' ? 'অনুগ্রহ করে আপনার ইমেইল ঠিকানা প্রদান করুন।' : 'Please enter your email address.');
+      setErrorMessage(
+        language === 'bn'
+          ? 'অনুগ্রহ করে আপনার ইমেইল ঠিকানা প্রদান করুন।'
+          : language === 'ar'
+          ? 'يرجى إدخال عنوان بريدك الإلكتروني.'
+          : 'Please enter your email address.'
+      );
       return;
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(cleanEmail)) {
-      setErrorMessage(language === 'bn' ? 'অনুগ্রহ করে একটি সঠিক ইমেইল ঠিকানা দিন।' : 'Please enter a valid email address.');
+      setErrorMessage(
+        language === 'bn'
+          ? 'অনুগ্রহ করে একটি সঠিক ইমেইল ঠিকানা দিন।'
+          : language === 'ar'
+          ? 'يرجى إدخال عنوان بريد إلكتروني صحيح.'
+          : 'Please enter a valid email address.'
+      );
       return;
     }
     if (!cleanPass) {
-      setErrorMessage(language === 'bn' ? 'অনুগ্রহ করে একটি নিরাপদ পাসওয়ার্ড প্রদান করুন।' : 'Please enter a secure password.');
+      setErrorMessage(
+        language === 'bn'
+          ? 'অনুগ্রহ করে একটি নিরাপদ পাসওয়ার্ড প্রদান করুন।'
+          : language === 'ar'
+          ? 'يرجى إدخال كلمة مرور آمنة.'
+          : 'Please enter a secure password.'
+      );
       return;
     }
     if (cleanPass.length < 6) {
-      setErrorMessage(language === 'bn' ? 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।' : 'Password must be at least 6 characters.');
+      setErrorMessage(
+        language === 'bn'
+          ? 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।'
+          : language === 'ar'
+          ? 'يجب أن تتكون كلمة المرور من ٦ أحرف على الأقل.'
+          : 'Password must be at least 6 characters.'
+      );
       return;
     }
 
@@ -139,6 +163,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         setErrorMessage(
           language === 'bn'
             ? `আপনি ইতিমধ্যে (${currentUser.email}) অ্যাকাউন্টে লগইন আছেন। একই সাথে অন্য একাউন্ট তৈরি করা যাবে না। প্রথমে লগআউট করুন।`
+            : language === 'ar'
+            ? `أنت مسجل الدخول بالفعل بحساب (${currentUser.email}). لا يمكنك تسجيل حساب آخر في نفس الوقت. يرجى تسجيل الخروج أولاً.`
             : `You are already logged into an account (${currentUser.email}). You cannot register another account at the same time. Please log out first.`
         );
         setLoading(false);
@@ -159,6 +185,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           data.message ||
             (language === 'bn'
               ? `${cleanEmail} ঠিকানায় ৬-সংখ্যার ভেরিফিকেশন কোড পাঠানো হয়েছে।`
+              : language === 'ar'
+              ? `تم إرسال رمز تحقق مكوّن من ٦ أرقام إلى ${cleanEmail}.`
               : `A 6-digit verification code was sent to ${cleanEmail}.`)
         );
       } else {
@@ -166,6 +194,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           data.error ||
             (language === 'bn'
               ? 'ভেরিফিকেশন কোড পাঠাতে ব্যর্থ হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।'
+              : language === 'ar'
+              ? 'فشل إرسال رمز التحقق. يرجى المحاولة مرة أخرى.'
               : 'Failed to send verification code. Please try again.')
         );
       }
@@ -173,6 +203,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setErrorMessage(
         language === 'bn'
           ? 'ডাটাবেজ সার্ভারের সাথে যোগাযোগে নেটওয়ার্ক ত্রুটি হয়েছে।'
+          : language === 'ar'
+          ? 'خطأ في الشبكة أثناء الاتصال بالخادم.'
           : 'Network error connecting to database server.'
       );
     } finally {
@@ -201,17 +233,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           data.message ||
             (language === 'bn'
               ? 'একটি নতুন ভেরিফিকেশন কোড পাঠানো হয়েছে।'
+              : language === 'ar'
+              ? 'تم إنشاء رمز تحقق جديد وإرساله بنجاح.'
               : 'A fresh verification code has been generated and sent.')
         );
       } else {
         setErrorMessage(
-          data.error || (language === 'bn' ? 'কোড পুনরায় পাঠাতে ব্যর্থ হয়েছে।' : 'Failed to resend code.')
+          data.error ||
+            (language === 'bn'
+              ? 'কোড পুনরায় পাঠাতে ব্যর্থ হয়েছে।'
+              : language === 'ar'
+              ? 'فشل إعادة إرسال الرمز.'
+              : 'Failed to resend code.')
         );
       }
     } catch {
       setErrorMessage(
         language === 'bn'
           ? 'ভেরিফিকেশন কোড পুনরায় পাঠাতে নেটওয়ার্ক ত্রুটি হয়েছে।'
+          : language === 'ar'
+          ? 'خطأ في الشبكة أثناء إعادة إرسال رمز التحقق.'
           : 'Network error resending verification code.'
       );
     } finally {
@@ -230,6 +271,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setErrorMessage(
         language === 'bn'
           ? 'অনুগ্রহ করে ৬-সংখ্যার ভেরিফিকেশন কোডটি দিন।'
+          : language === 'ar'
+          ? 'يرجى إدخال رمز التحقق المكون من ٦ أرقام.'
           : 'Please enter the 6-digit verification code.'
       );
       return;
@@ -238,6 +281,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setErrorMessage(
         language === 'bn'
           ? 'ভেরিফিকেশন কোডটি অবশ্যই ঠিক ৬ সংখ্যার হতে হবে।'
+          : language === 'ar'
+          ? 'يجب أن يتكون رمز التحقق من ٦ أرقام بالضبط.'
           : 'The verification code must be exactly 6 digits.'
       );
       return;
@@ -249,12 +294,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         setErrorMessage(
           language === 'bn'
             ? `আপনি ইতিমধ্যে (${currentUser.email}) অ্যাকাউন্টে লগইন আছেন। একই সাথে অন্য একাউন্ট তৈরি করা যাবে না। প্রথমে লগআউট করুন।`
+            : language === 'ar'
+            ? `أنت مسجل الدخول بالفعل بحساب (${currentUser.email}). لا يمكنك تسجيل حساب آخر في نفس الوقت. يرجى تسجيل الخروج أولاً.`
             : `You are already logged into an account (${currentUser.email}). You cannot register another account at the same time. Please log out first.`
         );
         setLoading(false);
         return;
       }
 
+      const chatSessionId = localStorage.getItem('trek_guest_session') || undefined;
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -263,12 +311,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           email: email.trim().toLowerCase(),
           password: password.trim(),
           verificationCode: cleanCode,
-          currentLoggedInEmail: currentUser?.email
+          currentLoggedInEmail: currentUser?.email,
+          sessionId: chatSessionId
         })
       });
       const data = await res.json();
       if (res.ok && data.success && data.user) {
         const verifiedUser = data.user;
+        try { localStorage.removeItem('trek_guest_session'); } catch {}
         handleClose();
         onSuccess(verifiedUser);
       } else {
@@ -276,6 +326,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           data.error ||
             (language === 'bn'
               ? 'ভেরিফিকেশন ব্যর্থ হয়েছে। কোড যাচাই করে আবার চেষ্টা করুন।'
+              : language === 'ar'
+              ? 'فشل التحقق. يرجى مراجعة الرمز والمحاولة مرة أخرى.'
               : 'Verification failed. Please check the code and try again.')
         );
       }
@@ -283,6 +335,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setErrorMessage(
         language === 'bn'
           ? 'অ্যাকাউন্ট তৈরিতে নেটওয়ার্ক ত্রুটি হয়েছে।'
+          : language === 'ar'
+          ? 'خطأ في الشبكة أثناء إتمام إنشاء الحساب.'
           : 'Network error finalizing account creation.'
       );
     } finally {
@@ -301,24 +355,29 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         setErrorMessage(
           language === 'bn'
             ? `আপনি ইতিমধ্যে (${currentUser.email}) অ্যাকাউন্টে লগইন আছেন। একই সাথে অন্য একাউন্টে লগইন করা যাবে না। প্রথমে লগআউট করুন।`
+            : language === 'ar'
+            ? `أنت مسجل الدخول بالفعل بحساب (${currentUser.email}). لا يمكنك تسجيل الدخول إلى حساب آخر في نفس الوقت. يرجى تسجيل الخروج أولاً.`
             : `You are already logged into an account (${currentUser.email}). You cannot log into another account at the same time. Please log out first.`
         );
         setLoading(false);
         return;
       }
 
+      const chatSessionId = localStorage.getItem('trek_guest_session') || undefined;
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: email.trim().toLowerCase(),
           password: password.trim(),
-          currentLoggedInEmail: currentUser?.email
+          currentLoggedInEmail: currentUser?.email,
+          sessionId: chatSessionId
         })
       });
       const data = await res.json();
       if (res.ok && data.success && data.user) {
         const loggedUser = data.user;
+        try { localStorage.removeItem('trek_guest_session'); } catch {}
         handleClose();
         onSuccess(loggedUser);
       } else {
@@ -326,6 +385,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           data.error ||
             (language === 'bn'
               ? 'ভুল তথ্য দিয়েছেন। আপনার ইমেইল ও পাসওয়ার্ড যাচাই করুন।'
+              : language === 'ar'
+              ? 'بيانات الدخول غير صحيحة. يرجى التحقق من بريدك الإلكتروني وكلمة المرور.'
               : 'Invalid credentials. Please check your email and password.')
         );
       }
@@ -333,6 +394,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setErrorMessage(
         language === 'bn'
           ? 'ডাটাবেজ সার্ভারের সাথে যোগাযোগে নেটওয়ার্ক ত্রুটি হয়েছে।'
+          : language === 'ar'
+          ? 'خطأ في الشبكة أثناء الاتصال بالخادم.'
           : 'Network error connecting to database server.'
       );
     } finally {
@@ -366,16 +429,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </div>
 
             <h3 className="text-xl font-bold text-slate-900 font-heading tracking-tight">
-              {language === 'bn' ? 'ইতিমধ্যেই লগইন আছেন' : 'Already Logged In'}
+              {language === 'bn' ? 'ইতিমধ্যেই লগইন আছেন' : language === 'ar' ? 'أنت مسجل الدخول بالفعل' : 'Already Logged In'}
             </h3>
             <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
               {language === 'bn'
                 ? 'আপনি বর্তমানে একটি অ্যাকাউন্টে লগইন আছেন। একই সময়ে অন্য অ্যাকাউন্টে লগইন করা যাবে না।'
+                : language === 'ar'
+                ? 'أنت مسجل الدخول حالياً بحساب نشط. لا يمكنك تسجيل الدخول إلى حساب آخر في نفس الوقت.'
                 : 'You are currently logged into an account. You cannot log into another account at the same time.'}
             </p>
 
             {/* Active Account Card */}
-            <div className="mt-5 p-4 rounded-2xl bg-slate-50/80 border border-slate-200/80 text-left flex items-center gap-3.5">
+            <div className="mt-5 p-4 rounded-2xl bg-slate-50/80 border border-slate-200/80 text-left rtl:text-right flex items-center gap-3.5">
               <div className="relative shrink-0">
                 {currentUser.avatar ? (
                   <img
@@ -388,7 +453,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     {currentUser.name.charAt(0).toUpperCase()}
                   </div>
                 )}
-                <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 ring-2 ring-white" title={language === 'bn' ? 'সক্রিয় সেশন' : 'Active session'} />
+                <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 ring-2 ring-white" title={language === 'bn' ? 'সক্রিয় সেশন' : language === 'ar' ? 'جلسة نشطة' : 'Active session'} />
               </div>
 
               <div className="min-w-0 flex-1">
@@ -397,7 +462,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     {currentUser.name}
                   </h4>
                   <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-teal-50 text-teal-700 border border-teal-200 shrink-0">
-                    {currentUser.role || (language === 'bn' ? 'সদস্য' : 'Member')}
+                    {currentUser.role || (language === 'bn' ? 'সদস্য' : language === 'ar' ? 'عضو' : 'Member')}
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 truncate mt-0.5">
@@ -406,17 +471,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 <div className="flex items-center gap-1.5 mt-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                   <span className="text-[11px] font-medium text-emerald-600">
-                    {language === 'bn' ? 'সক্রিয় সেশন' : 'Active session'}
+                    {language === 'bn' ? 'সক্রিয় সেশন' : language === 'ar' ? 'جلسة نشطة' : 'Active session'}
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="mt-4 p-3 rounded-xl bg-amber-50 border border-amber-200/70 text-amber-800 text-xs flex items-start gap-2 text-left">
+            <div className="mt-4 p-3 rounded-xl bg-amber-50 border border-amber-200/70 text-amber-800 text-xs flex items-start gap-2 text-left rtl:text-right">
               <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
               <span>
                 {language === 'bn' ? (
                   <>অন্য অ্যাকাউন্টে লগইন বা নতুন প্রোফাইল তৈরি করতে, প্রথমে <strong>{currentUser.name}</strong> থেকে লগআউট করতে হবে।</>
+                ) : language === 'ar' ? (
+                  <>لتسجيل الدخول إلى حساب آخر أو إنشاء ملف تعريف جديد، يجب تسجيل الخروج من <strong>{currentUser.name}</strong> أولاً.</>
                 ) : (
                   <>To sign into a different account or create a new profile, you must log out of <strong>{currentUser.name}</strong> first.</>
                 )}
@@ -436,7 +503,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 className="w-full py-2.5 px-4 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-semibold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
               >
                 <LogOut className="w-4 h-4" />
-                <span>{language === 'bn' ? 'বর্তমান অ্যাকাউন্ট থেকে লগআউট করুন' : 'Log Out of Current Account'}</span>
+                <span>{language === 'bn' ? 'বর্তমান অ্যাকাউন্ট থেকে লগআউট করুন' : language === 'ar' ? 'تسجيل الخروج من الحساب الحالي' : 'Log Out of Current Account'}</span>
               </button>
 
               <button
@@ -445,7 +512,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 onClick={handleClose}
                 className="w-full py-2.5 px-4 rounded-xl bg-[#00a8b5] hover:bg-[#0096a3] text-white font-semibold text-xs shadow-md shadow-teal-500/20 transition-colors cursor-pointer"
               >
-                {language === 'bn' ? `${currentUser.name} হিসেবে এগিয়ে যান` : `Continue as ${currentUser.name}`}
+                {language === 'bn' ? `${currentUser.name} হিসেবে এগিয়ে যান` : language === 'ar' ? `المتابعة كـ ${currentUser.name}` : `Continue as ${currentUser.name}`}
               </button>
             </div>
           </div>
@@ -459,7 +526,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
                 <div className="min-w-0">
                   <p className="font-bold text-teal-950 font-heading tracking-tight text-xs sm:text-sm">
-                    {language === 'bn' ? 'লগইন প্রয়োজন' : 'Account Required'}
+                    {language === 'bn' ? 'লগইন প্রয়োজন' : language === 'ar' ? 'مطلوب تسجيل الدخول' : 'Account Required'}
                   </p>
                   <p className="text-slate-600 mt-0.5 leading-relaxed text-[11px] sm:text-xs">
                     {promptMessage}
@@ -492,7 +559,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
-                {language === 'bn' ? 'সাইন ইন' : 'Sign In'}
+                {language === 'bn' ? 'সাইন ইন' : language === 'ar' ? 'تسجيل الدخول' : 'Sign In'}
               </button>
               <button
                 onClick={() => {
@@ -507,8 +574,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 }`}
               >
                 {registerStep === 'verify'
-                  ? (language === 'bn' ? 'ইমেইল ভেরিফিকেশন' : 'Email Verification')
-                  : (language === 'bn' ? 'অ্যাকাউন্ট তৈরি করুন' : 'Create Account')}
+                  ? (language === 'bn' ? 'ইমেইল ভেরিফিকেশন' : language === 'ar' ? 'التحقق من البريد' : 'Email Verification')
+                  : (language === 'bn' ? 'অ্যাকাউন্ট তৈরি করুন' : language === 'ar' ? 'إنشاء حساب' : 'Create Account')}
               </button>
             </div>
 
@@ -517,11 +584,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <div>
                 <div className="text-center mb-6">
                   <h3 className="text-xl font-bold text-slate-900 font-heading tracking-tight">
-                    {language === 'bn' ? 'ট্রেক কনসালটেন্সি ফোরামে স্বাগতম' : 'Welcome Back to Trek Consultancy Forum'}
+                    {language === 'bn' ? 'ট্রেক কনসালটেন্সি ফোরামে স্বাগতম' : language === 'ar' ? 'مرحباً بكم مجدداً في منتدى تريك للاستشارات' : 'Welcome Back to Trek Consultancy Forum'}
                   </h3>
                   <p className="text-xs text-slate-500 mt-1">
                     {language === 'bn'
                       ? 'আপনার আলোচনা, উত্তর এবং প্রোফাইলে প্রবেশ করতে সাইন ইন করুন'
+                      : language === 'ar'
+                      ? 'سجّل الدخول للوصول إلى مناقشاتك وإجاباتك وملفك الشخصي'
                       : 'Sign in to access your discussions, answers, and profile'}
                   </p>
                 </div>
@@ -536,16 +605,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      {language === 'bn' ? 'ইমেইল ঠিকানা' : 'Email Address'}
+                      {language === 'bn' ? 'ইমেইল ঠিকানা' : language === 'ar' ? 'عنوان البريد الإلكتروني' : 'Email Address'}
                     </label>
                     <div className="relative">
-                      <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                      <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 rtl:left-auto rtl:right-3.5 top-3.5" />
                       <input
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="name@company.com"
-                        className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-white/80 border border-slate-200/80 text-slate-900 placeholder-slate-400 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 backdrop-blur-md transition-all shadow-xs"
+                        className="w-full pl-10 rtl:pl-3.5 rtl:pr-10 pr-3.5 py-2.5 rounded-xl bg-white/80 border border-slate-200/80 text-slate-900 placeholder-slate-400 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 backdrop-blur-md transition-all shadow-xs"
                         required
                       />
                     </div>
@@ -553,16 +622,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      {language === 'bn' ? 'পাসওয়ার্ড' : 'Password'}
+                      {language === 'bn' ? 'পাসওয়ার্ড' : language === 'ar' ? 'كلمة المرور' : 'Password'}
                     </label>
                     <div className="relative">
-                      <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                      <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 rtl:left-auto rtl:right-3.5 top-3.5" />
                       <input
                         type="password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="••••••••"
-                        className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-white/80 border border-slate-200/80 text-slate-900 placeholder-slate-400 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 backdrop-blur-md transition-all shadow-xs"
+                        className="w-full pl-10 rtl:pl-3.5 rtl:pr-10 pr-3.5 py-2.5 rounded-xl bg-white/80 border border-slate-200/80 text-slate-900 placeholder-slate-400 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 backdrop-blur-md transition-all shadow-xs"
                         required
                       />
                     </div>
@@ -577,8 +646,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
                       <>
-                        <span>{language === 'bn' ? 'সাইন ইন করে এগিয়ে যান' : 'Sign In & Continue'}</span>
-                        <ArrowRight className="w-4 h-4" />
+                        <span>{language === 'bn' ? 'সাইন ইন করে এগিয়ে যান' : language === 'ar' ? 'تسجيل الدخول والمتابعة' : 'Sign In & Continue'}</span>
+                        <ArrowRight className="w-4 h-4 rtl:rotate-180" />
                       </>
                     )}
                   </button>
@@ -591,11 +660,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <div>
                 <div className="text-center mb-6">
                   <h3 className="text-xl font-bold text-slate-900 font-heading tracking-tight">
-                    {language === 'bn' ? 'কমিউনিটিতে যোগ দিন' : 'Join the Community'}
+                    {language === 'bn' ? 'কমিউনিটিতে যোগ দিন' : language === 'ar' ? 'انضم إلى مجتمعنا' : 'Join the Community'}
                   </h3>
                   <p className="text-xs text-slate-500 mt-1">
                     {language === 'bn'
                       ? 'ইমেইল ভেরিফিকেশন কোড পেতে আপনার তথ্য প্রদান করুন'
+                      : language === 'ar'
+                      ? 'أدخل بياناتك لاستلام رمز التحقق عبر البريد الإلكتروني'
                       : 'Enter your details to receive an email verification code'}
                   </p>
                 </div>
@@ -610,16 +681,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 <form onSubmit={handleSendVerificationCode} className="space-y-4">
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      {language === 'bn' ? 'পুরো নাম' : 'Full Name'}
+                      {language === 'bn' ? 'পুরো নাম' : language === 'ar' ? 'الاسم الكامل' : 'Full Name'}
                     </label>
                     <div className="relative">
-                      <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                      <User className="w-4 h-4 text-slate-400 absolute left-3.5 rtl:left-auto rtl:right-3.5 top-3.5" />
                       <input
                         type="text"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder="Sarah Jenkins"
-                        className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-white/80 border border-slate-200/80 text-slate-900 placeholder-slate-400 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 backdrop-blur-md transition-all shadow-xs"
+                        className="w-full pl-10 rtl:pl-3.5 rtl:pr-10 pr-3.5 py-2.5 rounded-xl bg-white/80 border border-slate-200/80 text-slate-900 placeholder-slate-400 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 backdrop-blur-md transition-all shadow-xs"
                         required
                       />
                     </div>
@@ -627,16 +698,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      {language === 'bn' ? 'ইমেইল ঠিকানা' : 'Email Address'}
+                      {language === 'bn' ? 'ইমেইল ঠিকানা' : language === 'ar' ? 'عنوان البريد الإلكتروني' : 'Email Address'}
                     </label>
                     <div className="relative">
-                      <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                      <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 rtl:left-auto rtl:right-3.5 top-3.5" />
                       <input
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="name@company.com"
-                        className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-white/80 border border-slate-200/80 text-slate-900 placeholder-slate-400 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 backdrop-blur-md transition-all shadow-xs"
+                        className="w-full pl-10 rtl:pl-3.5 rtl:pr-10 pr-3.5 py-2.5 rounded-xl bg-white/80 border border-slate-200/80 text-slate-900 placeholder-slate-400 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 backdrop-blur-md transition-all shadow-xs"
                         required
                       />
                     </div>
@@ -644,16 +715,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      {language === 'bn' ? 'পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)' : 'Password (min 6 characters)'}
+                      {language === 'bn' ? 'পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)' : language === 'ar' ? 'كلمة المرور (٦ أحرف على الأقل)' : 'Password (min 6 characters)'}
                     </label>
                     <div className="relative">
-                      <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                      <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 rtl:left-auto rtl:right-3.5 top-3.5" />
                       <input
                         type="password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="••••••••"
-                        className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-white/80 border border-slate-200/80 text-slate-900 placeholder-slate-400 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 backdrop-blur-md transition-all shadow-xs"
+                        className="w-full pl-10 rtl:pl-3.5 rtl:pr-10 pr-3.5 py-2.5 rounded-xl bg-white/80 border border-slate-200/80 text-slate-900 placeholder-slate-400 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 backdrop-blur-md transition-all shadow-xs"
                         required
                       />
                     </div>
@@ -669,8 +740,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
                         <>
-                          <span>{language === 'bn' ? 'ভেরিফিকেশন কোড পাঠান' : 'Send Verification Code'}</span>
-                          <ArrowRight className="w-4 h-4" />
+                          <span>{language === 'bn' ? 'ভেরিফিকেশন কোড পাঠান' : language === 'ar' ? 'إرسال رمز التحقق' : 'Send Verification Code'}</span>
+                          <ArrowRight className="w-4 h-4 rtl:rotate-180" />
                         </>
                       )}
                     </button>
@@ -679,6 +750,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <p className="text-[11px] text-center text-slate-400">
                     {language === 'bn'
                       ? 'আপনার ইমেইল যাচাই করার জন্য একটি ৬-সংখ্যার কনফার্মেশন কোড পাঠানো হবে।'
+                      : language === 'ar'
+                      ? 'سيتم إرسال رمز تأكيد مكوّن من ٦ أرقام للتحقق من ملكية بريدك الإلكتروني.'
                       : 'A 6-digit confirmation code will be sent to verify ownership of your email.'}
                   </p>
                 </form>
@@ -693,11 +766,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     <ShieldCheck className="w-6 h-6" />
                   </div>
                   <h3 className="text-xl font-bold text-slate-900 font-heading tracking-tight">
-                    {language === 'bn' ? 'আপনার ইমেইল যাচাই করুন' : 'Verify Your Email'}
+                    {language === 'bn' ? 'আপনার ইমেইল যাচাই করুন' : language === 'ar' ? 'تأكيد بريدك الإلكتروني' : 'Verify Your Email'}
                   </h3>
                   <p className="text-xs text-slate-500 mt-1">
                     {language === 'bn' ? (
                       <>আমরা ৬-সংখ্যার একটি ভেরিফিকেশন কোড পাঠিয়েছি: <span className="font-semibold text-slate-800">{email}</span></>
+                    ) : language === 'ar' ? (
+                      <>لقد أرسلنا رمز تحقق مكوّن من ٦ أرقام إلى: <span className="font-semibold text-slate-800">{email}</span></>
                     ) : (
                       <>We sent a 6-digit verification code to <span className="font-semibold text-slate-800">{email}</span></>
                     )}
@@ -725,7 +800,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <div className="mb-4 p-3 rounded-2xl bg-teal-50/80 border border-teal-200 text-xs text-teal-900 flex items-center justify-between">
                     <div>
                       <span className="text-[11px] font-medium text-teal-700 block">
-                        {language === 'bn' ? 'ভেরিফিকেশন কোড:' : 'Verification Code:'}
+                        {language === 'bn' ? 'ভেরিফিকেশন কোড:' : language === 'ar' ? 'رمز التحقق:' : 'Verification Code:'}
                       </span>
                       <span className="font-mono text-base font-bold tracking-widest text-teal-900">{previewCode}</span>
                     </div>
@@ -734,7 +809,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       onClick={() => setVerificationCode(previewCode)}
                       className="px-2.5 py-1 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-semibold text-[11px] transition-colors cursor-pointer shadow-xs"
                     >
-                      {language === 'bn' ? 'অটো-ফিল' : 'Auto-fill'}
+                      {language === 'bn' ? 'অটো-ফিল' : language === 'ar' ? 'تعبئة تلقائية' : 'Auto-fill'}
                     </button>
                   </div>
                 )}
@@ -742,7 +817,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 <form onSubmit={handleVerifyAndRegister} className="space-y-4">
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1 text-center">
-                      {language === 'bn' ? '৬-সংখ্যার কোড লিখুন' : 'Enter 6-Digit Code'}
+                      {language === 'bn' ? '৬-সংখ্যার কোড লিখুন' : language === 'ar' ? 'أدخل الرمز المكون من ٦ أرقام' : 'Enter 6-Digit Code'}
                     </label>
                     <div className="relative">
                       <input
@@ -770,7 +845,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     ) : (
                       <>
                         <ShieldCheck className="w-4 h-4" />
-                        <span>{language === 'bn' ? 'যাচাই করে অ্যাকাউন্ট তৈরি করুন' : 'Verify & Create Account'}</span>
+                        <span>{language === 'bn' ? 'যাচাই করে অ্যাকাউন্ট তৈরি করুন' : language === 'ar' ? 'تأكيد وإنشاء الحساب' : 'Verify & Create Account'}</span>
                       </>
                     )}
                   </button>
@@ -785,8 +860,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       }}
                       className="inline-flex items-center gap-1 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
                     >
-                      <ArrowLeft className="w-3.5 h-3.5" />
-                      <span>{language === 'bn' ? 'তথ্য পরিবর্তন' : 'Edit details'}</span>
+                      <ArrowLeft className="w-3.5 h-3.5 rtl:rotate-180" />
+                      <span>{language === 'bn' ? 'তথ্য পরিবর্তন' : language === 'ar' ? 'تعديل البيانات' : 'Edit details'}</span>
                     </button>
 
                     <button
@@ -798,8 +873,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       <RefreshCw className={`w-3.5 h-3.5 ${resending ? 'animate-spin' : ''}`} />
                       <span>
                         {resendTimer > 0
-                          ? (language === 'bn' ? `${formatNumber(resendTimer)} সেকেন্ড পর পুনরায় পাঠান` : `Resend in ${resendTimer}s`)
-                          : (language === 'bn' ? 'কোড পুনরায় পাঠান' : 'Resend Code')}
+                          ? (language === 'bn' ? `${formatNumber(resendTimer)} সেকেন্ড পর পুনরায় পাঠান` : language === 'ar' ? `إعادة الإرسال بعد ${formatNumber(resendTimer)} ثانية` : `Resend in ${resendTimer}s`)
+                          : (language === 'bn' ? 'কোড পুনরায় পাঠান' : language === 'ar' ? 'إعادة إرسال الرمز' : 'Resend Code')}
                       </span>
                     </button>
                   </div>
@@ -813,7 +888,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       }}
                       className="text-xs text-slate-500 hover:text-teal-700 font-medium transition-colors cursor-pointer"
                     >
-                      {language === 'bn' ? 'বাতিল করে সাইন ইন-এ ফিরুন' : 'Cancel & switch to Sign In'}
+                      {language === 'bn' ? 'বাতিল করে সাইন ইন-এ ফিরুন' : language === 'ar' ? 'إلغاء والعودة لتسجيل الدخول' : 'Cancel & switch to Sign In'}
                     </button>
                   </div>
                 </form>

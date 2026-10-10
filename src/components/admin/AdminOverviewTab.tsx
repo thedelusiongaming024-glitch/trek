@@ -1,19 +1,19 @@
 import React from 'react';
 import { 
   MessageSquare, 
-  Briefcase, 
+  BookOpen, 
   Users, 
   TrendingUp, 
   Clock, 
   ArrowUpRight, 
-  AlertCircle, 
-  Plus
+  Plus,
+  UserCheck
 } from 'lucide-react';
-import { ForumTopic, ConsultancyInquiry, AdminUser, ActivityLog } from '../../types';
+import { ForumTopic, BlogPost, AdminUser, ActivityLog } from '../../types';
 
 interface AdminOverviewTabProps {
   topics: ForumTopic[];
-  consultancyLeads: ConsultancyInquiry[];
+  blogs: BlogPost[];
   users: AdminUser[];
   activityLogs: ActivityLog[];
   onNavigateTab: (tab: any) => void;
@@ -22,14 +22,12 @@ interface AdminOverviewTabProps {
 
 export const AdminOverviewTab: React.FC<AdminOverviewTabProps> = ({
   topics,
-  consultancyLeads,
+  blogs,
   users,
   activityLogs,
   onNavigateTab,
   onOpenNewTopicModal
 }) => {
-  const pendingLeads = consultancyLeads.filter(l => l.status === 'new' || l.status === 'reviewing');
-  const handledLeads = consultancyLeads.filter(l => l.status === 'contacted' || l.status === 'resolved');
   const totalViews = topics.reduce((acc, t) => acc + (t.views || 0), 0);
   const totalReplies = topics.reduce((acc, t) => acc + (t.replies || 0), 0);
   const totalLikes = topics.reduce((acc, t) => acc + (t.likes || 0), 0);
@@ -48,12 +46,12 @@ export const AdminOverviewTab: React.FC<AdminOverviewTabProps> = ({
       bg: 'bg-teal-50'
     },
     {
-      label: 'Consultancy Inquiries',
-      value: consultancyLeads.length.toString(),
-      subtext: consultancyLeads.length === 0
-        ? 'No pending inquiries'
-        : `${pendingLeads.length} awaiting review • ${handledLeads.length} handled`,
-      icon: Briefcase,
+      label: 'Knowledge Base',
+      value: blogs.length.toString(),
+      subtext: blogs.length === 0
+        ? '0 articles published'
+        : `${blogs.length} guides & tutorials available`,
+      icon: BookOpen,
       color: 'text-emerald-600',
       bg: 'bg-emerald-50'
     },
@@ -86,7 +84,7 @@ export const AdminOverviewTab: React.FC<AdminOverviewTabProps> = ({
         <div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">Overview</h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Platform health, forum activity, and incoming consultancy inquiries.
+            Platform health, forum activity, and knowledge base performance.
           </p>
         </div>
 
@@ -99,11 +97,18 @@ export const AdminOverviewTab: React.FC<AdminOverviewTabProps> = ({
             <span>New Discussion</span>
           </button>
           <button
-            onClick={() => onNavigateTab('consultancy')}
+            onClick={() => onNavigateTab('customers')}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium shadow-2xs transition-colors cursor-pointer"
           >
-            <Briefcase className="w-3.5 h-3.5 text-slate-500" />
-            <span>Inquiries ({pendingLeads.length})</span>
+            <UserCheck className="w-3.5 h-3.5 text-teal-600" />
+            <span>Customers & Chats</span>
+          </button>
+          <button
+            onClick={() => onNavigateTab('topics')}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium shadow-2xs transition-colors cursor-pointer"
+          >
+            <MessageSquare className="w-3.5 h-3.5 text-slate-500" />
+            <span>Discussions ({topics.length})</span>
           </button>
         </div>
       </div>
@@ -136,71 +141,65 @@ export const AdminOverviewTab: React.FC<AdminOverviewTabProps> = ({
         })}
       </div>
 
-      {/* Two-Column Layout: Priority Inquiries + Live Audit Logs */}
+      {/* Two-Column Layout: Recent Discussions + Live Audit Logs */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        {/* Left 2 Cols: Priority Consultancy Inquiries */}
+        {/* Left 2 Cols: Recent Forum Discussions */}
         <div className="lg:col-span-2 bg-white border border-slate-200/90 rounded-xl shadow-2xs overflow-hidden">
           <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-md bg-amber-50 text-amber-600">
-                <AlertCircle className="w-3.5 h-3.5" />
+              <div className="p-1.5 rounded-md bg-teal-50 text-teal-600">
+                <MessageSquare className="w-3.5 h-3.5" />
               </div>
               <div>
                 <h2 className="text-sm font-semibold text-slate-900">
-                  Priority Consultancy Inquiries
+                  Recent Discussions
                 </h2>
                 <p className="text-[11px] text-slate-500">
-                  Recent architectural and enterprise engagement requests
+                  Latest forum topics posted across the community
                 </p>
               </div>
             </div>
             <button
-              onClick={() => onNavigateTab('consultancy')}
+              onClick={() => onNavigateTab('topics')}
               className="text-xs font-medium text-teal-600 hover:text-teal-700 flex items-center gap-1 transition-colors cursor-pointer"
             >
-              View all ({consultancyLeads.length})
+              View all ({topics.length})
               <ArrowUpRight className="w-3.5 h-3.5" />
             </button>
           </div>
 
           <div className="divide-y divide-slate-100">
-            {consultancyLeads.length === 0 ? (
+            {topics.length === 0 ? (
               <div className="py-8 text-center text-slate-400 text-xs">
-                No consultancy inquiries in queue.
+                No active discussions yet.
               </div>
             ) : (
-              consultancyLeads.slice(0, 4).map((lead) => (
-                <div key={lead.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/70 transition-colors">
+              topics.slice(0, 5).map((topic) => (
+                <div key={topic.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/70 transition-colors">
                   <div className="space-y-1 max-w-lg min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-xs text-slate-900">
-                        {lead.company}
+                      <span className="font-semibold text-xs text-slate-900 truncate">
+                        {topic.title}
                       </span>
-                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider ${
-                        lead.priority === 'urgent'
-                          ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                          : lead.priority === 'high'
-                          ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                          : 'bg-slate-100 text-slate-700 border border-slate-200'
-                      }`}>
-                        {lead.priority}
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider bg-slate-100 text-slate-700 border border-slate-200">
+                        {topic.category}
                       </span>
-                      <span className="text-[11px] text-slate-400">• {lead.date}</span>
+                      <span className="text-[11px] text-slate-400">• by {topic.author}</span>
                     </div>
                     <p className="text-xs text-slate-600 line-clamp-1 leading-normal">
-                      {lead.scope}
+                      {topic.content}
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700 capitalize border border-slate-200/60">
-                      {lead.status}
-                    </span>
+                  <div className="flex items-center gap-2 shrink-0 text-xs text-slate-500 font-mono">
+                    <span>{topic.replies || 0} replies</span>
+                    <span>•</span>
+                    <span>{topic.views || 0} views</span>
                     <button
-                      onClick={() => onNavigateTab('consultancy')}
-                      className="px-2.5 py-1 rounded-md text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors cursor-pointer shadow-2xs"
+                      onClick={() => onNavigateTab('topics')}
+                      className="ml-2 px-2.5 py-1 rounded-md text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors cursor-pointer shadow-2xs"
                     >
-                      Manage
+                      View
                     </button>
                   </div>
                 </div>
@@ -218,46 +217,47 @@ export const AdminOverviewTab: React.FC<AdminOverviewTabProps> = ({
               </div>
               <div>
                 <h2 className="text-sm font-semibold text-slate-900">
-                  Audit Activity
+                  Live Activity
                 </h2>
                 <p className="text-[11px] text-slate-500">
-                  Recent actions by staff
+                  Real-time events and audit trail
                 </p>
               </div>
             </div>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200/70">
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               Live
             </span>
           </div>
 
-          <div className="p-4 space-y-3.5 flex-1">
+          <div className="p-4 flex-1">
             {activityLogs.length === 0 ? (
               <div className="py-8 text-center text-slate-400 text-xs">
-                No recent activity logged.
+                No system activity recorded yet.
               </div>
             ) : (
-              activityLogs.map((log) => (
-                <div key={log.id} className="flex items-start gap-2.5 text-xs">
-                  <div className="w-1.5 h-1.5 rounded-full bg-teal-600 mt-1.5 shrink-0" />
-                  <div className="space-y-0.5 flex-1 min-w-0">
-                    <p className="text-slate-800 text-xs">
-                      <span className="font-semibold text-slate-900">{log.actor}</span> {log.action}
-                    </p>
-                    <p className="text-slate-500 truncate text-[11px]">{log.target}</p>
-                    <p className="text-[10px] text-slate-400 font-mono">{log.timeAgo}</p>
+              <div className="space-y-4">
+                {activityLogs.slice(0, 6).map((log) => (
+                  <div key={log.id} className="flex items-start gap-3 text-xs">
+                    <div className="w-2 h-2 rounded-full bg-slate-400 mt-1.5 shrink-0" />
+                    <div className="flex-1 min-w-0 space-y-0.5">
+                      <p className="text-slate-700 leading-normal">
+                        <span className="font-semibold text-slate-900">{log.actor}</span>
+                        {' '}
+                        <span>{log.action.toLowerCase()}</span>
+                        {' '}
+                        <span className="font-medium text-slate-800 truncate inline-block max-w-[120px] align-bottom">
+                          {log.target}
+                        </span>
+                      </p>
+                      <span className="text-[10px] text-slate-400 font-mono block">
+                        {log.timeAgo}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))
+                ))}
+              </div>
             )}
-          </div>
-
-          <div className="p-3 border-t border-slate-100 bg-slate-50/50">
-            <button
-              onClick={() => onNavigateTab('topics')}
-              className="w-full py-1.5 px-3 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium text-center transition-colors cursor-pointer shadow-2xs"
-            >
-              Browse All Discussions →
-            </button>
           </div>
         </div>
       </div>

@@ -17,10 +17,13 @@ import {
   ChevronUp,
   FolderPlus,
   Palette,
-  AlertCircle
+  AlertCircle,
+  Pencil
 } from 'lucide-react';
 import { ForumTopic, DiscussionCategory, StaffRoleBadge } from '../../types';
 import { DeleteConfirmModal } from '../DeleteConfirmModal';
+import { EditTopicModal } from '../EditTopicModal';
+import { useLanguage } from '../../context/LanguageContext';
 
 export interface AdminTopicsTabProps {
   topics: ForumTopic[];
@@ -29,8 +32,9 @@ export interface AdminTopicsTabProps {
   onDeleteTopic: (id: string) => void;
   onOpenNewTopicModal: () => void;
   onViewTopic: (topic: ForumTopic) => void;
-  categories?: DiscussionCategory[];
-  staffRoles?: StaffRoleBadge[];
+  onUpdateTopic?: (updatedData: { id: string; title: string; category: string; categorySlug?: string; content: string }) => Promise<void> | void;
+  categories?: (DiscussionCategory | string)[];
+  staffRoles?: (StaffRoleBadge | string)[];
   onAddCategory?: (category: { name: string; description?: string }) => Promise<void> | void;
   onDeleteCategory?: (id: string) => Promise<void> | void;
   onAddStaffRole?: (role: { name: string; badgeLabel?: string; color?: string }) => Promise<void> | void;
@@ -55,6 +59,7 @@ export const AdminTopicsTab: React.FC<AdminTopicsTabProps> = ({
   onDeleteTopic,
   onOpenNewTopicModal,
   onViewTopic,
+  onUpdateTopic,
   categories = [],
   staffRoles = [],
   onAddCategory,
@@ -62,8 +67,12 @@ export const AdminTopicsTab: React.FC<AdminTopicsTabProps> = ({
   onAddStaffRole,
   onDeleteStaffRole
 }) => {
+  const { formatTimeAgo, formatNumber } = useLanguage();
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+
+  // Topic edit modal state
+  const [topicToEdit, setTopicToEdit] = useState<ForumTopic | null>(null);
 
   // Deletion modals state
   const [topicToDelete, setTopicToDelete] = useState<ForumTopic | null>(null);
@@ -560,8 +569,13 @@ export const AdminTopicsTab: React.FC<AdminTopicsTabProps> = ({
                           {topic.title}
                         </button>
                         <p className="text-[11px] text-slate-500 mt-0.5">
-                          By <span className="font-medium text-slate-700">{topic.author}</span> • {topic.timeAgo}
+                          By <span className="font-medium text-slate-700">{topic.author}</span> • {formatTimeAgo(topic.createdAt || topic.timeAgo)}
                         </p>
+                        {topic.content && (
+                          <p className="text-[11px] text-slate-400 mt-1 line-clamp-1">
+                            {topic.content}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -578,15 +592,15 @@ export const AdminTopicsTab: React.FC<AdminTopicsTabProps> = ({
                     <div className="flex items-center justify-center gap-3 text-slate-500 text-[11px] font-mono">
                       <span className="flex items-center gap-1" title="Views">
                         <Eye className="w-3.5 h-3.5 text-slate-400" />
-                        {topic.views}
+                        {formatNumber(topic.views)}
                       </span>
                       <span className="flex items-center gap-1" title="Replies">
                         <MessageSquare className="w-3.5 h-3.5 text-teal-600" />
-                        {topic.replies}
+                        {formatNumber(topic.repliesList?.length ?? topic.replies)}
                       </span>
                       <span className="flex items-center gap-1" title="Likes">
                         <ThumbsUp className="w-3.5 h-3.5 text-slate-400" />
-                        {topic.likes}
+                        {formatNumber(topic.likes)}
                       </span>
                     </div>
                   </td>
@@ -646,6 +660,15 @@ export const AdminTopicsTab: React.FC<AdminTopicsTabProps> = ({
                         className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer"
                       >
                         <Eye className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Edit Topic */}
+                      <button
+                        onClick={() => setTopicToEdit(topic)}
+                        title="Edit Discussion Post"
+                        className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-teal-600 hover:bg-teal-50 transition-colors cursor-pointer"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
                       </button>
 
                       {/* Delete */}
@@ -719,6 +742,20 @@ export const AdminTopicsTab: React.FC<AdminTopicsTabProps> = ({
         itemTitle={staffRoleToDelete?.name}
         message="Are you sure you want to remove this staff badge? It will no longer appear as an official author designation option."
         confirmLabel="Delete Staff Role"
+      />
+
+      {/* Edit Topic Modal for Admin */}
+      <EditTopicModal
+        isOpen={Boolean(topicToEdit)}
+        topic={topicToEdit}
+        onClose={() => setTopicToEdit(null)}
+        onSubmit={async (data) => {
+          if (onUpdateTopic) {
+            await onUpdateTopic(data);
+          }
+          setTopicToEdit(null);
+        }}
+        categories={categories}
       />
     </div>
   );

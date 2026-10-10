@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Send, AlertCircle, Lock, UserPlus } from 'lucide-react';
 import { ForumTopic, DiscussionCategory } from '../types';
 import { useLanguage } from '../context/LanguageContext';
+import { getRandomAvatar } from '../utils/avatar';
 
 interface PostQuestionModalProps {
   isOpen: boolean;
@@ -55,15 +56,15 @@ export const PostQuestionModal: React.FC<PostQuestionModalProps> = ({
     e.preventDefault();
 
     if (!currentUser) {
-      setError('You must have an account and be logged in to create a topic.');
+      setError(t('You must have an account and be logged in to create a topic.'));
       if (onRequireAuth) {
-        onRequireAuth('To create a topic and post questions in the forum, you must have an account and be logged in.');
+        onRequireAuth(t('To create a topic and post questions in the forum, you must have an account and be logged in.'));
       }
       return;
     }
 
     if (!title.trim() || !content.trim()) {
-      setError('Please provide both a topic title and details.');
+      setError(t('Please provide both a topic title and details.'));
       return;
     }
 
@@ -78,7 +79,9 @@ export const PostQuestionModal: React.FC<PostQuestionModalProps> = ({
       authorEmail: currentUser.email || '',
       authorId: currentUser.id || '',
       authorRole: currentUser.role || 'Contributor',
+      authorAvatar: currentUser.avatar || getRandomAvatar(currentUser.email || currentUser.name),
       timeAgo: 'Just now',
+      createdAt: new Date().toISOString(),
       views: 1,
       likes: 0,
       replies: 0,
@@ -96,17 +99,17 @@ export const PostQuestionModal: React.FC<PostQuestionModalProps> = ({
       <div className="relative w-full max-w-xl max-h-[92vh] overflow-y-auto rounded-3xl bg-white/95 backdrop-blur-2xl border border-white/80 shadow-[0_25px_60px_rgba(0,0,0,0.12)] p-5 sm:p-8 text-slate-800">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 sm:top-5 sm:right-5 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+          className="absolute top-4 right-4 sm:top-5 sm:right-5 rtl:right-auto rtl:left-4 sm:rtl:left-5 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
           aria-label="Close dialog"
         >
           <X className="w-5 h-5" />
         </button>
 
-        <h3 className="text-lg sm:text-xl font-bold text-slate-900 font-heading tracking-tight mb-1 pr-8">
+        <h3 className="text-lg sm:text-xl font-bold text-slate-900 font-heading tracking-tight mb-1 pr-8 rtl:pr-0 rtl:pl-8">
           {t('Start a New Discussion')}
         </h3>
         <p className="text-xs text-slate-500 mb-5 sm:mb-6">
-          {t('Ask our community and support engineers for guidance on themes, plugins, and architecture.', 'থিম, প্লাগইন ও আর্কিটেকচার সংক্রান্ত যেকোনো প্রশ্ন আমাদের কমিউনিটি ও প্রকৌশলীদের জিজ্ঞাসা করুন।')}
+          {t('Ask our community and support engineers for guidance on themes, plugins, and architecture.', 'থিম, প্লাগইন ও আর্কিটেকচার সংক্রান্ত যেকোনো প্রশ্ন আমাদের কমিউনিটি ও প্রকৌশলীদের জিজ্ঞাসা করুন।', 'اطرح أسئلتك على مهندسي الدعم ومجتمعنا للحصول على التوجيه وحلول الأنظمة.')}
         </p>
 
         {error && (
@@ -120,18 +123,18 @@ export const PostQuestionModal: React.FC<PostQuestionModalProps> = ({
           <div className="mb-4 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
             <div className="flex items-center gap-2 text-amber-800">
               <Lock className="w-4 h-4 shrink-0 text-amber-600" />
-              <span><strong>{t('Account required:', 'অ্যাকাউন্ট প্রয়োজন:')}</strong> {t('You must be logged in to post questions.', 'প্রশ্ন পোস্ট করতে লগইন করুন।')}</span>
+              <span><strong>{t('Account required:', 'অ্যাকাউন্ট প্রয়োজন:', 'مطلوب حساب:')}</strong> {t('You must be logged in to post questions.', 'প্রশ্ন পোস্ট করতে লগইন করুন।', 'يجب تسجيل الدخول لنشر الأسئلة.')}</span>
             </div>
             <button
               type="button"
               onClick={() => {
                 onClose();
-                onRequireAuth?.('To create a topic and post questions in the forum, you must have an account and be logged in.');
+                onRequireAuth?.(t('To create a topic and post questions in the forum, you must have an account and be logged in.'));
               }}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#00a8b5] text-white font-semibold text-xs shadow-xs hover:bg-[#0096a3] shrink-0 cursor-pointer"
             >
               <UserPlus className="w-3.5 h-3.5" />
-              <span>{t('Log In / Sign Up', 'লগইন / সাইন আপ')}</span>
+              <span>{t('Log In / Sign Up', 'লগইন / সাইন আপ', 'تسجيل الدخول / إنشاء حساب')}</span>
             </button>
           </div>
         )}
@@ -145,7 +148,7 @@ export const PostQuestionModal: React.FC<PostQuestionModalProps> = ({
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder={t('e.g., How do I customize the header typography?', 'যেমন: হেডার টাইপোগ্রাফি কীভাবে কাস্টমাইজ করব?')}
+              placeholder={t('e.g., How do I customize the header typography?', 'যেমন: হেডার টাইপোগ্রাফি কীভাবে কাস্টমাইজ করব?', 'مثال: كيف يمكنني تهيئة هيكلة النظام؟')}
               className="w-full px-3.5 py-2.5 rounded-xl bg-white/80 border border-slate-200/80 text-slate-900 placeholder-slate-400 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 backdrop-blur-md transition-all shadow-xs"
               required
             />
@@ -163,7 +166,7 @@ export const PostQuestionModal: React.FC<PostQuestionModalProps> = ({
               >
                 {availableCategories.length === 0 ? (
                   <option value="" disabled className="bg-white text-slate-500">
-                    {t('Loading categories...', 'ক্যাটাগরি লোড হচ্ছে...')}
+                    {t('Loading categories...', 'ক্যাটাগরি লোড হচ্ছে...', 'جاري تحميل التصنيفات...')}
                   </option>
                 ) : (
                   availableCategories.map((cat) => (
@@ -183,7 +186,7 @@ export const PostQuestionModal: React.FC<PostQuestionModalProps> = ({
                 type="text"
                 value={authorName}
                 onChange={(e) => setAuthorName(e.target.value)}
-                placeholder="Guest User"
+                placeholder={t('Guest User')}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-white/80 border border-slate-200/80 text-slate-900 placeholder-slate-400 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 backdrop-blur-md transition-all shadow-xs"
               />
             </div>
@@ -197,7 +200,7 @@ export const PostQuestionModal: React.FC<PostQuestionModalProps> = ({
               rows={4}
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              placeholder={t('Provide relevant details, theme versions, or steps you have tried...', 'প্রাসঙ্গিক বিবরণ বা সমস্যাটি বিস্তারিত লিখুন...')}
+              placeholder={t('Provide relevant details, theme versions, or steps you have tried...', 'প্রাসঙ্গিক বিবরণ বা সমস্যাটি বিস্তারিত লিখুন...', 'يرجى تقديم التفاصيل ذات الصلة أو الخطوات التي جربتها...')}
               className="w-full px-3.5 py-2.5 rounded-xl bg-white/80 border border-slate-200/80 text-slate-900 placeholder-slate-400 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 backdrop-blur-md transition-all shadow-xs resize-none"
               required
             />
@@ -215,7 +218,7 @@ export const PostQuestionModal: React.FC<PostQuestionModalProps> = ({
               type="submit"
               className="px-5 py-2.5 min-h-[44px] rounded-full bg-[#00a8b5] hover:bg-[#0096a3] text-white text-xs sm:text-sm font-semibold shadow-md shadow-teal-500/25 flex items-center justify-center gap-1.5 cursor-pointer backdrop-blur-md transition-all active:scale-95"
             >
-              <Send className="w-3.5 h-3.5" />
+              <Send className="w-3.5 h-3.5 rtl:rotate-180" />
               <span>{t('Publish Discussion')}</span>
             </button>
           </div>

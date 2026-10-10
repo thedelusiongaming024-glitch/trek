@@ -163,7 +163,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
         {/* Enhanced Search Bar Container */}
         <div className="max-w-2xl sm:max-w-3xl mx-auto px-1 sm:px-0">
           <div className="relative flex items-center bg-white/95 backdrop-blur-2xl rounded-2xl sm:rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.15)] border border-white/80 transition-all focus-within:ring-3 focus-within:ring-teal-400 focus-within:border-transparent">
-            <div className="pl-4 sm:pl-5 pr-2 py-4 sm:py-5 text-slate-400">
+            <div className="pl-4 sm:pl-5 pr-2 rtl:pl-2 rtl:pr-4 sm:rtl:pr-5 py-4 sm:py-5 text-slate-400">
               <Search className="w-5 h-5 sm:w-6 sm:h-6 text-teal-600" />
             </div>
 
@@ -173,14 +173,14 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder={t(searchPlaceholder)}
-              className="w-full py-4 sm:py-5 pr-12 text-slate-900 placeholder-slate-400 text-base sm:text-lg font-normal bg-transparent focus:outline-none"
+              className="w-full py-4 sm:py-5 pr-12 rtl:pr-0 rtl:pl-12 text-slate-900 placeholder-slate-400 text-base sm:text-lg font-normal bg-transparent focus:outline-none"
             />
 
             {searchQuery && (
               <button
                 onClick={() => onSearchChange('')}
-                className="absolute right-4 p-1.5 text-slate-400 hover:text-slate-600 transition-colors rounded-full cursor-pointer min-w-[36px] min-h-[36px] flex items-center justify-center"
-                title={t('Clear search', 'অনুসন্ধান মুছুন')}
+                className="absolute right-4 rtl:right-auto rtl:left-4 p-1.5 text-slate-400 hover:text-slate-600 transition-colors rounded-full cursor-pointer min-w-[36px] min-h-[36px] flex items-center justify-center"
+                title={t('Clear search', 'অনুসন্ধান মুছুন', 'مسح البحث')}
               >
                 <X className="w-4 h-4" />
               </button>
@@ -215,10 +215,10 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             <button
               onClick={() => setCurrentIndex(prev => (prev === 0 ? activeSlides.length - 1 : prev - 1))}
               className="p-1.5 rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur-md transition-colors cursor-pointer border border-white/20 shadow-lg"
-              title={t('Previous slide', 'পূর্ববর্তী স্লাইড')}
+              title={t('Previous slide', 'পূর্ববর্তী স্লাইড', 'الشريحة السابقة')}
               aria-label="Previous slide"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="w-4 h-4 rtl:rotate-180" />
             </button>
 
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/20 shadow-lg">
@@ -239,10 +239,10 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             <button
               onClick={() => setCurrentIndex(prev => (prev + 1) % activeSlides.length)}
               className="p-1.5 rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur-md transition-colors cursor-pointer border border-white/20 shadow-lg"
-              title={t('Next slide', 'পরবর্তী স্লাইড')}
+              title={t('Next slide', 'পরবর্তী স্লাইড', 'الشريحة التالية')}
               aria-label="Next slide"
             >
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-4 h-4 rtl:rotate-180" />
             </button>
           </div>
         )}

@@ -2,20 +2,26 @@ import React, { useState } from 'react';
 import { 
   Save, 
   Bell, 
-  Sliders,
-  CheckCircle2
+  Sliders, 
+  CheckCircle2, 
+  ArrowRight, 
+  Cpu 
 } from 'lucide-react';
-import { PlatformSettings } from '../../types';
+import { PlatformSettings, AdminTab } from '../../types';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface AdminSettingsTabProps {
   settings: PlatformSettings;
   onSaveSettings: (newSettings: PlatformSettings) => void;
+  onNavigateTab?: (tab: AdminTab) => void;
 }
 
 export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({
   settings,
-  onSaveSettings
+  onSaveSettings,
+  onNavigateTab
 }) => {
+  const { isBn, isAr } = useLanguage();
   const [formData, setFormData] = useState<PlatformSettings>({ ...settings });
   const [savedSuccess, setSavedSuccess] = useState(false);
 
@@ -152,6 +158,38 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({
               <div className="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-teal-600"></div>
             </label>
           </div>
+        </div>
+
+        {/* Model & Assistant Settings Quick Link Card */}
+        <div className="rounded-xl p-5 bg-white border border-slate-200/90 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="p-1.5 rounded-md bg-slate-100 text-slate-700">
+                <Cpu className="w-4 h-4" />
+              </span>
+              <h2 className="text-sm font-semibold text-slate-900">
+                {isAr ? 'إعدادات النموذج ومساعد المنصة' : isBn ? 'মডেল সেটিংস ও সহকারী কনফিগারেশন' : 'Model & Assistant Settings'}
+              </h2>
+            </div>
+            <p className="text-[11px] text-slate-500">
+              {isAr
+                ? 'إدارة مفاتيح API، واختيار نموذج اللغة المعتمد، وضبط سلوك الاستجابة والنماذج الاحتياطية.'
+                : isBn
+                ? 'ল্যাঙ্গুয়েজ মডেল নির্বাচন, এপিআই কি এবং রেসপন্স কনফিগারেশন পরিচালনা করুন।'
+                : 'Configure language models, API credentials, and response behavior.'}
+            </p>
+          </div>
+
+          {onNavigateTab && (
+            <button
+              type="button"
+              onClick={() => onNavigateTab('ai')}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-medium text-xs transition-colors cursor-pointer shrink-0 shadow-2xs"
+            >
+              <span>{isAr ? 'فتح الإعدادات' : isBn ? 'সেটিংস খুলুন' : 'Manage Models'}</span>
+              <ArrowRight className="w-3.5 h-3.5 rtl:rotate-180" />
+            </button>
+          )}
         </div>
 
         {/* Save Bar */}

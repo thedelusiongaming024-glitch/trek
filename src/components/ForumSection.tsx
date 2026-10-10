@@ -22,12 +22,13 @@ interface ForumSectionProps {
   onOpenPostModal: () => void;
   onSelectTopic: (topic: ForumTopic) => void;
   onToggleLike: (e: React.MouseEvent, topicId: string) => void;
+  onEditTopic?: (topic: ForumTopic) => void;
   onDeleteTopic?: (topic: ForumTopic) => void;
+  canEditTopic?: (topic: ForumTopic) => boolean;
   canDeleteTopic?: (topic: ForumTopic) => boolean;
   isTopicAuthor?: (topic: ForumTopic) => boolean;
   recentTopics: RecentTopic[];
   recentReplies: RecentReply[];
-  onOpenConsultancy: () => void;
   onSelectRecentTopic: (topicTitle: string) => void;
   onOpenChat?: () => void;
   searchQuery: string;
@@ -41,12 +42,13 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
   onOpenPostModal,
   onSelectTopic,
   onToggleLike,
+  onEditTopic,
   onDeleteTopic,
+  canEditTopic,
   canDeleteTopic,
   isTopicAuthor,
   recentTopics,
   recentReplies,
-  onOpenConsultancy,
   onSelectRecentTopic,
   onOpenChat,
   searchQuery,
@@ -78,7 +80,7 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
             {t('Trek Consultancy Forum')}
           </h3>
           <span className="text-xs px-2.5 sm:px-3 py-1 rounded-full bg-white/80 border border-white/80 text-slate-700 font-medium backdrop-blur-md shadow-xs">
-            {formatNumber(filteredTopics.length)} {language === 'bn' ? 'টি আলোচনা' : 'Discussions'}
+            <strong className="font-bold text-slate-900">{formatNumber(filteredTopics.length)}</strong> {language === 'bn' ? 'টি আলোচনা' : language === 'ar' ? 'مناقشة' : 'Discussions'}
           </span>
         </div>
 
@@ -128,6 +130,10 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
                   <>
                     <strong className="text-teal-600">"{searchQuery}"</strong> এর জন্য ফলাফল:
                   </>
+                ) : language === 'ar' ? (
+                  <>
+                    نتائج البحث عن <strong className="text-teal-600">"{searchQuery}"</strong>:
+                  </>
                 ) : (
                   <>
                     Showing results for <strong className="text-teal-600">"{searchQuery}"</strong>
@@ -135,7 +141,13 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
                 )}
               </span>
               <span className="text-slate-400">
-                {language === 'bn' ? `${formatNumber(filteredTopics.length)}টি পাওয়া গেছে` : `${filteredTopics.length} found`}
+                {language === 'bn' ? (
+                  <><strong className="font-bold text-slate-700">{formatNumber(filteredTopics.length)}</strong>টি পাওয়া গেছে</>
+                ) : language === 'ar' ? (
+                  <>تم العثور على <strong className="font-bold text-slate-700">{formatNumber(filteredTopics.length)}</strong></>
+                ) : (
+                  `${filteredTopics.length} found`
+                )}
               </span>
             </div>
           )}
@@ -163,7 +175,9 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
                 topic={topic}
                 onSelect={onSelectTopic}
                 onToggleLike={onToggleLike}
+                onEdit={onEditTopic ? (_e, t) => onEditTopic(t) : undefined}
                 onDelete={onDeleteTopic ? (_e, t) => onDeleteTopic(t) : undefined}
+                canEdit={canEditTopic ? canEditTopic(topic) : false}
                 canDelete={canDeleteTopic ? canDeleteTopic(topic) : false}
                 isAuthor={isTopicAuthor ? isTopicAuthor(topic) : false}
               />
@@ -176,7 +190,6 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
           <ForumSidebar
             recentTopics={recentTopics}
             recentReplies={recentReplies}
-            onOpenConsultancy={onOpenConsultancy}
             onSelectRecentTopic={onSelectRecentTopic}
           />
         </div>
@@ -194,6 +207,8 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
             <span className="tracking-tight text-slate-700 whitespace-nowrap">
               {language === 'bn' 
                 ? (settings?.floatingSupportTagTextBn || '২৪/৭ সাপোর্ট চ্যাট ও হেল্প')
+                : language === 'ar'
+                ? 'المساعد الذكي والأسئلة الشائعة ٢٤/٧'
                 : (settings?.floatingSupportTagTextEn || 'Support Assistant & FAQs')}
             </span>
           </div>

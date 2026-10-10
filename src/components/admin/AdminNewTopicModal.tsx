@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Pin, Star, MessageSquare } from 'lucide-react';
 import { ForumTopic, DiscussionCategory, StaffRoleBadge } from '../../types';
+import { getRandomAvatar } from '../../utils/avatar';
 
 interface AdminNewTopicModalProps {
   isOpen: boolean;
@@ -64,8 +65,9 @@ export const AdminNewTopicModal: React.FC<AdminNewTopicModalProps> = ({
       title: title.trim(),
       author: 'Forum Admin',
       authorRole: chosenRole,
-      authorAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
+      authorAvatar: getRandomAvatar(chosenRole),
       timeAgo: 'Just now',
+      createdAt: new Date().toISOString(),
       category: chosenCat,
       categorySlug: chosenCat.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
       views: 1,

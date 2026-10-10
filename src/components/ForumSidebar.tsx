@@ -7,14 +7,12 @@ import { useLanguage } from '../context/LanguageContext';
 interface ForumSidebarProps {
   recentTopics: RecentTopic[];
   recentReplies: RecentReply[];
-  onOpenConsultancy: () => void;
   onSelectRecentTopic: (topicTitle: string) => void;
 }
 
 export const ForumSidebar: React.FC<ForumSidebarProps> = ({
   recentTopics,
   recentReplies,
-  onOpenConsultancy,
   onSelectRecentTopic
 }) => {
   const { language, t, formatTimeAgo } = useLanguage();
@@ -37,12 +35,14 @@ export const ForumSidebar: React.FC<ForumSidebarProps> = ({
           {t('Access our primary corporate platform for complete business solutions and architecture reviews.')}
         </p>
 
-        <button
-          onClick={onOpenConsultancy}
-          className="w-full py-2.5 px-4 text-xs font-semibold rounded-full bg-[#00a8b5] hover:bg-[#0096a3] text-white shadow-md shadow-teal-500/20 active:scale-98 transition-all cursor-pointer backdrop-blur-md"
+        <a
+          href="https://www.trekconsultancy.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block w-full py-2.5 px-4 text-xs font-semibold rounded-full bg-[#00a8b5] hover:bg-[#0096a3] text-white shadow-md shadow-teal-500/20 active:scale-98 transition-all cursor-pointer backdrop-blur-md text-center"
         >
           {t('Visit Main Website')}
-        </button>
+        </a>
       </div>
 
       {/* 2. Recent Topics Card with frosted glass */}
@@ -71,7 +71,7 @@ export const ForumSidebar: React.FC<ForumSidebarProps> = ({
                 <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5">
                   <span>{t('by')} <span className="text-slate-700 font-medium">{topic.author}</span></span>
                   <span>•</span>
-                  <span>{formatTimeAgo(topic.timeAgo)}</span>
+                  <span>{formatTimeAgo(topic.createdAt || topic.timeAgo)}</span>
                 </div>
               </div>
             ))
@@ -103,10 +103,10 @@ export const ForumSidebar: React.FC<ForumSidebarProps> = ({
                   <div>
                     <p className="text-xs text-slate-600">
                       <span className="font-semibold text-slate-800">{reply.author}</span>
-                      <span className="text-slate-400">{language === 'bn' ? ' এ ' : ' on '}</span>
+                      <span className="text-slate-400">{language === 'bn' ? ' এ ' : language === 'ar' ? ' في ' : ' on '}</span>
                       <span className="text-slate-700 group-hover:text-teal-600 transition-colors font-medium">{reply.topicTitle}</span>
                     </p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">{formatTimeAgo(reply.timeAgo)}</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">{formatTimeAgo(reply.createdAt || reply.timeAgo)}</p>
                   </div>
                 </div>
               </div>

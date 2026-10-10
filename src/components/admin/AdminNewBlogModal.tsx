@@ -1,6 +1,22 @@
-import React, { useState } from 'react';
-import { BookOpen, X } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import Markdown from 'react-markdown';
+import {
+  BookOpen,
+  X,
+  ExternalLink,
+  Eye,
+  Edit3,
+  Bold,
+  Italic,
+  Heading2,
+  Heading3,
+  List,
+  ListOrdered,
+  Quote,
+  Code
+} from 'lucide-react';
 import { BlogPost } from '../../types';
+import { normalizeUrl } from '../../utils/url';
 
 interface AdminNewBlogModalProps {
   isOpen: boolean;
@@ -15,17 +31,44 @@ export const AdminNewBlogModal: React.FC<AdminNewBlogModalProps> = ({
 }) => {
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('Architecture');
+  const [redirectUrl, setRedirectUrl] = useState('');
   const [excerpt, setExcerpt] = useState('');
   const [content, setContent] = useState('');
   const [imageUrl, setImageUrl] = useState(
     'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=700&auto=format&fit=crop&q=80'
   );
+  const [bodyTab, setBodyTab] = useState<'write' | 'preview'>('write');
+
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   if (!isOpen) return null;
+
+  const handleInsertFormat = (prefix: string, suffix: string = '') => {
+    const el = textareaRef.current;
+    if (!el) {
+      setContent(prev => prev + prefix + suffix);
+      return;
+    }
+
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const selected = content.substring(start, end);
+    const replacement = prefix + selected + suffix;
+    const newContent = content.substring(0, start) + replacement + content.substring(end);
+    setContent(newContent);
+
+    setTimeout(() => {
+      el.focus();
+      const cursorTarget = start + prefix.length + selected.length;
+      el.setSelectionRange(cursorTarget, cursorTarget);
+    }, 0);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !excerpt.trim() || !content.trim()) return;
+
+    const cleanRedirect = redirectUrl.trim() ? normalizeUrl(redirectUrl.trim()) : '';
 
     const newBlog: BlogPost = {
       id: `blog-${Date.now()}`,
@@ -36,23 +79,26 @@ export const AdminNewBlogModal: React.FC<AdminNewBlogModalProps> = ({
       excerpt: excerpt.trim(),
       content: content.trim(),
       author: 'Forum Admin',
-      authorAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80'
+      authorAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
+      redirectUrl: cleanRedirect
     };
 
     onAddBlog(newBlog);
     setTitle('');
+    setRedirectUrl('');
     setExcerpt('');
     setContent('');
+    setBodyTab('write');
     onClose();
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto">
-      <div className="relative w-full max-w-xl bg-white rounded-xl border border-slate-200 shadow-xl text-slate-800 overflow-hidden my-6">
+      <div className="relative w-full max-w-2xl bg-white rounded-xl border border-slate-200 shadow-xl text-slate-800 overflow-hidden my-6 max-h-[92vh] flex flex-col">
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/50">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/50 shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-lg bg-slate-100 text-slate-700 border border-slate-200">
+            <div className="p-2 rounded-lg bg-teal-50 text-teal-700 border border-teal-200">
               <BookOpen className="w-4 h-4" />
             </div>
             <div>
@@ -74,7 +120,7 @@ export const AdminNewBlogModal: React.FC<AdminNewBlogModalProps> = ({
         </div>
 
         {/* Modal Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1.5">
               Article Title <span className="text-rose-500">*</span>
@@ -85,7 +131,7 @@ export const AdminNewBlogModal: React.FC<AdminNewBlogModalProps> = ({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Architecting Distributed Redis Cache Leases for High-Traffic Support"
-              className="w-full px-3 py-2 text-xs rounded-lg bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition-colors shadow-2xs"
+              className="w-full px-3 py-2 text-xs rounded-lg bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-teal-600 focus:border-teal-600 transition-colors shadow-2xs"
             />
           </div>
 
@@ -97,13 +143,14 @@ export const AdminNewBlogModal: React.FC<AdminNewBlogModalProps> = ({
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-lg bg-white border border-slate-300 text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition-colors shadow-2xs"
+                className="w-full px-3 py-2 text-xs rounded-lg bg-white border border-slate-300 text-slate-900 focus:outline-none focus:ring-1 focus:ring-teal-600 focus:border-teal-600 transition-colors shadow-2xs"
               >
                 <option value="Architecture">Architecture</option>
                 <option value="Design">Design & UI</option>
                 <option value="DevOps">DevOps & Scale</option>
                 <option value="Performance">Performance</option>
                 <option value="Security">Security</option>
+                <option value="Tutorial">Tutorial & Guides</option>
               </select>
             </div>
 
@@ -116,9 +163,42 @@ export const AdminNewBlogModal: React.FC<AdminNewBlogModalProps> = ({
                 value={imageUrl}
                 onChange={(e) => setImageUrl(e.target.value)}
                 placeholder="https://images.unsplash.com/..."
-                className="w-full px-3 py-2 text-xs rounded-lg bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition-colors shadow-2xs"
+                className="w-full px-3 py-2 text-xs rounded-lg bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-teal-600 focus:border-teal-600 transition-colors shadow-2xs"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1.5 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <ExternalLink className="w-3.5 h-3.5 text-teal-600" />
+                <span>Redirect Link / External URL (Optional)</span>
+              </span>
+              <span className="text-[10px] text-slate-400 font-normal">Directly opens link when clicked</span>
+            </label>
+            <div className="relative">
+              <input
+                type="url"
+                value={redirectUrl}
+                onChange={(e) => setRedirectUrl(e.target.value)}
+                placeholder="e.g. https://b2bfiy.me or https://www.trekconsultancy.com/resource"
+                className="w-full px-3 py-2 pr-24 text-xs rounded-lg bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-teal-600 focus:border-teal-600 transition-colors shadow-2xs"
+              />
+              {redirectUrl.trim() && (
+                <button
+                  type="button"
+                  onClick={() => setRedirectUrl('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded text-[11px] font-medium bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200 transition-colors cursor-pointer flex items-center gap-1"
+                  title="Remove external redirect link"
+                >
+                  <X className="w-3 h-3" />
+                  <span>Remove Link</span>
+                </button>
+              )}
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1">
+              If added, readers clicking this article will redirect directly to this link.
+            </p>
           </div>
 
           <div>
@@ -131,22 +211,208 @@ export const AdminNewBlogModal: React.FC<AdminNewBlogModalProps> = ({
               value={excerpt}
               onChange={(e) => setExcerpt(e.target.value)}
               placeholder="Brief summary displayed on article preview cards..."
-              className="w-full px-3 py-2 text-xs rounded-lg bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition-colors shadow-2xs resize-y"
+              className="w-full px-3 py-2 text-xs rounded-lg bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-teal-600 focus:border-teal-600 transition-colors shadow-2xs resize-y"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1.5">
-              Full Article Body <span className="text-rose-500">*</span>
-            </label>
-            <textarea
-              rows={5}
-              required
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="Write the full technical content, architectural recommendations, and code snippets..."
-              className="w-full px-3 py-2 text-xs rounded-lg bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition-colors shadow-2xs resize-y font-mono text-[11px]"
-            />
+            {/* Header for Body editor with Write / Preview Tabs & Format Toolbar */}
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+              <label className="text-xs font-medium text-slate-700">
+                Full Article Body <span className="text-rose-500">*</span>
+              </label>
+
+              <div className="flex items-center gap-1 border border-slate-200 rounded-lg p-0.5 bg-slate-50">
+                <button
+                  type="button"
+                  onClick={() => setBodyTab('write')}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer ${
+                    bodyTab === 'write'
+                      ? 'bg-white text-slate-900 shadow-2xs border border-slate-200/80'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <Edit3 className="w-3 h-3" />
+                  <span>Write</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBodyTab('preview')}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer ${
+                    bodyTab === 'preview'
+                      ? 'bg-white text-teal-700 shadow-2xs border border-teal-200/80'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <Eye className="w-3 h-3" />
+                  <span>Preview</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Markdown Toolbar (visible in write tab) */}
+            {bodyTab === 'write' && (
+              <div className="flex flex-wrap items-center gap-1 p-1 mb-1.5 bg-slate-50 rounded-lg border border-slate-200/80 text-slate-600">
+                <button
+                  type="button"
+                  onClick={() => handleInsertFormat('**', '**')}
+                  title="Bold (**text**)"
+                  className="p-1 hover:bg-slate-200/80 rounded transition-colors text-xs font-bold"
+                >
+                  <Bold className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleInsertFormat('*', '*')}
+                  title="Italic (*text*)"
+                  className="p-1 hover:bg-slate-200/80 rounded transition-colors text-xs italic"
+                >
+                  <Italic className="w-3.5 h-3.5" />
+                </button>
+                <span className="w-px h-3.5 bg-slate-300 mx-0.5" />
+                <button
+                  type="button"
+                  onClick={() => handleInsertFormat('\n## ')}
+                  title="Heading 2 (## Title)"
+                  className="p-1 hover:bg-slate-200/80 rounded transition-colors text-xs"
+                >
+                  <Heading2 className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleInsertFormat('\n### ')}
+                  title="Heading 3 (### Title)"
+                  className="p-1 hover:bg-slate-200/80 rounded transition-colors text-xs"
+                >
+                  <Heading3 className="w-3.5 h-3.5" />
+                </button>
+                <span className="w-px h-3.5 bg-slate-300 mx-0.5" />
+                <button
+                  type="button"
+                  onClick={() => handleInsertFormat('\n- ')}
+                  title="Bullet List (- Item)"
+                  className="p-1 hover:bg-slate-200/80 rounded transition-colors text-xs"
+                >
+                  <List className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleInsertFormat('\n1. ')}
+                  title="Numbered List (1. Item)"
+                  className="p-1 hover:bg-slate-200/80 rounded transition-colors text-xs"
+                >
+                  <ListOrdered className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleInsertFormat('\n> ')}
+                  title="Quote (> Quote)"
+                  className="p-1 hover:bg-slate-200/80 rounded transition-colors text-xs"
+                >
+                  <Quote className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleInsertFormat('```\n', '\n```')}
+                  title="Code Block"
+                  className="p-1 hover:bg-slate-200/80 rounded transition-colors text-xs"
+                >
+                  <Code className="w-3.5 h-3.5" />
+                </button>
+                <span className="ml-auto text-[10px] text-slate-400 pr-1">
+                  Supports Markdown & Linebreaks
+                </span>
+              </div>
+            )}
+
+            {bodyTab === 'write' ? (
+              <textarea
+                ref={textareaRef}
+                rows={11}
+                required
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="Write the full technical content, architectural recommendations, and code snippets..."
+                className="w-full px-3 py-2 text-xs rounded-lg bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-teal-600 focus:border-teal-600 transition-colors shadow-2xs resize-y font-mono leading-relaxed"
+              />
+            ) : (
+              <div className="w-full min-h-[220px] max-h-[350px] overflow-y-auto px-4 py-3 rounded-lg bg-slate-50/60 border border-slate-200 text-slate-800 text-xs">
+                {content.trim() ? (
+                  <div className="space-y-3 leading-relaxed">
+                    <Markdown
+                      components={{
+                        h1: ({ children }) => (
+                          <h1 className="text-base font-bold text-slate-900 mt-3 mb-1.5 pb-1 border-b border-slate-200 font-heading">
+                            {children}
+                          </h1>
+                        ),
+                        h2: ({ children }) => (
+                          <h2 className="text-sm font-bold text-slate-900 mt-2.5 mb-1 pb-0.5 border-b border-slate-200 font-heading">
+                            {children}
+                          </h2>
+                        ),
+                        h3: ({ children }) => (
+                          <h3 className="text-xs font-semibold text-slate-900 mt-2 mb-0.5 font-heading">
+                            {children}
+                          </h3>
+                        ),
+                        p: ({ children }) => (
+                          <p className="mb-2.5 text-slate-700 leading-relaxed whitespace-pre-line text-xs last:mb-0">
+                            {children}
+                          </p>
+                        ),
+                        strong: ({ children }) => (
+                          <strong className="font-bold text-slate-900">{children}</strong>
+                        ),
+                        em: ({ children }) => (
+                          <em className="italic text-slate-800">{children}</em>
+                        ),
+                        ul: ({ children }) => (
+                          <ul className="list-disc pl-4 space-y-1 my-2 text-slate-700 text-xs">
+                            {children}
+                          </ul>
+                        ),
+                        ol: ({ children }) => (
+                          <ol className="list-decimal pl-4 space-y-1 my-2 text-slate-700 text-xs">
+                            {children}
+                          </ol>
+                        ),
+                        li: ({ children }) => (
+                          <li className="leading-relaxed text-slate-700 pl-0.5 my-0.5">
+                            {children}
+                          </li>
+                        ),
+                        blockquote: ({ children }) => (
+                          <blockquote className="border-l-3 border-teal-500 pl-3 py-1 my-2 bg-teal-50/50 rounded-r text-slate-700 italic text-xs">
+                            {children}
+                          </blockquote>
+                        ),
+                        code: ({ inline, className, children, ...props }: any) => {
+                          if (inline) {
+                            return (
+                              <code className="px-1.5 py-0.5 rounded bg-slate-200 text-teal-800 font-mono text-[11px] font-medium">
+                                {children}
+                              </code>
+                            );
+                          }
+                          return (
+                            <div className="my-2 rounded bg-slate-900 text-teal-300 p-2.5 font-mono text-[11px] overflow-x-auto whitespace-pre leading-relaxed">
+                              <code>{children}</code>
+                            </div>
+                          );
+                        }
+                      }}
+                    >
+                      {content}
+                    </Markdown>
+                  </div>
+                ) : (
+                  <p className="text-slate-400 italic text-center py-8">
+                    No article body content to preview. Switch to the Write tab to enter text.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Footer Actions */}
@@ -160,7 +426,7 @@ export const AdminNewBlogModal: React.FC<AdminNewBlogModalProps> = ({
             </button>
             <button
               type="submit"
-              className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium cursor-pointer transition-colors shadow-xs"
+              className="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-medium cursor-pointer transition-colors shadow-xs"
             >
               Publish Article
             </button>

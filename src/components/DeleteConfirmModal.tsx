@@ -61,7 +61,7 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
         <button
           onClick={onClose}
           disabled={isLoading}
-          className="absolute top-4 right-4 sm:top-5 sm:right-5 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 disabled:opacity-50 transition-colors cursor-pointer"
+          className="absolute top-4 right-4 sm:top-5 sm:right-5 rtl:right-auto rtl:left-4 sm:rtl:left-5 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 disabled:opacity-50 transition-colors cursor-pointer"
           aria-label="Close dialog"
         >
           <X className="w-5 h-5" />
@@ -73,7 +73,7 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
             <Trash2 className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
 
-          <div className="flex-1 pr-6">
+          <div className="flex-1 pr-6 rtl:pr-0 rtl:pl-6">
             <h3 id="delete-dialog-title" className="text-base sm:text-lg font-bold text-slate-900 font-heading tracking-tight">
               {displayTitle}
             </h3>
@@ -87,14 +87,14 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
         {itemTitle && (
           <div className="mt-4 p-3 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs text-slate-700 font-medium line-clamp-2">
             <span className="text-[11px] text-slate-400 block mb-0.5 uppercase tracking-wider font-bold">
-              {t('Target Post', 'পোস্ট')}
+              {t('Target Post', 'পোস্ট', 'المنشور المستهدف')}
             </span>
             "{itemTitle}"
           </div>
         )}
 
         {/* Action Buttons */}
-        <div className="mt-6 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2.5 sm:gap-3 pt-4 border-t border-slate-100">
+        <div className="mt-6 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end rtl:justify-start gap-2.5 sm:gap-3 pt-4 border-t border-slate-100">
           <button
             type="button"
             onClick={onClose}
@@ -113,7 +113,7 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
             {isLoading ? (
               <>
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span>{t('Deleting...', 'মুছে ফেলা হচ্ছে...')}</span>
+                <span>{t('Deleting...', 'মুছে ফেলা হচ্ছে...', 'جاري الحذف...')}</span>
               </>
             ) : (
               <>

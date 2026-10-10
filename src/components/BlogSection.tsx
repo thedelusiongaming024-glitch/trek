@@ -1,7 +1,8 @@
 import React from 'react';
-import { Calendar, Tag, ArrowUpRight, Heart, MessageSquare, Lock } from 'lucide-react';
+import { Calendar, Tag, ArrowUpRight, Heart, MessageSquare, Lock, ExternalLink } from 'lucide-react';
 import { BlogPost } from '../types';
 import { useLanguage } from '../context/LanguageContext';
+import { normalizeUrl } from '../utils/url';
 
 interface BlogSectionProps {
   posts: BlogPost[];
@@ -20,12 +21,19 @@ export const BlogSection: React.FC<BlogSectionProps> = ({
   currentUser,
   onRequireAuth
 }) => {
-  const { t, formatNumber, formatTimeAgo, translateCategory } = useLanguage();
+  const { t, formatNumber, formatDate, formatTimeAgo, translateCategory } = useLanguage();
 
   const handleCardClick = (post: BlogPost) => {
+    // If the article has a redirect URL configured by admin, redirect to that link!
+    if (post.redirectUrl && post.redirectUrl.trim()) {
+      const targetUrl = normalizeUrl(post.redirectUrl);
+      window.open(targetUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
     if (!currentUser) {
       if (onRequireAuth) {
-        onRequireAuth('To participate in blog activities and read full articles, you must have an account and be logged in. Please sign in or create an account.');
+        onRequireAuth(t('To participate in blog activities and read full articles, you must have an account and be logged in. Please sign in or create an account.'));
       }
       return;
     }
@@ -81,20 +89,25 @@ export const BlogSection: React.FC<BlogSectionProps> = ({
                 <div className="absolute inset-0 bg-gradient-to-t from-white/60 via-transparent to-transparent opacity-70" />
                 
                 {/* Blog Activity Metrics Badge */}
-                <div className="absolute bottom-3 right-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900/65 backdrop-blur-md text-white text-[11px] font-medium shadow-xs">
+                <div className="absolute bottom-3 right-3 rtl:right-auto rtl:left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900/65 backdrop-blur-md text-white text-[11px] font-medium shadow-xs">
                   <span className="flex items-center gap-1">
                     <Heart className="w-3 h-3 text-rose-400 fill-rose-400" />
-                    <span>{post.likes || 0}</span>
+                    <span>{formatNumber(post.likes || 0)}</span>
                   </span>
                   <span>•</span>
                   <span className="flex items-center gap-1">
                     <MessageSquare className="w-3 h-3 text-teal-300" />
-                    <span>{post.commentsCount || 0}</span>
+                    <span>{formatNumber(post.commentsCount || 0)}</span>
                   </span>
                 </div>
 
-                {!currentUser && (
-                  <div className="absolute top-3 left-3 flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-900/75 backdrop-blur-md text-amber-300 text-[10px] font-semibold border border-amber-400/30 shadow-xs">
+                {post.redirectUrl ? (
+                  <div className="absolute top-3 left-3 rtl:left-auto rtl:right-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-900/80 backdrop-blur-md text-teal-200 text-[10px] font-semibold border border-teal-400/30 shadow-xs">
+                    <ExternalLink className="w-2.5 h-2.5 text-teal-300" />
+                    <span>{t('External Article', 'বহিঃসংযোগ নিবন্ধ', 'مقال خارجي')}</span>
+                  </div>
+                ) : !currentUser && (
+                  <div className="absolute top-3 left-3 rtl:left-auto rtl:right-3 flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-900/75 backdrop-blur-md text-amber-300 text-[10px] font-semibold border border-amber-400/30 shadow-xs">
                     <Lock className="w-2.5 h-2.5" />
                     <span>{t('Login to Read & React')}</span>
                   </div>
@@ -108,7 +121,7 @@ export const BlogSection: React.FC<BlogSectionProps> = ({
                   <div className="flex items-center gap-3 text-xs text-slate-500 mb-3">
                     <span className="flex items-center gap-1.5">
                       <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                      <span>{post.date}</span>
+                      <span>{formatDate(post.date)}</span>
                     </span>
                     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/25 text-teal-700 font-medium">
                       <Tag className="w-3 h-3" />
@@ -140,12 +153,15 @@ export const BlogSection: React.FC<BlogSectionProps> = ({
                       <h5 className="text-xs font-semibold text-slate-800">
                         {post.author}
                       </h5>
-                      <p className="text-[11px] text-slate-400">{post.date}</p>
+                      <p className="text-[11px] text-slate-400">{formatDate(post.date)}</p>
                     </div>
                   </div>
 
-                  <span className="p-2 rounded-full bg-white/80 text-slate-600 group-hover:bg-[#00a8b5] group-hover:text-white transition-all shadow-xs">
-                    <ArrowUpRight className="w-3.5 h-3.5" />
+                  <span
+                    className="p-2 rounded-full bg-white/80 text-slate-600 group-hover:bg-[#00a8b5] group-hover:text-white transition-all shadow-xs"
+                    title={post.redirectUrl ? t('Open link in new tab', 'নতুন ট্যাবে লিঙ্ক খুলুন', 'فتح الرابط في علامة تبويب جديدة') : undefined}
+                  >
+                    {post.redirectUrl ? <ExternalLink className="w-3.5 h-3.5" /> : <ArrowUpRight className="w-3.5 h-3.5 rtl:-scale-x-100" />}
                   </span>
                 </div>
               </div>

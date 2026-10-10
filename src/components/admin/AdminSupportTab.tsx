@@ -24,7 +24,9 @@ import {
   ShieldCheck,
   Check,
   ChevronRight,
-  ChevronDown
+  ChevronDown,
+  Zap,
+  Sparkles
 } from 'lucide-react';
 import { SupportTicket, FAQItem, FAQCategory, SupportChatSession, PlatformSettings } from '../../types';
 import { AdminKnowledgeChunksTab } from './AdminKnowledgeChunksTab';
@@ -166,7 +168,11 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
           setSelectedTicket(updated);
         }
         setAdminReplyText('');
-        showNotification(`Ticket #${updated.ticketNumber} updated successfully!`);
+        showNotification(
+          replyContent
+            ? `Ticket #${updated.ticketNumber} answered! Solution synchronized to AI Support Assistant.`
+            : `Ticket #${updated.ticketNumber} updated successfully!`
+        );
       }
     } catch (err) {
       console.error('Failed to update ticket:', err);
@@ -266,8 +272,7 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: staffReplyText.trim(),
-          staffName: 'Alex Ross (Specialist)'
+          message: staffReplyText.trim()
         })
       });
       if (res.ok) {
@@ -522,6 +527,11 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
                             <span className="font-mono text-[11px] font-semibold text-teal-700 bg-teal-50 border border-teal-200/80 px-1.5 py-0.2 rounded">
                               #{t.ticketNumber}
                             </span>
+                            {t.subject?.includes('[Auto-Flagged VIP Lead]') && (
+                              <span className="text-[10px] px-1.5 py-0.2 rounded font-semibold tracking-wide bg-amber-50 text-amber-800 border border-amber-300 flex items-center gap-1">
+                                <Zap className="w-3 h-3 text-amber-600" /> Auto-Flagged VIP
+                              </span>
+                            )}
                             <span className={`text-[10px] px-1.5 py-0.2 rounded font-medium uppercase tracking-wider ${
                               t.priority === 'Critical'
                                 ? 'bg-rose-50 text-rose-700 border border-rose-200'
@@ -598,6 +608,16 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
                   </button>
                 </div>
 
+                {/* VIP Auto-Flag Notification Banner */}
+                {selectedTicket.subject?.includes('[Auto-Flagged VIP Lead]') && (
+                  <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-950 text-xs flex items-start gap-2">
+                    <Zap className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-semibold text-amber-900">AI Secret Escalation:</span> This client expressed high commercial intent or requested direct phone/WhatsApp advisory. The AI assistant has handled them with VIP care—review details below to follow up!
+                    </div>
+                  </div>
+                )}
+
                 {/* Question Body */}
                 <div className="p-3 rounded-lg bg-slate-50 border border-slate-200/80 space-y-1">
                   <div className="flex items-center justify-between text-[11px] font-semibold text-slate-600 uppercase tracking-wider">
@@ -624,6 +644,10 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
                     <p className="text-xs text-slate-800 whitespace-pre-wrap leading-normal">
                       {selectedTicket.adminAnswer}
                     </p>
+                    <div className="pt-1.5 flex items-center gap-1.5 text-[10px] text-teal-700">
+                      <Sparkles className="w-3 h-3 text-teal-600 shrink-0" />
+                      <span className="font-medium">Active in 24/7 AI Support Knowledge Base (RAG Real-Time Sync)</span>
+                    </div>
                   </div>
                 )}
 
@@ -800,6 +824,7 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
               <div className="space-y-2">
                 {conversations.map(c => {
                   const isActive = activeSessionId === c.sessionId;
+                  const isFlaggedLead = tickets.some(t => t.sessionId === c.sessionId && t.subject?.includes('[Auto-Flagged VIP Lead]'));
                   return (
                     <div
                       key={c.sessionId}
@@ -811,10 +836,33 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
                       }`}
                     >
                       <div className="flex items-center justify-between text-xs">
-                        <span className="font-mono font-medium text-slate-800 truncate max-w-[150px]">
-                          {c.sessionId}
-                        </span>
-                        <span className="text-[10px] text-slate-400 font-mono">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          {c.isGuest === false && c.userEmail ? (
+                            <>
+                              <span className="font-semibold text-slate-900 truncate max-w-[130px]" title={c.userEmail}>
+                                {c.userName || c.userEmail}
+                              </span>
+                              <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wider bg-teal-100 text-teal-800 border border-teal-200 shrink-0">
+                                User
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="font-mono font-medium text-slate-700 truncate max-w-[130px]">
+                                {c.sessionId}
+                              </span>
+                              <span className="px-1.5 py-0.2 rounded text-[9px] font-medium uppercase tracking-wider bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
+                                Guest
+                              </span>
+                            </>
+                          )}
+                          {isFlaggedLead && (
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-0.5 shrink-0">
+                              <Zap className="w-2.5 h-2.5 text-amber-600" /> VIP
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-mono shrink-0">
                           {new Date(c.lastActive).toLocaleTimeString()}
                         </span>
                       </div>
@@ -840,7 +888,18 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
                 <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                   <div>
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-700">Transcript</span>
-                    <h3 className="text-xs font-mono font-semibold text-slate-900">Session: {activeSessionId}</h3>
+                    <h3 className="text-xs font-mono font-semibold text-slate-900 flex items-center gap-2">
+                      <span>Session: {activeSessionId}</span>
+                      {conversations.find(c => c.sessionId === activeSessionId)?.userEmail ? (
+                        <span className="text-teal-700 font-sans font-medium text-[11px]">
+                          ({conversations.find(c => c.sessionId === activeSessionId)?.userName ? `${conversations.find(c => c.sessionId === activeSessionId)?.userName} - ` : ''}{conversations.find(c => c.sessionId === activeSessionId)?.userEmail})
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 font-sans text-[11px]">
+                          (Guest Visitor)
+                        </span>
+                      )}
+                    </h3>
                   </div>
                   <span className="px-2 py-0.5 rounded text-emerald-800 bg-emerald-50 border border-emerald-200 text-[10px] font-medium font-mono">
                     Connected
@@ -871,11 +930,11 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
                             ? 'bg-amber-50 border border-amber-200 text-amber-950'
                             : 'bg-slate-100 text-slate-800'
                         }`}>
-                          <p className="whitespace-pre-wrap">{m.message}</p>
+                          <p className="whitespace-pre-wrap">{(m.message || m.content || '').replace(/^\[[^\]]+\]:\s*/, '')}</p>
                           <div className={`text-[9px] mt-1 flex items-center justify-between gap-2 font-mono ${
                             isUser ? 'text-teal-100' : 'text-slate-400'
                           }`}>
-                            <span>{m.source || (isUser ? 'USER' : 'AI')}</span>
+                            <span>{isStaff ? 'EXECUTIVE SENIOR' : (m.source || (isUser ? 'USER' : 'AI'))}</span>
                             <span>{m.createdAt ? new Date(m.createdAt).toLocaleTimeString() : ''}</span>
                           </div>
                         </div>
@@ -887,7 +946,7 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
                 {/* Staff intervention reply box */}
                 <div className="pt-2 border-t border-slate-100 space-y-1.5">
                   <label className="block text-[11px] font-semibold text-slate-700">
-                    Live Specialist Message:
+                    Executive Senior Direct Message:
                   </label>
                   <div className="flex items-center gap-2">
                     <input
@@ -895,7 +954,7 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
                       value={staffReplyText}
                       onChange={(e) => setStaffReplyText(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleSendStaffReply()}
-                      placeholder="Type staff response to visitor..."
+                      placeholder="Type executive senior response to customer..."
                       className="flex-1 px-3 py-1.5 text-xs rounded-lg bg-slate-50 border border-slate-200 focus:bg-white focus:border-teal-600 focus:ring-1 focus:ring-teal-600/30 focus:outline-none text-slate-800"
                     />
                     <button

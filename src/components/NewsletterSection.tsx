@@ -27,7 +27,7 @@ export const NewsletterSection: React.FC<NewsletterSectionProps> = ({
     const targetEmail = (email || currentUser?.email || '').trim();
     if (!targetEmail || !targetEmail.includes('@')) {
       setStatus('error');
-      setMessage('Please enter a valid email address.');
+      setMessage(t('Please enter a valid email address.'));
       return;
     }
 
@@ -42,21 +42,20 @@ export const NewsletterSection: React.FC<NewsletterSectionProps> = ({
       if (res.ok) {
         setStatus('success');
         setMessage(
-          data.message ||
-          (currentUser?.name
-            ? `Thank you ${currentUser.name}! You are now subscribed to our weekly digest.`
-            : 'Thank you! You are now subscribed to our weekly digest.')
+          data.message
+            ? t(data.message)
+            : t('Thank you! You are now subscribed to our weekly digest.')
         );
         if (!currentUser?.email) {
           setEmail('');
         }
       } else {
         setStatus('error');
-        setMessage(data.error || 'Subscription failed. Please try again.');
+        setMessage(t(data.error || 'Subscription failed. Please try again.'));
       }
     } catch {
       setStatus('error');
-      setMessage('Network error. Please try again later.');
+      setMessage(t('Network error. Please try again later.'));
     }
   };
 

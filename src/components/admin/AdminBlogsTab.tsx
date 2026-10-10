@@ -6,24 +6,31 @@ import {
   Eye, 
   Calendar, 
   Tag, 
-  Search
+  Search,
+  Pencil,
+  ExternalLink
 } from 'lucide-react';
 import { BlogPost } from '../../types';
+import { normalizeUrl } from '../../utils/url';
+import { AdminEditBlogModal } from './AdminEditBlogModal';
 
 interface AdminBlogsTabProps {
   blogs: BlogPost[];
   onDeleteBlog: (id: string) => void;
   onOpenNewBlogModal: () => void;
   onViewBlog: (blog: BlogPost) => void;
+  onUpdateBlog?: (blog: BlogPost) => Promise<void> | void;
 }
 
 export const AdminBlogsTab: React.FC<AdminBlogsTabProps> = ({
   blogs,
   onDeleteBlog,
   onOpenNewBlogModal,
-  onViewBlog
+  onViewBlog,
+  onUpdateBlog
 }) => {
   const [search, setSearch] = useState('');
+  const [blogToEdit, setBlogToEdit] = useState<BlogPost | null>(null);
 
   const filteredBlogs = blogs.filter(b => 
     b.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -85,6 +92,15 @@ export const AdminBlogsTab: React.FC<AdminBlogsTabProps> = ({
                 <span className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded text-[10px] font-medium bg-white/95 text-slate-800 border border-slate-200/60 shadow-2xs">
                   {blog.category}
                 </span>
+                {blog.redirectUrl && (
+                  <span
+                    title={`Redirects to: ${blog.redirectUrl}`}
+                    className="absolute top-2.5 right-2.5 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-teal-600/90 text-white shadow-2xs backdrop-blur-xs"
+                  >
+                    <ExternalLink className="w-2.5 h-2.5" />
+                    <span>Redirect Link</span>
+                  </span>
+                )}
               </div>
 
               {/* Body */}
@@ -108,25 +124,63 @@ export const AdminBlogsTab: React.FC<AdminBlogsTabProps> = ({
 
             {/* Footer Actions */}
             <div className="px-4 pb-4 pt-2 flex items-center justify-between border-t border-slate-100">
-              <button
-                onClick={() => onViewBlog(blog)}
-                className="inline-flex items-center gap-1.5 text-xs font-medium text-teal-600 hover:text-teal-700 transition-colors cursor-pointer"
-              >
-                <Eye className="w-3.5 h-3.5" />
-                Read Article
-              </button>
+              <div className="flex items-center gap-2.5">
+                <button
+                  onClick={() => onViewBlog(blog)}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-teal-600 hover:text-teal-700 transition-colors cursor-pointer"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  Read Article
+                </button>
 
-              <button
-                onClick={() => onDeleteBlog(blog.id)}
-                title="Delete article"
-                className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+                {blog.redirectUrl && (
+                  <a
+                    href={normalizeUrl(blog.redirectUrl)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={`Open redirect link: ${blog.redirectUrl}`}
+                    className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-teal-700 transition-colors"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    <span className="hidden sm:inline">Link</span>
+                  </a>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setBlogToEdit(blog)}
+                  title="Edit article"
+                  className="p-1.5 rounded-md text-slate-400 hover:text-teal-600 hover:bg-teal-50 transition-colors cursor-pointer"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+
+                <button
+                  onClick={() => onDeleteBlog(blog.id)}
+                  title="Delete article"
+                  className="p-1.5 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
           </div>
         ))}
       </div>
+
+      {/* Edit Blog Modal */}
+      <AdminEditBlogModal
+        isOpen={Boolean(blogToEdit)}
+        blog={blogToEdit}
+        onClose={() => setBlogToEdit(null)}
+        onUpdateBlog={async (updatedBlog) => {
+          if (onUpdateBlog) {
+            await onUpdateBlog(updatedBlog);
+          }
+          setBlogToEdit(null);
+        }}
+      />
     </div>
   );
 };

@@ -4,6 +4,7 @@ export interface ForumReply {
   authorRole?: string;
   authorAvatar: string;
   timeAgo: string;
+  createdAt?: string;
   content: string;
   likes: number;
   isLiked?: boolean;
@@ -33,6 +34,7 @@ export interface ForumTopic {
   authorRole?: string;
   authorAvatar: string;
   timeAgo: string;
+  createdAt?: string;
   category: string;
   categorySlug: string;
   views: number;
@@ -50,6 +52,7 @@ export interface RecentTopic {
   title: string;
   author: string;
   timeAgo: string;
+  createdAt?: string;
 }
 
 export interface RecentReply {
@@ -57,6 +60,7 @@ export interface RecentReply {
   author: string;
   topicTitle: string;
   timeAgo: string;
+  createdAt?: string;
 }
 
 export interface BlogComment {
@@ -68,6 +72,7 @@ export interface BlogComment {
   timeAgo: string;
   content: string;
   likes?: number;
+  createdAt?: string;
 }
 
 export interface BlogPost {
@@ -80,6 +85,7 @@ export interface BlogPost {
   content: string;
   author: string;
   authorAvatar: string;
+  redirectUrl?: string;
   likes?: number;
   isLiked?: boolean;
   commentsCount?: number;
@@ -88,7 +94,33 @@ export interface BlogPost {
 
 export type FilterCategory = 'all' | 'popular' | 'featured' | 'recent' | 'unloved' | 'loved';
 
-export type AdminTab = 'overview' | 'topics' | 'consultancy' | 'blogs' | 'users' | 'hero' | 'settings' | 'support';
+export type AdminTab = 'overview' | 'customers' | 'hero' | 'topics' | 'support' | 'blogs' | 'users' | 'ai' | 'seo' | 'settings';
+
+export interface SEOSettings {
+  metaTitle: string;
+  titleSeparator: string;
+  metaDescription: string;
+  metaKeywords: string;
+  canonicalUrl: string;
+  siteName: string;
+  robotsIndex: boolean;
+  robotsFollow: boolean;
+  ogTitle: string;
+  ogDescription: string;
+  ogImage: string;
+  ogType: string;
+  twitterCard: 'summary_large_image' | 'summary';
+  twitterSite: string;
+  twitterCreator: string;
+  googleSiteVerification: string;
+  bingSiteVerification: string;
+  organizationName: string;
+  organizationLogo: string;
+  contactEmail: string;
+  contactPhone: string;
+  customHeadTags?: string;
+  updatedAt?: string;
+}
 
 export interface HeroSlideImage {
   id: string;
@@ -112,18 +144,6 @@ export interface HeroSettings {
   heroHeight?: 'standard' | 'tall' | 'cinematic' | 'fullscreen';
 }
 
-export interface ConsultancyInquiry {
-  id: string;
-  company: string;
-  email: string;
-  scope: string;
-  date: string;
-  status: 'new' | 'reviewing' | 'contacted' | 'resolved';
-  priority: 'normal' | 'high' | 'urgent';
-  assignedTo?: string;
-  notes?: string;
-}
-
 export interface AdminUser {
   id: string;
   name: string;
@@ -141,7 +161,7 @@ export interface ActivityLog {
   actor: string;
   target: string;
   timeAgo: string;
-  type: 'topic' | 'reply' | 'consultancy' | 'user' | 'system' | 'blog' | 'setting' | 'support';
+  type: 'topic' | 'reply' | 'user' | 'system' | 'blog' | 'setting' | 'support';
 }
 
 export interface SupportTicket {
@@ -182,10 +202,17 @@ export interface FAQItem {
 
 export interface SupportChatSession {
   sessionId: string;
+  userId?: string;
+  userEmail?: string;
+  userName?: string;
+  title?: string;
+  isGuest?: boolean;
+  status?: string;
   lastMessage: string;
   lastSender: string;
   messageCount: number;
   lastActive: string;
+  createdAt?: string;
 }
 
 export interface PlatformSettings {
@@ -206,6 +233,7 @@ export interface PlatformSettings {
   floatingSupportDefaultPriority?: 'Normal' | 'Urgent' | 'Critical';
   floatingSupportMessengerTheme?: string;
   hero?: HeroSettings;
+  seo?: SEOSettings;
 }
 
 export interface KnowledgeDocument {
@@ -227,4 +255,120 @@ export interface AIKnowledgeStatus {
   lastSyncedAt: string;
   liveSyncStatus: 'ACTIVE' | 'SYNCING' | 'READY';
   models: string[];
+  activeModel?: string;
+  isKeyConfigured?: boolean;
 }
+
+export type AiProvider = 'gemini' | 'openai';
+
+export interface AiModelOption {
+  id: string;
+  name: string;
+  provider?: AiProvider;
+  tagline: string;
+  speed: string;
+  intelligence: string;
+  contextWindow: string;
+  badge?: string;
+  badgeColor?: string;
+  capabilities: string[];
+  description?: string;
+}
+
+export interface AiSettingsConfig {
+  apiKey?: string;
+  apiKeyMasked?: string;
+  isKeyConfigured?: boolean;
+  hasCustomKey?: boolean;
+  usingEnvKey?: boolean;
+  provider?: AiProvider;
+  baseUrl?: string;
+  providerApiKeys?: Partial<Record<AiProvider, string>>;
+  selectedModel: string;
+  fallbackModels: string[];
+  temperature: number;
+  maxOutputTokens: number;
+  customSystemInstruction?: string;
+  status: 'active' | 'disabled' | 'fallback_only';
+  lastTestedAt?: string;
+  lastTestStatus?: 'success' | 'failed' | 'untested';
+  lastTestMessage?: string;
+  lastTestLatencyMs?: number;
+  updatedAt?: string;
+  availableModels?: AiModelOption[];
+}
+
+export const isAdministrativeRole = (role?: string | null): boolean => {
+  if (!role) return false;
+  const r = role.trim().toLowerCase();
+  return (
+    r === 'super admin' ||
+    r === 'admin' ||
+    r === 'administrator' ||
+    r === 'moderator' ||
+    r === 'support specialist' ||
+    r === 'community lead' ||
+    r.includes('admin')
+  );
+};
+
+export interface Customer {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  whatsapp?: string;
+  role: string;
+  status: 'active' | 'inactive' | 'lead';
+  avatar: string;
+  joinedDate: string;
+  createdAt?: string;
+  lastActive?: string;
+  threadsCount: number;
+  conversationsCount: number;
+  messagesCount: number;
+  isRegistered: boolean;
+  latestMessageSnippet?: string;
+  sessionIds?: string[];
+}
+
+export interface CustomerConversationMessage {
+  id: string;
+  conversationId: string;
+  sessionId?: string;
+  role: 'user' | 'assistant' | 'system';
+  sender: 'user' | 'bot' | 'staff' | string;
+  content: string;
+  message?: string;
+  source: 'AI' | 'USER' | 'STAFF' | string;
+  createdAt: string;
+}
+
+export interface CustomerConversationSession {
+  id: string;
+  sessionId: string;
+  title: string;
+  status: string;
+  isGuest: boolean;
+  messageCount: number;
+  lastMessage: string;
+  lastSender: string;
+  createdAt: string;
+  updatedAt: string;
+  messages: CustomerConversationMessage[];
+}
+
+export interface CustomerFullDetail {
+  customer: Customer;
+  conversations: CustomerConversationSession[];
+  allMessages: CustomerConversationMessage[];
+  forumTopics?: {
+    id: string;
+    title: string;
+    category: string;
+    views: number;
+    replies: number;
+    createdAt: string;
+  }[];
+}
+

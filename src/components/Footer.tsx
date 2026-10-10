@@ -9,7 +9,7 @@ interface FooterProps {
 }
 
 export const Footer: React.FC<FooterProps> = () => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   return (
     <footer className="w-full bg-[#1c4447] text-white pt-14 sm:pt-16 pb-10 sm:pb-12 relative overflow-hidden select-none">
       {/* Ambient background glow accents matching Saudi corporate palette */}
@@ -35,8 +35,24 @@ export const Footer: React.FC<FooterProps> = () => {
         <div className="border-t border-white/15 pt-8 flex flex-col md:flex-row items-start md:items-end justify-between gap-6">
           {/* Left Column: Policies & Copyright */}
           <div className="flex flex-col gap-3">
-            {/* Policy Links pointing to official Trek Consultancy pages */}
+            {/* Policy & Company Links pointing to official Trek Consultancy pages */}
             <div className="flex flex-wrap items-center gap-5 sm:gap-7 text-sm font-semibold text-white">
+              <a
+                href="https://www.trekconsultancy.com/about-us/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-teal-200 hover:underline underline-offset-4 transition-colors cursor-pointer"
+              >
+                {t('About Us')}
+              </a>
+              <a
+                href="https://www.trekconsultancy.com/contact/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-teal-200 hover:underline underline-offset-4 transition-colors cursor-pointer"
+              >
+                {t('Contact')}
+              </a>
               <a
                 href="https://www.trekconsultancy.com/privacy-policy/"
                 target="_blank"
@@ -65,7 +81,46 @@ export const Footer: React.FC<FooterProps> = () => {
 
             {/* Copyright */}
             <div className="text-xs sm:text-sm text-white/80 font-normal">
-              {t('© 2023–2026 Trek Consultancy. All Rights Reserved.')}
+              {language === 'bn' ? (
+                <>
+                  © ২০২৩–২০২৬{' '}
+                  <a
+                    href="https://b2bfiy.me"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-white hover:text-teal-200 underline underline-offset-4 decoration-white/40 hover:decoration-teal-200 transition-colors cursor-pointer"
+                  >
+                    B2bfiy
+                  </a>
+                  । সর্বস্বত্ব সংরক্ষিত।
+                </>
+              ) : language === 'ar' ? (
+                <>
+                  © ٢٠٢٣–٢٠٢٦{' '}
+                  <a
+                    href="https://b2bfiy.me"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-white hover:text-teal-200 underline underline-offset-4 decoration-white/40 hover:decoration-teal-200 transition-colors cursor-pointer"
+                  >
+                    B2bfiy
+                  </a>
+                  . جميع الحقوق محفوظة.
+                </>
+              ) : (
+                <>
+                  © 2023–2026{' '}
+                  <a
+                    href="https://b2bfiy.me"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-white hover:text-teal-200 underline underline-offset-4 decoration-white/40 hover:decoration-teal-200 transition-colors cursor-pointer"
+                  >
+                    B2bfiy
+                  </a>
+                  . All Rights Reserved.
+                </>
+              )}
             </div>
           </div>
 
