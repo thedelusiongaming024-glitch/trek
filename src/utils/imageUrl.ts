@@ -100,7 +100,7 @@ export function getAlternativeImageUrl(url?: string | null): string | null {
 /**
  * Default fallback image for hero section slides
  */
-export const DEFAULT_HERO_FALLBACK = 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1920&q=80';
+export const DEFAULT_HERO_FALLBACK = 'https://lh3.googleusercontent.com/d/1FEXdukvgPULuNc4uoTwcHF1EjuW3BG1f';
 
 /**
  * Default fallback image for blog articles

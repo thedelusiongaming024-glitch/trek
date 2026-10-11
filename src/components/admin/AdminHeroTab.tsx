@@ -14,47 +14,12 @@ import {
 } from 'lucide-react';
 import { HeroSettings, HeroSlideImage } from '../../types';
 import { normalizeImageUrl, DEFAULT_HERO_FALLBACK } from '../../utils/imageUrl';
+import { defaultAdminHeroSettings } from '../../utils/heroDefaults';
 
 interface AdminHeroTabProps {
   heroSettings?: HeroSettings;
   onSaveHeroSettings: (settings: HeroSettings) => Promise<void> | void;
 }
-
-export const defaultAdminHeroSettings: HeroSettings = {
-  slides: [
-    {
-      id: 'slide-1',
-      url: 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1920&q=80',
-      title: 'Enterprise Architecture & Cloud Systems',
-      subtitle: 'Designing scalable, mission-critical platforms with modern resilience.',
-      isActive: true
-    },
-    {
-      id: 'slide-2',
-      url: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1920&q=80',
-      title: 'Global Technology Strategy & Community Advisory',
-      subtitle: 'Collaborative problem solving with leading senior engineers.',
-      isActive: true
-    },
-    {
-      id: 'slide-3',
-      url: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=1920&q=80',
-      title: 'Performance Engineering & High-Traffic Optimization',
-      subtitle: 'Turnkey solutions for database scaling, APIs, and microservices.',
-      isActive: true
-    }
-  ],
-  autoplay: true,
-  intervalSeconds: 2,
-  overlayOpacity: 0.65,
-  overlayGradient: 'violet-dark',
-  transitionEffect: 'fade',
-  title: 'Welcome to Trek Consultancy Forum',
-  subtitle: 'The official community forum and support portal for Trek Consultancy',
-  searchPlaceholder: 'Search for Topics, Solutions, & Guides....',
-  enableOverlayMesh: true,
-  heroHeight: 'tall'
-};
 
 export const AdminHeroTab: React.FC<AdminHeroTabProps> = ({
   heroSettings,
@@ -141,6 +106,9 @@ export const AdminHeroTab: React.FC<AdminHeroTabProps> = ({
   const handleResetDefaults = () => {
     if (window.confirm('Reset hero slideshow to default corporate images?')) {
       setSettings(defaultAdminHeroSettings);
+      try {
+        localStorage.setItem('trek_hero_settings', JSON.stringify(defaultAdminHeroSettings));
+      } catch {}
     }
   };
 

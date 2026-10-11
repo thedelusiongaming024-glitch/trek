@@ -15,7 +15,7 @@ import { SupportChatModal } from './components/SupportChatModal';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal';
 import { AdminPanel } from './components/admin/AdminPanel';
 import { AdminLogin } from './components/admin/AdminLogin';
-import { defaultAdminHeroSettings } from './components/admin/AdminHeroTab';
+import { defaultAdminHeroSettings } from './utils/heroDefaults';
 import trekSaudiBg from './assets/trek-saudi-bg.png';
 import { useLanguage } from './context/LanguageContext';
 import { normalizeUrl } from './utils/url';
@@ -59,7 +59,22 @@ export default function App() {
     slaHours: 24
   });
 
-  const [heroSettings, setHeroSettings] = useState<HeroSettings>(defaultAdminHeroSettings);
+  const [heroSettings, setHeroSettings] = useState<HeroSettings>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('trek_hero_settings') || localStorage.getItem('ama_hero_settings');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && Array.isArray(parsed.slides) && parsed.slides.length > 0) {
+            return parsed;
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to parse cached hero settings:', e);
+      }
+    }
+    return defaultAdminHeroSettings;
+  });
   const [discussionCategories, setDiscussionCategories] = useState<DiscussionCategory[]>([]);
   const [staffRoles, setStaffRoles] = useState<StaffRoleBadge[]>([]);
   const [seoSettings, setSeoSettings] = useState<SEOSettings>(defaultSeoSettings);
@@ -338,6 +353,9 @@ export default function App() {
         const val = heroRes.value;
         if (val.slides && val.slides.length > 0) {
           setHeroSettings(val);
+          try {
+            localStorage.setItem('trek_hero_settings', JSON.stringify(val));
+          } catch {}
         } else {
           setHeroSettings({
             ...defaultAdminHeroSettings,
@@ -1141,7 +1159,11 @@ export default function App() {
         throw new Error(`Failed to save hero settings: ${res.statusText}`);
       }
       const saved = await res.json();
-      setHeroSettings(saved.hero || saved);
+      const updatedHero = saved.hero || saved;
+      setHeroSettings(updatedHero);
+      try {
+        localStorage.setItem('trek_hero_settings', JSON.stringify(updatedHero));
+      } catch {}
       showToast(language === 'ar' ? 'تم تحديث ومزامنة إعدادات العرض الرئيسية بنجاح!' : (language === 'bn' ? 'হিরো স্লাইডশো সেটিংস ডাটাবেজে সংরক্ষিত হয়েছে!' : 'Hero slideshow settings updated & synced with database!'));
     } catch (e) {
       console.error('Failed to save hero settings:', e);

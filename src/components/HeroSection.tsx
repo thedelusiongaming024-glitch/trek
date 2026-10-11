@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Search, X, ChevronLeft, ChevronRight, TrendingUp, Shield, Users, Sparkles } from 'lucide-react';
 import { HeroSettings } from '../types';
-import { defaultAdminHeroSettings } from './admin/AdminHeroTab';
+import { defaultAdminHeroSettings } from '../utils/heroDefaults';
 import { useLanguage } from '../context/LanguageContext';
 import { normalizeImageUrl, getAlternativeImageUrl, DEFAULT_HERO_FALLBACK } from '../utils/imageUrl';
 
@@ -49,18 +49,31 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
     }
   }, [activeSlides.length, currentIndex]);
 
-  // Autoplay slideshow timer: auto change every 2 seconds
+  // Preload images into browser cache so crossfades are 100% glitch-free
+  useEffect(() => {
+    if (typeof window !== 'undefined' && activeSlides.length > 0) {
+      activeSlides.forEach((slide) => {
+        const fullUrl = normalizeImageUrl(slide.url) || DEFAULT_HERO_FALLBACK;
+        if (fullUrl) {
+          const img = new Image();
+          img.src = fullUrl;
+        }
+      });
+    }
+  }, [activeSlides]);
+
+  // Autoplay slideshow timer: respects intervalSeconds from settings
   useEffect(() => {
     const shouldAutoplay = heroSettings ? heroSettings.autoplay : true;
     if (!shouldAutoplay || isPaused || activeSlides.length <= 1) return;
 
-    const intervalSeconds = 2;
+    const intervalSec = Math.max(2, heroSettings?.intervalSeconds || 3);
     const timer = setInterval(() => {
       setCurrentIndex(prev => (prev + 1) % activeSlides.length);
-    }, intervalSeconds * 1000);
+    }, intervalSec * 1000);
 
     return () => clearInterval(timer);
-  }, [heroSettings?.autoplay, isPaused, activeSlides.length]);
+  }, [heroSettings?.autoplay, heroSettings?.intervalSeconds, isPaused, activeSlides.length]);
 
   // Determine section height / length
   const getHeroHeightClasses = (height?: string) => {

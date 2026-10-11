@@ -82,23 +82,23 @@ var defaultSettings = {
 var defaultHeroSettings = {
   slides: [
     {
-      id: "slide-1",
-      url: "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1920&q=80",
-      title: "Enterprise Architecture & Cloud Systems",
+      id: "slide-1791659224239-kiky",
+      url: "https://lh3.googleusercontent.com/d/1FEXdukvgPULuNc4uoTwcHF1EjuW3BG1f",
+      title: "Business in Saudi Arab",
       subtitle: "Designing scalable, mission-critical platforms with modern resilience.",
       isActive: true
     },
     {
-      id: "slide-2",
-      url: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1920&q=80",
-      title: "Global Technology Strategy & Community Advisory",
+      id: "slide-1791659279385-erlw",
+      url: "https://lh3.googleusercontent.com/d/1_c3PSuRB80oXLj6cYVg2lUzIGyBiK2a9",
+      title: "Company Registration",
       subtitle: "Collaborative problem solving with leading senior engineers.",
       isActive: true
     },
     {
-      id: "slide-3",
-      url: "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=1920&q=80",
-      title: "Performance Engineering & High-Traffic Optimization",
+      id: "slide-1791659301001-ey65",
+      url: "https://lh3.googleusercontent.com/d/1G-5SLPgor-BgFGP6e7VAFiGbOSn81tfc",
+      title: "We Are With You",
       subtitle: "Turnkey solutions for database scaling, APIs, and microservices.",
       isActive: true
     }
