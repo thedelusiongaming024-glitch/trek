@@ -160,87 +160,153 @@ var defaultStaffRoles = [
   { name: "Community Lead", badgeLabel: "Lead", color: "amber" },
   { name: "Senior Consultant", badgeLabel: "Consultant", color: "rose" }
 ];
+var DEFAULT_PROVIDER_BASE_URLS = {
+  gemini: "https://generativelanguage.googleapis.com",
+  openai: "https://api.openai.com/v1"
+};
 var TOP_AI_MODELS = [
+  // Google Gemini (Gemini 3 Family)
   {
-    id: "gemini-2.5-flash",
-    name: "Gemini 2.5 Flash",
-    tagline: "Fast and balanced for general queries (Default)",
-    speed: "Fast",
-    intelligence: "High",
+    id: "gemini-3.8-flash",
+    name: "Gemini 3.8 Flash",
+    provider: "gemini",
+    tagline: "Flagship workhorse with long-horizon reasoning & agentic execution (Google Default)",
+    speed: "Ultra Fast",
+    intelligence: "Very High",
     contextWindow: "1M Tokens",
     badge: "DEFAULT",
     badgeColor: "emerald",
-    capabilities: ["General Support", "Document Indexing", "Multilingual"],
-    description: "Fast response times and high accuracy for community discussions and customer support."
+    capabilities: ["General Support", "Enterprise Advisory", "Agentic Workflows", "Multilingual"],
+    description: "Google state-of-the-art workhorse model optimized for high-speed multi-step reasoning, customer support, and autonomous assistance."
   },
   {
-    id: "gemini-2.5-pro",
-    name: "Gemini 2.5 Pro",
-    tagline: "Advanced reasoning for complex business consulting",
+    id: "gemini-3.1-pro",
+    name: "Gemini 3.1 Pro",
+    provider: "gemini",
+    tagline: "Deep thinking & complex corporate advisory",
     speed: "Moderate",
-    intelligence: "Very High",
+    intelligence: "Maximum",
     contextWindow: "2M Tokens",
-    badge: "ADVANCED",
-    badgeColor: "slate",
-    capabilities: ["Corporate Advisory", "Licensing & Compliance", "Complex Questions"],
-    description: "Designed for detailed business consulting, Saudi MISA licensing analysis, and complex queries."
+    badge: "MAX REASONING",
+    badgeColor: "indigo",
+    capabilities: ["Statutory Compliance", "MISA Licensing", "Contract Analysis", "Complex Logic"],
+    description: "Designed for intricate business consulting, statutory compliance, legal frameworks, and executive decision-making with a massive 2M token context window."
   },
   {
-    id: "gemini-2.0-flash",
-    name: "Gemini 2.0 Flash",
-    tagline: "High concurrency and low latency",
+    id: "gemini-3.7-flash",
+    name: "Gemini 3.7 Flash",
+    provider: "gemini",
+    tagline: "Advanced reasoning with high-throughput response speed",
+    speed: "Very Fast",
+    intelligence: "Very High",
+    contextWindow: "1M Tokens",
+    badge: "FAST REASONING",
+    badgeColor: "purple",
+    capabilities: ["High Throughput", "Multi-step Logic", "Fast Response"],
+    description: "Frontier reasoning model combining deep analysis with low latency for interactive client consultations."
+  },
+  {
+    id: "gemini-3.5-flash",
+    name: "Gemini 3.5 Flash",
+    provider: "gemini",
+    tagline: "Balanced, highly efficient multimodal intelligence",
     speed: "Fast",
     intelligence: "High",
     contextWindow: "1M Tokens",
-    badge: "HIGH SPEED",
+    badge: "BALANCED",
     badgeColor: "slate",
-    capabilities: ["High Volume", "Low Latency", "Chat"],
-    description: "Optimized for high-volume message traffic with consistent, low-latency responses."
+    capabilities: ["Community Support", "Knowledge Retrieval", "Multilingual"],
+    description: "Reliable and cost-effective daily driver for customer conversations and FAQ document indexing."
   },
   {
-    id: "gemini-2.0-flash-lite",
-    name: "Gemini 2.0 Flash Lite",
-    tagline: "Lightweight model with lower token usage",
+    id: "gemini-3.5-flash-lite",
+    name: "Gemini 3.5 Flash-Lite",
+    provider: "gemini",
+    tagline: "Ultra-low latency lightweight intelligence for instant chat",
     speed: "Instant",
     intelligence: "Standard",
     contextWindow: "1M Tokens",
-    badge: "LIGHTWEIGHT",
-    badgeColor: "slate",
-    capabilities: ["FAQ Search", "Quick Answers", "Efficient"],
-    description: "Resource-efficient model tuned for straightforward FAQ queries and brief answers."
+    badge: "ULTRA FAST",
+    badgeColor: "teal",
+    capabilities: ["Instant Reply", "FAQ Matching", "High Concurrency"],
+    description: "Extremely lightweight, instantaneous model engineered for rapid-fire chat widgets and high-concurrency traffic."
   },
+  // OpenAI
   {
-    id: "gemini-1.5-pro",
-    name: "Gemini 1.5 Pro",
-    tagline: "Extended context window for long reference documents",
-    speed: "Standard",
-    intelligence: "High",
-    contextWindow: "2M Tokens",
-    badge: "LONG CONTEXT",
-    badgeColor: "slate",
-    capabilities: ["PDF Documents", "Policy Manuals", "Large Files"],
-    description: "2M token capacity for processing lengthy corporate guidelines, contracts, and manuals."
-  },
-  {
-    id: "gemini-1.5-flash",
-    name: "Gemini 1.5 Flash",
-    tagline: "Stable baseline model",
+    id: "gpt-4o",
+    name: "GPT-4o (Omni)",
+    provider: "openai",
+    tagline: "OpenAI Flagship Multimodal Model",
     speed: "Fast",
-    intelligence: "Standard",
-    contextWindow: "1M Tokens",
-    badge: "STABLE",
+    intelligence: "Very High",
+    contextWindow: "128K Tokens",
+    badge: "FLAGSHIP",
+    badgeColor: "emerald",
+    capabilities: ["Executive Advisory", "Deep Reasoning", "Multilingual Mastery"],
+    description: "OpenAI flagship model with state-of-the-art conversational reasoning."
+  },
+  {
+    id: "gpt-4o-mini",
+    name: "GPT-4o Mini",
+    provider: "openai",
+    tagline: "Fast, affordable & smart daily driver",
+    speed: "Very Fast",
+    intelligence: "High",
+    contextWindow: "128K Tokens",
+    badge: "POPULAR",
+    badgeColor: "emerald",
+    capabilities: ["Customer Support", "FAQ RAG", "Low Latency"],
+    description: "Exceptional balance of speed, cost efficiency, and consulting intelligence."
+  },
+  {
+    id: "o3-mini",
+    name: "o3-mini",
+    provider: "openai",
+    tagline: "High-speed reasoning model",
+    speed: "Moderate",
+    intelligence: "Maximum",
+    contextWindow: "200K Tokens",
+    badge: "REASONING",
+    badgeColor: "indigo",
+    capabilities: ["Complex Legal Analysis", "Statutory Compliance", "Logic"],
+    description: "Specialized logical reasoning model designed for deep legal and business analysis."
+  },
+  {
+    id: "o1",
+    name: "o1 (Reasoning Flagship)",
+    provider: "openai",
+    tagline: "Frontier reasoning for hard problems",
+    speed: "Deliberate",
+    intelligence: "Maximum",
+    contextWindow: "200K Tokens",
+    badge: "MAX REASONING",
+    badgeColor: "indigo",
+    capabilities: ["Advanced Regulatory Analysis", "Contractual Frameworks", "Strategic Planning"],
+    description: "Deep-thinking reasoning model designed for maximum problem-solving fidelity."
+  },
+  {
+    id: "gpt-4-turbo",
+    name: "GPT-4 Turbo",
+    provider: "openai",
+    tagline: "High-accuracy enterprise workhorse",
+    speed: "Fast",
+    intelligence: "High",
+    contextWindow: "128K Tokens",
+    badge: "ENTERPRISE",
     badgeColor: "slate",
-    capabilities: ["General Support", "Consistent Baseline"],
-    description: "Reliable, time-tested model for day-to-day community support."
+    capabilities: ["Enterprise Consulting", "Structured Parsing", "Reliable"],
+    description: "Proven high-precision model for business operations and advisory."
   }
 ];
 var defaultAiSettings = {
+  provider: "gemini",
   apiKey: "",
-  selectedModel: "gemini-2.5-flash",
-  fallbackModels: ["gemini-2.0-flash", "gemini-1.5-flash"],
+  baseUrl: "",
+  providerApiKeys: {},
+  selectedModel: "gemini-3.8-flash",
+  fallbackModels: ["gemini-3.7-flash", "gemini-3.5-flash", "gpt-4o-mini", "gpt-4o"],
   temperature: 0.4,
   maxOutputTokens: 2048,
-  provider: "Google Gemini",
   customSystemInstruction: "",
   status: "active",
   lastTestStatus: "untested"
@@ -738,6 +804,63 @@ function getRandomAvatar(seed) {
   return DEFAULT_AVATARS[Math.floor(Math.random() * DEFAULT_AVATARS.length)];
 }
 
+// src/utils/imageUrl.ts
+var GOOGLE_DRIVE_PATTERNS = [
+  /drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/i,
+  /drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/i,
+  /drive\.google\.com\/uc\?(?:export=view&)?id=([a-zA-Z0-9_-]+)/i,
+  /drive\.google\.com\/thumbnail\?id=([a-zA-Z0-9_-]+)/i,
+  /docs\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/i,
+  /lh3\.googleusercontent\.com\/d\/([a-zA-Z0-9_-]+)/i
+];
+var DROPBOX_PATTERNS = [
+  /www\.dropbox\.com\/s\/(.+)/i,
+  /dropbox\.com\/s\/(.+)/i
+];
+var GITHUB_BLOB_PATTERN = /github\.com\/([^/]+)\/([^/]+)\/blob\/([^/]+)\/(.+\.(?:png|jpe?g|webp|gif|svg|avif))/i;
+function extractGoogleDriveId(url) {
+  if (!url) return null;
+  for (const pattern of GOOGLE_DRIVE_PATTERNS) {
+    const match = url.match(pattern);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+  return null;
+}
+function normalizeImageUrl(url) {
+  if (!url || typeof url !== "string") return "";
+  const trimmed = url.trim();
+  if (!trimmed) return "";
+  if (trimmed.startsWith("data:image") || trimmed.startsWith("blob:") || trimmed.startsWith("/")) {
+    return trimmed;
+  }
+  const gdriveId = extractGoogleDriveId(trimmed);
+  if (gdriveId) {
+    return `https://lh3.googleusercontent.com/d/${gdriveId}`;
+  }
+  for (const pattern of DROPBOX_PATTERNS) {
+    if (pattern.test(trimmed)) {
+      if (trimmed.includes("?dl=0")) {
+        return trimmed.replace("?dl=0", "?raw=1");
+      }
+      if (trimmed.includes("?dl=1")) {
+        return trimmed.replace("?dl=1", "?raw=1");
+      }
+      return trimmed.includes("?") ? `${trimmed}&raw=1` : `${trimmed}?raw=1`;
+    }
+  }
+  const githubMatch = trimmed.match(GITHUB_BLOB_PATTERN);
+  if (githubMatch) {
+    const [, user, repo, branch, filePath] = githubMatch;
+    return `https://raw.githubusercontent.com/${user}/${repo}/${branch}/${filePath}`;
+  }
+  if (/imgur\.com\/([a-zA-Z0-9]+)$/i.test(trimmed) && !trimmed.includes("/a/") && !trimmed.includes("/gallery/")) {
+    return trimmed.replace("imgur.com/", "i.imgur.com/") + ".jpg";
+  }
+  return trimmed;
+}
+
 // src/server/businessMemory.ts
 var CANONICAL_BUSINESS_IDENTITY = {
   name: "Trek Consultancy",
@@ -1177,45 +1300,54 @@ function synthesizeBusinessMemoryAnswer({
   if (isOriginQuery) {
     if (isAr) {
       return {
-        reply: `### \u062A\u0631\u064A\u0643 \u0644\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u0627\u062A \u2014 \u0627\u0644\u062E\u0644\u0641\u064A\u0629 \u0627\u0644\u0645\u0624\u0633\u0633\u064A\u0629 \u0648\u0631\u0624\u064A\u0629 \u0627\u0644\u0633\u0639\u0648\u062F\u064A\u0629 2030
+        reply: `### \u{1F3DB}\uFE0F \u062A\u0631\u064A\u0643 \u0644\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u0627\u062A \u2014 \u0627\u0644\u062E\u0644\u0641\u064A\u0629 \u0627\u0644\u0645\u0624\u0633\u0633\u064A\u0629 \u0648\u0631\u0624\u064A\u0629 \u0627\u0644\u0633\u0639\u0648\u062F\u064A\u0629 2030
 
 \u062A\u0623\u0633\u0633\u062A **${memory.identity.name}** \u0644\u062A\u0645\u0643\u064A\u0646 \u0627\u0644\u0634\u0631\u0643\u0627\u062A \u0627\u0644\u062F\u0648\u0644\u064A\u0629 \u0648\u0627\u0644\u0645\u0633\u062A\u062B\u0645\u0631\u064A\u0646 \u0627\u0644\u0639\u0627\u0644\u0645\u064A\u064A\u0646 \u0645\u0646 \u0627\u0644\u062A\u0648\u0633\u0639 \u0627\u0644\u0645\u0624\u0633\u0633\u064A \u0641\u064A \u0627\u0644\u0645\u0645\u0644\u0643\u0629 \u0627\u0644\u0639\u0631\u0628\u064A\u0629 \u0627\u0644\u0633\u0639\u0648\u062F\u064A\u0629 \u0641\u064A \u0625\u0637\u0627\u0631 **\u0631\u0624\u064A\u0629 \u0627\u0644\u0633\u0639\u0648\u062F\u064A\u0629 2030**.
 
-- **\u0627\u0644\u0645\u0642\u0631 \u0627\u0644\u0631\u0626\u064A\u0633\u064A**: ${memory.identity.headquarters}
-- **\u0645\u0643\u062A\u0628 \u0627\u0644\u0627\u062A\u0635\u0627\u0644 \u0627\u0644\u062F\u0648\u0644\u064A**: ${memory.identity.internationalDesk}
-- **\u0627\u0644\u0631\u0633\u0627\u0644\u0629 \u0648\u0627\u0644\u062E\u062F\u0645\u0627\u062A**: \u062A\u0648\u0641\u064A\u0631 \u062D\u0644\u0648\u0644 \u0645\u062A\u0643\u0627\u0645\u0644\u0629 \u0644\u062A\u0623\u0633\u064A\u0633 \u0627\u0644\u0634\u0631\u0643\u0627\u062A \u0628\u0645\u0644\u0643\u064A\u0629 \u0623\u062C\u0646\u0628\u064A\u0629 100% \u0628\u0645\u0648\u062C\u0628 \u062A\u0631\u062E\u064A\u0635 MISA\u060C \u0648\u0641\u062A\u062D \u0627\u0644\u062D\u0633\u0627\u0628\u0627\u062A \u0627\u0644\u0645\u0635\u0631\u0641\u064A\u0629 \u0644\u062F\u0649 \u0628\u0646\u0648\u0643 \u0627\u0644\u0641\u0626\u0629 \u0627\u0644\u0623\u0648\u0644\u0649\u060C \u0648\u0627\u0644\u062D\u0644\u0648\u0644 \u0627\u0644\u0631\u0642\u0645\u064A\u0629 \u0627\u0644\u0645\u062A\u0637\u0648\u0631\u0629.
+- \u{1F539} **\u0627\u0644\u0645\u0642\u0631 \u0627\u0644\u0631\u0626\u064A\u0633\u064A**: ${memory.identity.headquarters}
+- \u{1F539} **\u0645\u0643\u062A\u0628 \u0627\u0644\u0627\u062A\u0635\u0627\u0644 \u0627\u0644\u062F\u0648\u0644\u064A**: ${memory.identity.internationalDesk}
+- \u{1F539} **\u0627\u0644\u0631\u0633\u0627\u0644\u0629 \u0648\u0627\u0644\u062E\u062F\u0645\u0627\u062A**: \u062A\u0648\u0641\u064A\u0631 \u062D\u0644\u0648\u0644 \u0645\u062A\u0643\u0627\u0645\u0644\u0629 \u0644\u062A\u0623\u0633\u064A\u0633 \u0627\u0644\u0634\u0631\u0643\u0627\u062A \u0628\u0645\u0644\u0643\u064A\u0629 \u0623\u062C\u0646\u0628\u064A\u0629 100% \u0628\u0645\u0648\u062C\u0628 \u062A\u0631\u062E\u064A\u0635 MISA\u060C \u0648\u0641\u062A\u062D \u0627\u0644\u062D\u0633\u0627\u0628\u0627\u062A \u0627\u0644\u0645\u0635\u0631\u0641\u064A\u0629 \u0644\u062F\u0649 \u0628\u0646\u0648\u0643 \u0627\u0644\u0641\u0626\u0629 \u0627\u0644\u0623\u0648\u0644\u0649\u060C \u0648\u0627\u0644\u062D\u0644\u0648\u0644 \u0627\u0644\u0631\u0642\u0645\u064A\u0629 \u0627\u0644\u0645\u062A\u0637\u0648\u0631\u0629.
 
----
-> **\u0627\u0644\u0645\u0643\u062A\u0628 \u0627\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u064A:** \u064A\u0631\u0627\u0641\u0642 \u0641\u0631\u064A\u0642\u0646\u0627 \u0627\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u064A \u0648\u0627\u0644\u0642\u0627\u0646\u0648\u0646\u064A \u0641\u064A \u0627\u0644\u0631\u064A\u0627\u0636 \u0627\u0644\u0634\u0631\u0643\u0627\u062A \u0648\u0627\u0644\u0645\u0633\u062A\u062B\u0645\u0631\u064A\u0646 \u0639\u0628\u0631 \u062C\u0645\u064A\u0639 \u0645\u0631\u0627\u062D\u0644 \u0627\u0644\u062A\u0631\u062E\u064A\u0635 \u0648\u0627\u0644\u062A\u0634\u063A\u064A\u0644 \u0628\u0645\u0647\u0646\u064A\u0629 \u062A\u0627\u0645\u0629.`,
+> \u{1F4A1} **\u0627\u0644\u0645\u064A\u0632\u0629 \u0627\u0644\u0645\u0624\u0633\u0633\u064A\u0629:**  
+> \u0646\u0648\u0641\u0631 \u0646\u0642\u0637\u0629 \u0645\u0633\u0624\u0648\u0644\u064A\u0629 \u0645\u0648\u062D\u062F\u0629 \u0644\u0644\u0634\u0631\u0643\u0627\u062A \u0627\u0644\u0639\u0627\u0644\u0645\u064A\u0629 \u0644\u0644\u062A\u0648\u0633\u0639 \u0641\u064A \u0627\u0644\u0633\u0648\u0642 \u0627\u0644\u0633\u0639\u0648\u062F\u064A \u062F\u0648\u0646 \u0627\u0644\u062D\u0627\u062C\u0629 \u0644\u0634\u0631\u064A\u0643 \u0645\u062D\u0644\u064A.
+
+> \u{1F3DB}\uFE0F **\u0627\u0644\u0645\u0643\u062A\u0628 \u0627\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u064A \u0648\u0627\u0644\u062A\u0646\u0641\u064A\u0630\u064A \u0628\u0627\u0644\u0631\u064A\u0627\u0636**  
+> *\u062A\u0631\u064A\u0643 \u0644\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u0627\u062A | \u062A\u0623\u0633\u064A\u0633 \u0627\u0644\u0634\u0631\u0643\u0627\u062A \u0648\u062D\u0644\u0648\u0644 \u0627\u0644\u0623\u0639\u0645\u0627\u0644 \u0648\u0641\u0642 \u0631\u0624\u064A\u0629 2030*`,
         source: "AI"
       };
     }
     if (isBn) {
       return {
-        reply: `### \u099F\u09CD\u09B0\u09C7\u0995 \u0995\u09A8\u09B8\u09BE\u09B2\u099F\u09C7\u09A8\u09CD\u09B8\u09BF \u2014 \u09AA\u09CD\u09B0\u09BE\u09A4\u09BF\u09B7\u09CD\u09A0\u09BE\u09A8\u09BF\u0995 \u09AA\u09B0\u09BF\u099A\u09BF\u09A4\u09BF \u0993 \u09AD\u09BF\u09B6\u09A8 \u09E8\u09E6\u09E9\u09E6
+        reply: `### \u{1F3DB}\uFE0F \u099F\u09CD\u09B0\u09C7\u0995 \u0995\u09A8\u09B8\u09BE\u09B2\u099F\u09C7\u09A8\u09CD\u09B8\u09BF \u2014 \u09AA\u09CD\u09B0\u09BE\u09A4\u09BF\u09B7\u09CD\u09A0\u09BE\u09A8\u09BF\u0995 \u09AA\u09B0\u09BF\u099A\u09BF\u09A4\u09BF \u0993 \u09AD\u09BF\u09B6\u09A8 \u09E8\u09E6\u09E9\u09E6
 
 **${memory.identity.name}** \u09B8\u09CC\u09A6\u09BF \u0986\u09B0\u09AC\u09C7\u09B0 **\u09AD\u09BF\u09B6\u09A8 \u09E8\u09E6\u09E9\u09E6 (Vision 2030)** \u0985\u09B0\u09CD\u09A5\u09A8\u09C8\u09A4\u09BF\u0995 \u09B0\u09C2\u09AA\u09BE\u09A8\u09CD\u09A4\u09B0\u09C7\u09B0 \u0985\u0982\u09B6 \u09B9\u09BF\u09B8\u09C7\u09AC\u09C7 \u0986\u09A8\u09CD\u09A4\u09B0\u09CD\u099C\u09BE\u09A4\u09BF\u0995 \u0989\u09A6\u09CD\u09AF\u09CB\u0995\u09CD\u09A4\u09BE, \u0995\u09B0\u09AA\u09CB\u09B0\u09C7\u099F \u09AC\u09BF\u09A8\u09BF\u09AF\u09BC\u09CB\u0997\u0995\u09BE\u09B0\u09C0 \u098F\u09AC\u0982 \u09AA\u09CD\u09B0\u09AF\u09C1\u0995\u09CD\u09A4\u09BF \u09A6\u09B2\u0997\u09C1\u09B2\u09CB\u0995\u09C7 \u09B8\u09CC\u09A6\u09BF \u0986\u09B0\u09AC\u09C7\u09B0 \u09AC\u09BE\u099C\u09BE\u09B0\u09C7 \u09AC\u09CD\u09AF\u09AC\u09B8\u09BE \u09B8\u09AE\u09CD\u09AA\u09CD\u09B0\u09B8\u09BE\u09B0\u09A3\u09C7 \u09B8\u09B9\u09BE\u09AF\u09BC\u09A4\u09BE \u0995\u09B0\u09BE\u09B0 \u09B2\u0995\u09CD\u09B7\u09CD\u09AF\u09C7 \u09AF\u09BE\u09A4\u09CD\u09B0\u09BE \u09B6\u09C1\u09B0\u09C1 \u0995\u09B0\u09C7\u0964
 
-- **\u09AA\u09CD\u09B0\u09A7\u09BE\u09A8 \u0995\u09BE\u09B0\u09CD\u09AF\u09BE\u09B2\u09AF\u09BC**: ${memory.identity.headquarters}
-- **\u0986\u09A8\u09CD\u09A4\u09B0\u09CD\u099C\u09BE\u09A4\u09BF\u0995 \u09B2\u09BF\u09AF\u09BC\u09BE\u099C\u09CB\u0981 \u0985\u09AB\u09BF\u09B8**: ${memory.identity.internationalDesk}
-- **\u09AE\u09C2\u09B2 \u09B2\u0995\u09CD\u09B7\u09CD\u09AF**: \u0986\u09A8\u09CD\u09A4\u09B0\u09CD\u099C\u09BE\u09A4\u09BF\u0995 \u0995\u09CD\u09B2\u09BE\u09AF\u09BC\u09C7\u09A8\u09CD\u099F\u09A6\u09C7\u09B0 \u099C\u09A8\u09CD\u09AF \u0995\u09CB\u09A8\u09CB \u09B8\u09CD\u09A5\u09BE\u09A8\u09C0\u09AF\u09BC \u09B8\u09CD\u09AA\u09A8\u09CD\u09B8\u09B0 \u099B\u09BE\u09A1\u09BC\u09BE\u0987 **\u09E7\u09E6\u09E6% \u09AC\u09BF\u09A6\u09C7\u09B6\u09BF \u09AE\u09BE\u09B2\u09BF\u0995\u09BE\u09A8\u09BE\u09A7\u09C0\u09A8 \u0995\u09CB\u09AE\u09CD\u09AA\u09BE\u09A8\u09BF \u0997\u09A0\u09A8**, MISA \u0987\u09A8\u09AD\u09C7\u09B8\u09CD\u099F\u09AE\u09C7\u09A8\u09CD\u099F \u09B2\u09BE\u0987\u09B8\u09C7\u09A8\u09CD\u09B8\u09BF\u0982, \u0995\u09AE\u09BE\u09B0\u09CD\u09B6\u09BF\u09AF\u09BC\u09BE\u09B2 \u09B0\u09C7\u099C\u09BF\u09B8\u09CD\u099F\u09CD\u09B0\u09C7\u09B6\u09A8 (CR) \u098F\u09AC\u0982 \u0987\u09A8-\u09B9\u09BE\u0989\u09B8 \u09B8\u09AB\u099F\u0993\u09AF\u09BC\u09CD\u09AF\u09BE\u09B0 \u0993 \u09A1\u09BF\u099C\u09BF\u099F\u09BE\u09B2 \u09B8\u09B2\u09BF\u0989\u09B6\u09A8 \u09B8\u09B0\u09AC\u09B0\u09BE\u09B9 \u0995\u09B0\u09BE\u0964
+- \u{1F539} **\u09AA\u09CD\u09B0\u09A7\u09BE\u09A8 \u0995\u09BE\u09B0\u09CD\u09AF\u09BE\u09B2\u09AF\u09BC**: ${memory.identity.headquarters}
+- \u{1F539} **\u0986\u09A8\u09CD\u09A4\u09B0\u09CD\u099C\u09BE\u09A4\u09BF\u0995 \u09B2\u09BF\u09AF\u09BC\u09BE\u099C\u09CB\u0981 \u0985\u09AB\u09BF\u09B8**: ${memory.identity.internationalDesk}
+- \u{1F539} **\u09AE\u09C2\u09B2 \u09B2\u0995\u09CD\u09B7\u09CD\u09AF**: \u0995\u09CB\u09A8\u09CB \u09B8\u09CD\u09A5\u09BE\u09A8\u09C0\u09AF\u09BC \u09B8\u09CD\u09AA\u09A8\u09CD\u09B8\u09B0 \u099B\u09BE\u09A1\u09BC\u09BE\u0987 **\u09E7\u09E6\u09E6% \u09AC\u09BF\u09A6\u09C7\u09B6\u09BF \u09AE\u09BE\u09B2\u09BF\u0995\u09BE\u09A8\u09BE\u09A7\u09C0\u09A8 \u0995\u09CB\u09AE\u09CD\u09AA\u09BE\u09A8\u09BF \u0997\u09A0\u09A8**, MISA \u0987\u09A8\u09AD\u09C7\u09B8\u09CD\u099F\u09AE\u09C7\u09A8\u09CD\u099F \u09B2\u09BE\u0987\u09B8\u09C7\u09A8\u09CD\u09B8\u09BF\u0982, \u0995\u09AE\u09BE\u09B0\u09CD\u09B6\u09BF\u09AF\u09BC\u09BE\u09B2 \u09B0\u09C7\u099C\u09BF\u09B8\u09CD\u099F\u09CD\u09B0\u09C7\u09B6\u09A8 (CR) \u098F\u09AC\u0982 \u0987\u09A8-\u09B9\u09BE\u0989\u09B8 \u09B8\u09AB\u099F\u0993\u09AF\u09BC\u09CD\u09AF\u09BE\u09B0 \u0993 \u09A1\u09BF\u099C\u09BF\u099F\u09BE\u09B2 \u09B8\u09B2\u09BF\u0989\u09B6\u09A8 \u09B8\u09B0\u09AC\u09B0\u09BE\u09B9 \u0995\u09B0\u09BE\u0964
 
----
-> **\u09B8\u09BF\u09A8\u09BF\u09AF\u09BC\u09B0 \u0985\u09CD\u09AF\u09BE\u09A1\u09AD\u09BE\u0987\u099C\u09B0\u09BF \u09A1\u09C7\u09B8\u09CD\u0995:** \u09B6\u09C1\u09B0\u09C1 \u09A5\u09C7\u0995\u09C7\u0987 \u0986\u09AE\u09B0\u09BE \u0986\u09A8\u09CD\u09A4\u09B0\u09CD\u099C\u09BE\u09A4\u09BF\u0995 \u09AE\u09BE\u09A8 \u09AC\u099C\u09BE\u09AF\u09BC \u09B0\u09C7\u0996\u09C7 \u09B6\u09A4 \u09B6\u09A4 \u0989\u09A6\u09CD\u09AF\u09CB\u0995\u09CD\u09A4\u09BE\u0995\u09C7 \u09B8\u09CC\u09A6\u09BF \u0993 \u0997\u09CD\u09B2\u09CB\u09AC\u09BE\u09B2 \u09AE\u09BE\u09B0\u09CD\u0995\u09C7\u099F\u09C7 \u09B8\u09AB\u09B2\u09AD\u09BE\u09AC\u09C7 \u09AA\u09CD\u09B0\u09A4\u09BF\u09B7\u09CD\u09A0\u09BF\u09A4 \u09B9\u09A4\u09C7 \u09AA\u09CD\u09B0\u09BE\u09A4\u09BF\u09B7\u09CD\u09A0\u09BE\u09A8\u09BF\u0995 \u09AA\u09B0\u09BE\u09AE\u09B0\u09CD\u09B6 \u09AA\u09CD\u09B0\u09A6\u09BE\u09A8 \u0995\u09B0\u09C7 \u0986\u09B8\u099B\u09BF\u0964`,
+> \u{1F4A1} **\u0995\u09CC\u09B6\u09B2\u0997\u09A4 \u09B8\u09C1\u09AC\u09BF\u09A7\u09BE:**  
+> \u09B6\u09C1\u09B0\u09C1 \u09A5\u09C7\u0995\u09C7\u0987 \u0986\u09AE\u09B0\u09BE \u0986\u09A8\u09CD\u09A4\u09B0\u09CD\u099C\u09BE\u09A4\u09BF\u0995 \u09AE\u09BE\u09A8 \u09AC\u099C\u09BE\u09AF\u09BC \u09B0\u09C7\u0996\u09C7 \u09B6\u09A4 \u09B6\u09A4 \u0989\u09A6\u09CD\u09AF\u09CB\u0995\u09CD\u09A4\u09BE\u0995\u09C7 \u09B8\u09CC\u09A6\u09BF \u0993 \u0997\u09CD\u09B2\u09CB\u09AC\u09BE\u09B2 \u09AE\u09BE\u09B0\u09CD\u0995\u09C7\u099F\u09C7 \u09B8\u09AB\u09B2\u09AD\u09BE\u09AC\u09C7 \u09AA\u09CD\u09B0\u09A4\u09BF\u09B7\u09CD\u09A0\u09BF\u09A4 \u09B9\u09A4\u09C7 \u09AA\u09CD\u09B0\u09BE\u09A4\u09BF\u09B7\u09CD\u09A0\u09BE\u09A8\u09BF\u0995 \u09B8\u09BF\u0999\u09CD\u0997\u09C7\u09B2-\u09AA\u09AF\u09BC\u09C7\u09A8\u09CD\u099F \u09AA\u09B0\u09BE\u09AE\u09B0\u09CD\u09B6 \u09AA\u09CD\u09B0\u09A6\u09BE\u09A8 \u0995\u09B0\u09C7 \u0986\u09B8\u099B\u09BF\u0964
+
+> \u{1F3DB}\uFE0F **\u09B8\u09BF\u09A8\u09BF\u09AF\u09BC\u09B0 \u0985\u09CD\u09AF\u09BE\u09A1\u09AD\u09BE\u0987\u099C\u09B0\u09BF \u0993 \u09B2\u09BF\u0997\u09CD\u09AF\u09BE\u09B2 \u09A1\u09C7\u09B8\u09CD\u0995 (\u09B0\u09BF\u09AF\u09BC\u09BE\u09A6)**  
+> *\u099F\u09CD\u09B0\u09C7\u0995 \u0995\u09A8\u09B8\u09BE\u09B2\u099F\u09C7\u09A8\u09CD\u09B8\u09BF | \u09AD\u09BF\u09B6\u09A8 \u09E8\u09E6\u09E9\u09E6 \u0995\u09B0\u09CD\u09AA\u09CB\u09B0\u09C7\u099F \u09AE\u09BE\u09B0\u09CD\u0995\u09C7\u099F \u098F\u09A8\u09CD\u099F\u09CD\u09B0\u09BF \u0993 \u098F\u09A8\u09CD\u099F\u09BE\u09B0\u09AA\u09CD\u09B0\u09BE\u0987\u099C \u09B8\u09B2\u09BF\u0989\u09B6\u09A8\u09B8*`,
         source: "AI"
       };
     }
     return {
-      reply: `### Trek Consultancy \u2014 Institutional Background & Vision 2030
+      reply: `### \u{1F3DB}\uFE0F Trek Consultancy \u2014 Institutional Background & Vision 2030
 
 **${memory.identity.name}** was established to empower international enterprises, corporate investors, and technology founders expanding into the Kingdom of Saudi Arabia under **Saudi Vision 2030**.
 
-- **Headquarters**: ${memory.identity.headquarters}
-- **International Liaison Desk**: ${memory.identity.internationalDesk}
-- **Core Mission**: Providing turnkey corporate market entry\u2014facilitating **100% foreign-owned company incorporation** under MISA, commercial tier-1 banking, government relations, and in-house enterprise digital engineering.
+- \u{1F539} **Global Headquarters**: ${memory.identity.headquarters}
+- \u{1F539} **International Liaison Desk**: ${memory.identity.internationalDesk}
+- \u{1F539} **Turnkey Corporate Mission**: Providing turnkey corporate market entry\u2014facilitating **100% foreign-owned company incorporation** under MISA, commercial tier-1 banking, government relations, and in-house enterprise digital engineering.
 
----
-> **Executive Advisory:** Trek Consultancy continuously guides global entrepreneurs across North America, Europe, Asia, and the GCC through seamless market entry and commercial licensing.`,
+> \u{1F4A1} **Executive Strategic Takeaway:**  
+> We provide single-point institutional accountability for global enterprises expanding into the Saudi market without requiring any local partner.
+
+> \u{1F3DB}\uFE0F **Senior Advisory & Legal Desk (Riyadh)**  
+> *Trek Consultancy | Vision 2030 Corporate Market Entry & Enterprise Solutions*`,
       source: "AI"
     };
   }
@@ -1223,45 +1355,54 @@ function synthesizeBusinessMemoryAnswer({
   if (isResponsibilityQuery) {
     if (isAr) {
       return {
-        reply: `### \u0627\u0644\u0645\u0633\u0624\u0648\u0644\u064A\u0629 \u0627\u0644\u062A\u0634\u063A\u064A\u0644\u064A\u0629 \u2014 \u0627\u0644\u0645\u0643\u062A\u0628 \u0627\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u064A \u0648\u0627\u0644\u0642\u0627\u0646\u0648\u0646\u064A \u0627\u0644\u0623\u0648\u0644
+        reply: `### \u{1F3DB}\uFE0F \u0627\u0644\u062D\u0648\u0643\u0645\u0629 \u0627\u0644\u062A\u0634\u063A\u064A\u0644\u064A\u0629 \u2014 \u0627\u0644\u0645\u0643\u062A\u0628 \u0627\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u064A \u0648\u0627\u0644\u0642\u0627\u0646\u0648\u0646\u064A \u0627\u0644\u0623\u0648\u0644
 
 \u062A\u062A\u0645 \u0625\u062F\u0627\u0631\u0629 \u0639\u0645\u0644\u064A\u0627\u062A \u062A\u0623\u0633\u064A\u0633 \u0627\u0644\u0634\u0631\u0643\u0627\u062A \u0648\u0627\u0644\u062A\u0631\u062E\u064A\u0635 \u0627\u0644\u0627\u0633\u062A\u062B\u0645\u0627\u0631\u064A \u0645\u0628\u0627\u0634\u0631\u0629 \u0639\u0628\u0631 **\u0627\u0644\u0645\u0643\u062A\u0628 \u0627\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u064A \u0648\u0627\u0644\u0642\u0627\u0646\u0648\u0646\u064A \u0644\u062A\u0631\u064A\u0643 \u0641\u064A \u0627\u0644\u0631\u064A\u0627\u0636**.
 
-- **\u0645\u062D\u0627\u0645\u0648\u0646 \u0648\u0645\u0633\u062A\u0634\u0627\u0631\u0648\u0646 \u0645\u0639\u062A\u0645\u062F\u0648\u0646**: \u0627\u0644\u062A\u0646\u0633\u064A\u0642 \u0627\u0644\u0645\u0628\u0627\u0634\u0631 \u0645\u0639 **\u0648\u0632\u0627\u0631\u0629 \u0627\u0644\u0627\u0633\u062A\u062B\u0645\u0627\u0631 (MISA)** \u0648**\u0648\u0632\u0627\u0631\u0629 \u0627\u0644\u062A\u062C\u0627\u0631\u0629 (MoC)** \u0648\u0627\u0644\u0645\u0648\u062B\u0642\u064A\u0646 \u0627\u0644\u0645\u0639\u062A\u0645\u062F\u064A\u0646 \u0644\u062A\u0648\u062B\u064A\u0642 \u0639\u0642\u062F \u0627\u0644\u062A\u0623\u0633\u064A\u0633 \u0648\u0631\u062E\u0635\u0629 \u0627\u0644\u0627\u0633\u062A\u062B\u0645\u0627\u0631.
-- **\u0641\u0631\u064A\u0642 \u0627\u0644\u062E\u062F\u0645\u0627\u062A \u0627\u0644\u0645\u0635\u0631\u0641\u064A\u0629 \u0648\u0627\u0644\u0636\u0631\u064A\u0628\u064A\u0629**: \u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u0639\u0646\u0648\u0627\u0646 \u0627\u0644\u0648\u0637\u0646\u064A (SPL) \u0648\u0641\u062A\u062D \u0627\u0644\u062D\u0633\u0627\u0628\u0627\u062A \u0627\u0644\u0628\u0646\u0643\u064A\u0629 \u0648\u0627\u0644\u0627\u0645\u062A\u062B\u0627\u0644 \u0627\u0644\u0636\u0631\u064A\u0628\u064A \u0644\u062F\u0649 \u0647\u064A\u0626\u0629 \u0627\u0644\u0632\u0643\u0627\u0629 \u0648\u0627\u0644\u0636\u0631\u064A\u0628\u0629 \u0648\u0627\u0644\u062C\u0645\u0627\u0631\u0643 (ZATCA).
-- **\u0645\u062F\u064A\u0631 \u062D\u0633\u0627\u0628\u0627\u062A \u062A\u0646\u0641\u064A\u0630\u064A \u0645\u062E\u0635\u0635**: \u0645\u0633\u062A\u0634\u0627\u0631 \u0623\u0648\u0644 \u0645\u062A\u062E\u0635\u0635 \u064A\u062A\u0627\u0628\u0639 \u0645\u0644\u0641\u0643 \u062E\u0637\u0648\u0629 \u0628\u062E\u0637\u0648\u0629 \u0648\u064A\u0642\u062F\u0645 \u0627\u0644\u062A\u062D\u062F\u064A\u062B\u0627\u062A \u0627\u0644\u0645\u0633\u062A\u0645\u0631\u0629 \u0639\u0646\u062F \u0643\u0644 \u0645\u0631\u062D\u0644\u0629 \u0646\u0638\u0627\u0645\u064A\u0629.
+- \u{1F539} **\u0645\u062D\u0627\u0645\u0648\u0646 \u0648\u0645\u0633\u062A\u0634\u0627\u0631\u0648\u0646 \u0645\u0639\u062A\u0645\u062F\u0648\u0646**: \u0627\u0644\u062A\u0646\u0633\u064A\u0642 \u0627\u0644\u0645\u0628\u0627\u0634\u0631 \u0645\u0639 **\u0648\u0632\u0627\u0631\u0629 \u0627\u0644\u0627\u0633\u062A\u062B\u0645\u0627\u0631 (MISA)** \u0648**\u0648\u0632\u0627\u0631\u0629 \u0627\u0644\u062A\u062C\u0627\u0631\u0629 (MoC)** \u0648\u0627\u0644\u0645\u0648\u062B\u0642\u064A\u0646 \u0627\u0644\u0645\u0639\u062A\u0645\u062F\u064A\u0646 \u0644\u062A\u0648\u062B\u064A\u0642 \u0639\u0642\u062F \u0627\u0644\u062A\u0623\u0633\u064A\u0633 \u0648\u0631\u062E\u0635\u0629 \u0627\u0644\u0627\u0633\u062A\u062B\u0645\u0627\u0631.
+- \u{1F539} **\u0641\u0631\u064A\u0642 \u0627\u0644\u062E\u062F\u0645\u0627\u062A \u0627\u0644\u0645\u0635\u0631\u0641\u064A\u0629 \u0648\u0627\u0644\u0636\u0631\u064A\u0628\u064A\u0629**: \u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u0639\u0646\u0648\u0627\u0646 \u0627\u0644\u0648\u0637\u0646\u064A (SPL) \u0648\u0641\u062A\u062D \u0627\u0644\u062D\u0633\u0627\u0628\u0627\u062A \u0627\u0644\u0628\u0646\u0643\u064A\u0629 \u0648\u0627\u0644\u0627\u0645\u062A\u062B\u0627\u0644 \u0627\u0644\u0636\u0631\u064A\u0628\u064A \u0644\u062F\u0649 \u0647\u064A\u0626\u0629 \u0627\u0644\u0632\u0643\u0627\u0629 \u0648\u0627\u0644\u0636\u0631\u064A\u0628\u0629 \u0648\u0627\u0644\u062C\u0645\u0627\u0631\u0643 (ZATCA).
+- \u{1F539} **\u0645\u062F\u064A\u0631 \u062D\u0633\u0627\u0628\u0627\u062A \u062A\u0646\u0641\u064A\u0630\u064A \u0645\u062E\u0635\u0635**: \u0645\u0633\u062A\u0634\u0627\u0631 \u0623\u0648\u0644 \u0645\u062A\u062E\u0635\u0635 \u064A\u062A\u0627\u0628\u0639 \u0645\u0644\u0641\u0643 \u062E\u0637\u0648\u0629 \u0628\u062E\u0637\u0648\u0629 \u0648\u064A\u0642\u062F\u0645 \u0627\u0644\u062A\u062D\u062F\u064A\u062B\u0627\u062A \u0627\u0644\u0645\u0633\u062A\u0645\u0631\u0629 \u0639\u0646\u062F \u0643\u0644 \u0645\u0631\u062D\u0644\u0629 \u0646\u0638\u0627\u0645\u064A\u0629.
 
----
-> **\u0627\u0644\u062A\u0632\u0627\u0645 \u0645\u0624\u0633\u0633\u064A:** \u064A\u062A\u0648\u0644\u0649 \u0641\u0631\u064A\u0642\u0646\u0627 \u0627\u0644\u0645\u0624\u0633\u0633\u064A \u0627\u0644\u0645\u0639\u062A\u0645\u062F \u0643\u0627\u0645\u0644 \u0627\u0644\u0645\u0633\u0624\u0648\u0644\u064A\u0629 \u0645\u0646 \u0645\u0631\u062D\u0644\u0629 \u0627\u0644\u062A\u0642\u062F\u064A\u0645 \u0627\u0644\u0623\u0648\u0644\u0649 \u0648\u062D\u062A\u0649 \u0627\u0644\u062A\u0634\u063A\u064A\u0644 \u0627\u0644\u062A\u062C\u0627\u0631\u064A \u0627\u0644\u0643\u0627\u0645\u0644.`,
+> \u{1F4A1} **\u0627\u0644\u062A\u0632\u0627\u0645 \u0645\u0624\u0633\u0633\u064A:**  
+> \u064A\u062A\u0648\u0644\u0649 \u0641\u0631\u064A\u0642\u0646\u0627 \u0627\u0644\u0645\u0624\u0633\u0633\u064A \u0627\u0644\u0645\u0639\u062A\u0645\u062F \u0643\u0627\u0645\u0644 \u0627\u0644\u0645\u0633\u0624\u0648\u0644\u064A\u0629 \u0645\u0646 \u0645\u0631\u062D\u0644\u0629 \u0627\u0644\u062A\u0642\u062F\u064A\u0645 \u0627\u0644\u0623\u0648\u0644\u0649 \u0648\u062D\u062A\u0649 \u0627\u0644\u062A\u0634\u063A\u064A\u0644 \u0627\u0644\u062A\u062C\u0627\u0631\u064A \u0627\u0644\u0643\u0627\u0645\u0644 \u0648\u0641\u0642 \u0627\u062A\u0641\u0627\u0642\u064A\u0627\u062A \u0645\u0633\u062A\u0648\u0649 \u0627\u0644\u062E\u062F\u0645\u0629 \u0627\u0644\u0631\u0633\u0645\u064A\u0629.
+
+> \u{1F3DB}\uFE0F **\u0627\u0644\u0645\u0643\u062A\u0628 \u0627\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u064A \u0648\u0627\u0644\u062A\u0646\u0641\u064A\u0630\u064A \u0628\u0627\u0644\u0631\u064A\u0627\u0636**  
+> *\u062A\u0631\u064A\u0643 \u0644\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u0627\u062A | \u062A\u0623\u0633\u064A\u0633 \u0627\u0644\u0634\u0631\u0643\u0627\u062A \u0648\u062D\u0644\u0648\u0644 \u0627\u0644\u0623\u0639\u0645\u0627\u0644 \u0648\u0641\u0642 \u0631\u0624\u064A\u0629 2030*`,
         source: "AI"
       };
     }
     if (isBn) {
       return {
-        reply: `### \u0985\u09AA\u09BE\u09B0\u09C7\u09B6\u09A8\u09BE\u09B2 \u09A6\u09BE\u09AF\u09BC\u09BF\u09A4\u09CD\u09AC \u2014 \u09B8\u09BF\u09A8\u09BF\u09AF\u09BC\u09B0 \u0985\u09CD\u09AF\u09BE\u09A1\u09AD\u09BE\u0987\u099C\u09B0\u09BF \u0993 \u09B2\u09BF\u0997\u09CD\u09AF\u09BE\u09B2 \u09A1\u09C7\u09B8\u09CD\u0995
+        reply: `### \u{1F3DB}\uFE0F \u0985\u09AA\u09BE\u09B0\u09C7\u09B6\u09A8\u09BE\u09B2 \u09AA\u09B0\u09BF\u099A\u09BE\u09B2\u09A8\u09BE \u2014 \u09B8\u09BF\u09A8\u09BF\u09AF\u09BC\u09B0 \u0985\u09CD\u09AF\u09BE\u09A1\u09AD\u09BE\u0987\u099C\u09B0\u09BF \u0993 \u09B2\u09BF\u0997\u09CD\u09AF\u09BE\u09B2 \u09A1\u09C7\u09B8\u09CD\u0995
 
 \u09B8\u09CC\u09A6\u09BF \u0986\u09B0\u09AC\u09C7 \u0986\u09AA\u09A8\u09BE\u09B0 \u0995\u09CB\u09AE\u09CD\u09AA\u09BE\u09A8\u09BF \u0997\u09A0\u09A8 \u0993 \u09B2\u09BE\u0987\u09B8\u09C7\u09A8\u09CD\u09B8\u09BF\u0982 \u09AA\u09CD\u09B0\u0995\u09CD\u09B0\u09BF\u09AF\u09BC\u09BE\u099F\u09BF \u09B8\u09B0\u09BE\u09B8\u09B0\u09BF **\u099F\u09CD\u09B0\u09C7\u0995 \u0995\u09A8\u09B8\u09BE\u09B2\u099F\u09C7\u09A8\u09CD\u09B8\u09BF\u09B0 \u09B0\u09BF\u09AF\u09BC\u09BE\u09A6\u09B8\u09CD\u09A5 \u09B8\u09BF\u09A8\u09BF\u09AF\u09BC\u09B0 \u0985\u09CD\u09AF\u09BE\u09A1\u09AD\u09BE\u0987\u099C\u09B0\u09BF \u0993 \u09B2\u09BF\u0997\u09CD\u09AF\u09BE\u09B2 \u09A1\u09C7\u09B8\u09CD\u0995**-\u098F\u09B0 \u09AA\u09CD\u09B0\u09A4\u09CD\u09AF\u0995\u09CD\u09B7 \u09A6\u09BE\u09AF\u09BC\u09BF\u09A4\u09CD\u09AC\u09C7 \u09AA\u09B0\u09BF\u099A\u09BE\u09B2\u09BF\u09A4 \u09B9\u09AF\u09BC\u0964
 
-- **\u09B8\u09A8\u09A6\u09AA\u09CD\u09B0\u09BE\u09AA\u09CD\u09A4 \u09B8\u09CC\u09A6\u09BF \u0995\u09B0\u09AA\u09CB\u09B0\u09C7\u099F \u0986\u0987\u09A8\u099C\u09C0\u09AC\u09C0 \u0993 \u09B8\u09B0\u0995\u09BE\u09B0\u09BF \u09B2\u09BF\u09AF\u09BC\u09BE\u099C\u09CB\u0981 \u099F\u09BF\u09AE**: \u09B8\u09B0\u09BE\u09B8\u09B0\u09BF **Ministry of Investment (MISA)** \u0993 **\u09AC\u09BE\u09A3\u09BF\u099C\u09CD\u09AF \u09AE\u09A8\u09CD\u09A4\u09CD\u09B0\u09A3\u09BE\u09B2\u09AF\u09BC\u09C7\u09B0 (Ministry of Commerce)** \u09B8\u09BE\u09A5\u09C7 \u09B8\u09AE\u09A8\u09CD\u09AC\u09AF\u09BC \u0995\u09B0\u09C7 \u0986\u09AA\u09A8\u09BE\u09B0 \u09E7\u09E6\u09E6% \u09AC\u09BF\u09A6\u09C7\u09B6\u09BF \u09AE\u09BE\u09B2\u09BF\u0995\u09BE\u09A8\u09BE \u09B2\u09BE\u0987\u09B8\u09C7\u09A8\u09CD\u09B8, \u0995\u09AE\u09BE\u09B0\u09CD\u09B6\u09BF\u09AF\u09BC\u09BE\u09B2 \u09B0\u09C7\u099C\u09BF\u09B8\u09CD\u099F\u09CD\u09B0\u09C7\u09B6\u09A8 (CR) \u098F\u09AC\u0982 \u09A8\u09CB\u099F\u09BE\u09B0\u09BF \u09AA\u09BE\u09AC\u09B2\u09BF\u0995 \u09B8\u09A4\u09CD\u09AF\u09BE\u09AF\u09BC\u09A8 \u09A8\u09BF\u09B6\u09CD\u099A\u09BF\u09A4 \u0995\u09B0\u09C7\u09A8\u0964
-- **\u0995\u09B0\u09CD\u09AA\u09CB\u09B0\u09C7\u099F \u09AC\u09CD\u09AF\u09BE\u0982\u0995\u09BF\u0982 \u0993 \u099F\u09CD\u09AF\u09BE\u0995\u09CD\u09B8 \u09AC\u09BF\u09AD\u09BE\u0997**: \u09A8\u09CD\u09AF\u09BE\u09B6\u09A8\u09BE\u09B2 \u0985\u09CD\u09AF\u09BE\u09A1\u09CD\u09B0\u09C7\u09B8 (SPL) \u09B8\u09CD\u09A5\u09BE\u09AA\u09A8, \u099F\u09BF\u09AF\u09BC\u09BE\u09B0-\u09E7 \u0995\u09B0\u09CD\u09AA\u09CB\u09B0\u09C7\u099F \u09AC\u09CD\u09AF\u09BE\u0982\u0995 \u0985\u09CD\u09AF\u09BE\u0995\u09BE\u0989\u09A8\u09CD\u099F \u0993 ZATCA \u09AB\u09C7\u099C \u09E8 \u09AD\u09CD\u09AF\u09BE\u099F \u09B0\u09C7\u099C\u09BF\u09B8\u09CD\u099F\u09CD\u09B0\u09C7\u09B6\u09A8 \u09B8\u09AE\u09CD\u09AA\u09A8\u09CD\u09A8 \u0995\u09B0\u09C7\u09A8\u0964
-- **\u09A1\u09C7\u09A1\u09BF\u0995\u09C7\u099F\u09C7\u09A1 \u09B8\u09BF\u09A8\u09BF\u09AF\u09BC\u09B0 \u0995\u09A8\u09B8\u09BE\u09B2\u099F\u09C7\u09A8\u09CD\u099F**: \u0986\u09AA\u09A8\u09BE\u09B0 \u09B8\u09BE\u09B0\u09CD\u09AC\u09BF\u0995 \u09AB\u09BE\u0987\u09B2 \u09A4\u09A4\u09CD\u09A4\u09CD\u09AC\u09BE\u09AC\u09A7\u09BE\u09A8\u09C7\u09B0 \u099C\u09A8\u09CD\u09AF \u098F\u0995\u099C\u09A8 \u09B8\u09C1\u09A8\u09BF\u09B0\u09CD\u09A6\u09BF\u09B7\u09CD\u099F \u09B8\u09BF\u09A8\u09BF\u09AF\u09BC\u09B0 \u0995\u09A8\u09B8\u09BE\u09B2\u099F\u09C7\u09A8\u09CD\u099F \u09B8\u09B0\u09BE\u09B8\u09B0\u09BF \u09A8\u09BF\u09AF\u09BC\u09CB\u099C\u09BF\u09A4 \u09A5\u09BE\u0995\u09C7\u09A8\u0964
+- \u{1F539} **\u09B8\u09A8\u09A6\u09AA\u09CD\u09B0\u09BE\u09AA\u09CD\u09A4 \u09B8\u09CC\u09A6\u09BF \u0995\u09B0\u09AA\u09CB\u09B0\u09C7\u099F \u0986\u0987\u09A8\u099C\u09C0\u09AC\u09C0 \u0993 \u09B8\u09B0\u0995\u09BE\u09B0\u09BF \u09B2\u09BF\u09AF\u09BC\u09BE\u099C\u09CB\u0981 \u099F\u09BF\u09AE**: \u09B8\u09B0\u09BE\u09B8\u09B0\u09BF **Ministry of Investment (MISA)** \u0993 **\u09AC\u09BE\u09A3\u09BF\u099C\u09CD\u09AF \u09AE\u09A8\u09CD\u09A4\u09CD\u09B0\u09A3\u09BE\u09B2\u09AF\u09BC\u09C7\u09B0 (MoC)** \u09B8\u09BE\u09A5\u09C7 \u09B8\u09AE\u09A8\u09CD\u09AC\u09AF\u09BC \u0995\u09B0\u09C7 \u0986\u09AA\u09A8\u09BE\u09B0 \u09E7\u09E6\u09E6% \u09AC\u09BF\u09A6\u09C7\u09B6\u09BF \u09AE\u09BE\u09B2\u09BF\u0995\u09BE\u09A8\u09BE \u09B2\u09BE\u0987\u09B8\u09C7\u09A8\u09CD\u09B8, \u0995\u09AE\u09BE\u09B0\u09CD\u09B6\u09BF\u09AF\u09BC\u09BE\u09B2 \u09B0\u09C7\u099C\u09BF\u09B8\u09CD\u099F\u09CD\u09B0\u09C7\u09B6\u09A8 (CR) \u098F\u09AC\u0982 \u09A8\u09CB\u099F\u09BE\u09B0\u09BF \u09AA\u09BE\u09AC\u09B2\u09BF\u0995 \u09B8\u09A4\u09CD\u09AF\u09BE\u09AF\u09BC\u09A8 \u09A8\u09BF\u09B6\u09CD\u099A\u09BF\u09A4 \u0995\u09B0\u09C7\u09A8\u0964
+- \u{1F539} **\u0995\u09B0\u09CD\u09AA\u09CB\u09B0\u09C7\u099F \u09AC\u09CD\u09AF\u09BE\u0982\u0995\u09BF\u0982 \u0993 \u099F\u09CD\u09AF\u09BE\u0995\u09CD\u09B8 \u09AC\u09BF\u09AD\u09BE\u0997**: \u09A8\u09CD\u09AF\u09BE\u09B6\u09A8\u09BE\u09B2 \u0985\u09CD\u09AF\u09BE\u09A1\u09CD\u09B0\u09C7\u09B8 (SPL) \u09B8\u09CD\u09A5\u09BE\u09AA\u09A8, \u099F\u09BF\u09AF\u09BC\u09BE\u09B0-\u09E7 \u0995\u09B0\u09CD\u09AA\u09CB\u09B0\u09C7\u099F \u09AC\u09CD\u09AF\u09BE\u0982\u0995 \u0985\u09CD\u09AF\u09BE\u0995\u09BE\u0989\u09A8\u09CD\u099F \u0993 ZATCA \u09AB\u09C7\u099C \u09E8 \u09AD\u09CD\u09AF\u09BE\u099F \u09B0\u09C7\u099C\u09BF\u09B8\u09CD\u099F\u09CD\u09B0\u09C7\u09B6\u09A8 \u09B8\u09AE\u09CD\u09AA\u09A8\u09CD\u09A8 \u0995\u09B0\u09C7\u09A8\u0964
+- \u{1F539} **\u09A1\u09C7\u09A1\u09BF\u0995\u09C7\u099F\u09C7\u09A1 \u09B8\u09BF\u09A8\u09BF\u09AF\u09BC\u09B0 \u0995\u09A8\u09B8\u09BE\u09B2\u099F\u09C7\u09A8\u09CD\u099F**: \u0986\u09AA\u09A8\u09BE\u09B0 \u09B8\u09BE\u09B0\u09CD\u09AC\u09BF\u0995 \u09AB\u09BE\u0987\u09B2 \u09A4\u09A4\u09CD\u09A4\u09CD\u09AC\u09BE\u09AC\u09A7\u09BE\u09A8\u09C7\u09B0 \u099C\u09A8\u09CD\u09AF \u098F\u0995\u099C\u09A8 \u09B8\u09C1\u09A8\u09BF\u09B0\u09CD\u09A6\u09BF\u09B7\u09CD\u099F \u09B8\u09BF\u09A8\u09BF\u09AF\u09BC\u09B0 \u0995\u09A8\u09B8\u09BE\u09B2\u099F\u09C7\u09A8\u09CD\u099F \u09B8\u09B0\u09BE\u09B8\u09B0\u09BF \u09A8\u09BF\u09AF\u09BC\u09CB\u099C\u09BF\u09A4 \u09A5\u09BE\u0995\u09C7\u09A8\u0964
 
----
-> **\u09AA\u09CD\u09B0\u09BE\u09A4\u09BF\u09B7\u09CD\u09A0\u09BE\u09A8\u09BF\u0995 \u09A8\u09BF\u09B6\u09CD\u099A\u09AF\u09BC\u09A4\u09BE:** \u09B8\u09AE\u09CD\u09AA\u09C2\u09B0\u09CD\u09A3 \u09AA\u09CD\u09B0\u0995\u09CD\u09B0\u09BF\u09AF\u09BC\u09BE\u099F\u09BF \u0986\u09AE\u09BE\u09A6\u09C7\u09B0 \u09B8\u09A8\u09A6\u09AA\u09CD\u09B0\u09BE\u09AA\u09CD\u09A4 \u09AA\u09C7\u09B6\u09BE\u09A6\u09BE\u09B0 \u09A6\u09B2\u09C7\u09B0 \u09AA\u09CD\u09B0\u09A4\u09CD\u09AF\u0995\u09CD\u09B7 \u09A6\u09BE\u09AF\u09BC\u09BF\u09A4\u09CD\u09AC\u09C7 \u099F\u09BE\u09B0\u09CD\u09A8\u0995\u09BF \u09AD\u09BF\u09A4\u09CD\u09A4\u09BF\u09A4\u09C7 \u09B8\u09C1\u099A\u09BE\u09B0\u09C1\u09AD\u09BE\u09AC\u09C7 \u09B8\u09AE\u09CD\u09AA\u09A8\u09CD\u09A8 \u09B9\u09AF\u09BC\u0964`,
+> \u{1F4A1} **\u09AA\u09CD\u09B0\u09BE\u09A4\u09BF\u09B7\u09CD\u09A0\u09BE\u09A8\u09BF\u0995 \u09A8\u09BF\u09B6\u09CD\u099A\u09AF\u09BC\u09A4\u09BE:**  
+> \u09B8\u09AE\u09CD\u09AA\u09C2\u09B0\u09CD\u09A3 \u09AA\u09CD\u09B0\u0995\u09CD\u09B0\u09BF\u09AF\u09BC\u09BE\u099F\u09BF \u0986\u09AE\u09BE\u09A6\u09C7\u09B0 \u09B8\u09A8\u09A6\u09AA\u09CD\u09B0\u09BE\u09AA\u09CD\u09A4 \u09AA\u09C7\u09B6\u09BE\u09A6\u09BE\u09B0 \u09A6\u09B2\u09C7\u09B0 \u09AA\u09CD\u09B0\u09A4\u09CD\u09AF\u0995\u09CD\u09B7 \u09A6\u09BE\u09AF\u09BC\u09BF\u09A4\u09CD\u09AC\u09C7 \u099F\u09BE\u09B0\u09CD\u09A8\u0995\u09BF \u09AD\u09BF\u09A4\u09CD\u09A4\u09BF\u09A4\u09C7 \u09B8\u09C1\u099A\u09BE\u09B0\u09C1\u09AD\u09BE\u09AC\u09C7 \u09B8\u09AE\u09CD\u09AA\u09A8\u09CD\u09A8 \u09B9\u09AF\u09BC\u0964
+
+> \u{1F3DB}\uFE0F **\u09B8\u09BF\u09A8\u09BF\u09AF\u09BC\u09B0 \u0985\u09CD\u09AF\u09BE\u09A1\u09AD\u09BE\u0987\u099C\u09B0\u09BF \u0993 \u09B2\u09BF\u0997\u09CD\u09AF\u09BE\u09B2 \u09A1\u09C7\u09B8\u09CD\u0995 (\u09B0\u09BF\u09AF\u09BC\u09BE\u09A6)**  
+> *\u099F\u09CD\u09B0\u09C7\u0995 \u0995\u09A8\u09B8\u09BE\u09B2\u099F\u09C7\u09A8\u09CD\u09B8\u09BF | \u09AD\u09BF\u09B6\u09A8 \u09E8\u09E6\u09E9\u09E6 \u0995\u09B0\u09CD\u09AA\u09CB\u09B0\u09C7\u099F \u09AE\u09BE\u09B0\u09CD\u0995\u09C7\u099F \u098F\u09A8\u09CD\u099F\u09CD\u09B0\u09BF \u0993 \u098F\u09A8\u09CD\u099F\u09BE\u09B0\u09AA\u09CD\u09B0\u09BE\u0987\u099C \u09B8\u09B2\u09BF\u0989\u09B6\u09A8\u09B8*`,
         source: "AI"
       };
     }
     return {
-      reply: `### Operational Responsibility \u2014 Senior Advisory & Legal Desk
+      reply: `### \u{1F3DB}\uFE0F Operational Governance \u2014 Senior Advisory & Legal Desk
 
 Company setup and foreign investment licensing are managed directly by **Trek Consultancy\u2019s Senior Advisory & Legal Desk in Riyadh**.
 
-- **Accredited Saudi Corporate Lawyers & Government Liaisons**: Directly interface with the **Ministry of Investment (MISA)**, the **Ministry of Commerce (MoC)**, and authorized Saudi notaries to ratify your 100% foreign ownership license, Commercial Registration (CR), and Articles of Association (AoA).
-- **Corporate Banking & Tax Specialists**: Oversee commercial National Address (SPL) registration, tier-1 corporate bank account opening, and ZATCA Phase 2 tax compliance.
-- **Dedicated Senior Account Manager**: A designated senior consultant coordinates your entire file, keeping you updated at every statutory milestone.
+- \u{1F539} **Accredited Saudi Corporate Lawyers & Government Liaisons**: Directly interface with the **Ministry of Investment (MISA)**, the **Ministry of Commerce (MoC)**, and authorized Saudi notaries to ratify your 100% foreign ownership license, Commercial Registration (CR), and Articles of Association (AoA).
+- \u{1F539} **Corporate Banking & Tax Specialists**: Oversee commercial National Address (SPL) registration, tier-1 corporate bank account opening, and ZATCA Phase 2 tax compliance.
+- \u{1F539} **Dedicated Senior Account Manager**: A designated senior consultant coordinates your entire file, keeping you updated at every statutory milestone.
 
----
-> **Institutional Commitment:** An accredited corporate legal and advisory team takes end-to-end institutional responsibility for your business setup from inception to full commercial activation.`,
+> \u{1F4A1} **Institutional Commitment:**  
+> An accredited corporate legal and advisory team takes end-to-end institutional responsibility for your business setup from inception to full commercial activation.
+
+> \u{1F3DB}\uFE0F **Senior Advisory & Legal Desk (Riyadh)**  
+> *Trek Consultancy | Vision 2030 Corporate Market Entry & Enterprise Solutions*`,
       source: "AI"
     };
   }
@@ -1269,51 +1410,63 @@ Company setup and foreign investment licensing are managed directly by **Trek Co
   if (isGreeting) {
     if (isAr) {
       return {
-        reply: `### \u0645\u0631\u062D\u0628\u0627 \u0628\u0643\u0645 \u0641\u064A \u062A\u0631\u064A\u0643 \u0644\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u0627\u062A \u2014 \u0627\u0644\u0645\u0643\u062A\u0628 \u0627\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u064A \u0627\u0644\u062A\u0646\u0641\u064A\u0630\u064A
+        reply: `### \u{1F3DB}\uFE0F \u0645\u0631\u062D\u0628\u0627 \u0628\u0643\u0645 \u0641\u064A \u062A\u0631\u064A\u0643 \u0644\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u0627\u062A \u2014 \u0627\u0644\u0645\u0643\u062A\u0628 \u0627\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u064A \u0627\u0644\u062A\u0646\u0641\u064A\u0630\u064A
 
-\u0623\u0647\u0644\u0627\u064B \u0628\u0643! \u0623\u0646\u0627 \u0627\u0644\u0645\u0633\u062A\u0634\u0627\u0631 \u0627\u0644\u0622\u0644\u064A \u0627\u0644\u0645\u0633\u0627\u0639\u062F \u0644\u0640 **${memory.identity.brand}**. \u064A\u0633\u0639\u062F\u0646\u064A \u0645\u0633\u0627\u0639\u062F\u062A\u0643 \u0628\u0646\u0627\u0621\u064B \u0639\u0644\u0649 \u0627\u0644\u0630\u0627\u0643\u0631\u0629 \u0627\u0644\u0645\u0624\u0633\u0633\u064A\u0629 \u0648\u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0645\u0639\u062A\u0645\u062F\u0629 \u0644\u062F\u064A\u0646\u0627:
+\u0623\u0647\u0644\u0627\u064B \u0628\u0643! \u0623\u0646\u0627 \u0627\u0644\u0645\u0633\u062A\u0634\u0627\u0631 \u0627\u0644\u0622\u0644\u064A \u0627\u0644\u0645\u0633\u0627\u0639\u062F \u0644\u0640 **${memory.identity.brand}**. \u064A\u0633\u0639\u062F\u0646\u064A \u0645\u0633\u0627\u0639\u062F\u062A\u0643 \u0639\u0628\u0631 \u0631\u0643\u0627\u0626\u0632\u0646\u0627 \u0627\u0644\u0627\u0633\u062A\u0631\u0627\u062A\u064A\u062C\u064A\u0629 \u0627\u0644\u0645\u0639\u062A\u0645\u062F\u0629:
 
-- **\u062A\u0623\u0633\u064A\u0633 \u0627\u0644\u0634\u0631\u0643\u0627\u062A \u0641\u064A \u0627\u0644\u0633\u0639\u0648\u062F\u064A\u0629**: \u0645\u0644\u0643\u064A\u0629 \u0623\u062C\u0646\u0628\u064A\u0629 100%\u060C \u0631\u062E\u0635\u0629 MISA\u060C \u0627\u0644\u0633\u062C\u0644 \u0627\u0644\u062A\u062C\u0627\u0631\u064A\u060C \u0648\u0627\u0644\u062D\u0633\u0627\u0628\u0627\u062A \u0627\u0644\u0628\u0646\u0643\u064A\u0629.
-- **\u0627\u0644\u062D\u0644\u0648\u0644 \u0627\u0644\u0628\u0631\u0645\u062C\u064A\u0629 \u0648\u0627\u0644\u0631\u0642\u0645\u064A\u0629**: \u0623\u0646\u0638\u0645\u0629 ERP \u0633\u062D\u0627\u0628\u064A\u0629\u060C \u062A\u0637\u0628\u064A\u0642\u0627\u062A \u0627\u0644\u0647\u0627\u062A\u0641\u060C \u0648\u0627\u0644\u0645\u0646\u0635\u0627\u062A \u0627\u0644\u0645\u0624\u0633\u0633\u064A\u0629.
-- **\u0627\u0644\u062A\u0623\u0634\u064A\u0631\u0627\u062A \u0648\u0627\u0644\u062E\u062F\u0645\u0627\u062A \u0627\u0644\u062D\u0643\u0648\u0645\u064A\u0629 (PRO)**: \u062A\u0623\u0634\u064A\u0631\u0627\u062A \u0627\u0644\u0645\u0633\u062A\u062B\u0645\u0631\u064A\u0646\u060C \u0627\u0644\u0625\u0642\u0627\u0645\u0627\u062A\u060C \u0648\u0627\u0644\u0627\u0645\u062A\u062B\u0627\u0644 \u0644\u0645\u0646\u0635\u062A\u064A \u0642\u0648\u0649 \u0648\u0645\u0642\u064A\u0645.
-- **\u0627\u0644\u0639\u0642\u0627\u0631\u0627\u062A \u0627\u0644\u062A\u062C\u0627\u0631\u064A\u0629**: \u0639\u0642\u0648\u062F \u0625\u064A\u062C\u0627\u0631 \u0627\u0644\u0645\u0643\u0627\u062A\u0628 \u0627\u0644\u0645\u0639\u062A\u0645\u062F\u0629 (\u0625\u064A\u062C\u0627\u0631\u064A) \u0648\u0627\u0644\u0645\u0633\u062A\u0648\u062F\u0639\u0627\u062A.
-- **\u0627\u0644\u0645\u062D\u0627\u0633\u0628\u0629 \u0648\u0627\u0644\u0636\u0631\u0627\u0626\u0628**: \u0627\u0644\u0641\u0648\u062A\u0631\u0629 \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A\u0629 \u0644\u0644\u0645\u0631\u062D\u0644\u0629 \u0627\u0644\u062B\u0627\u0646\u064A\u0629 \u0645\u0646 \u0647\u064A\u0626\u0629 \u0627\u0644\u0632\u0643\u0627\u0629 (ZATCA)\u060C \u0648\u0645\u0633\u0643 \u0627\u0644\u062F\u0641\u0627\u062A\u0631\u060C \u0648\u0627\u0644\u062A\u062F\u0642\u064A\u0642 \u0627\u0644\u0642\u0627\u0646\u0648\u0646\u064A.
+- \u{1F539} **\u062A\u0623\u0633\u064A\u0633 \u0627\u0644\u0634\u0631\u0643\u0627\u062A \u0641\u064A \u0627\u0644\u0633\u0639\u0648\u062F\u064A\u0629**: \u0645\u0644\u0643\u064A\u0629 \u0623\u062C\u0646\u0628\u064A\u0629 100%\u060C \u0631\u062E\u0635\u0629 MISA\u060C \u0627\u0644\u0633\u062C\u0644 \u0627\u0644\u062A\u062C\u0627\u0631\u064A\u060C \u0648\u0627\u0644\u062D\u0633\u0627\u0628\u0627\u062A \u0627\u0644\u0628\u0646\u0643\u064A\u0629.
+- \u{1F539} **\u0627\u0644\u0647\u0646\u062F\u0633\u0629 \u0648\u0627\u0644\u062D\u0644\u0648\u0644 \u0627\u0644\u0628\u0631\u0645\u062C\u064A\u0629**: \u0623\u0646\u0638\u0645\u0629 ERP \u0633\u062D\u0627\u0628\u064A\u0629 \u0645\u062E\u0635\u0635\u0629\u060C \u062A\u0637\u0628\u064A\u0642\u0627\u062A \u0627\u0644\u0647\u0627\u062A\u0641\u060C \u0648\u0627\u0644\u0645\u0646\u0635\u0627\u062A \u0627\u0644\u0645\u0624\u0633\u0633\u064A\u0629.
+- \u{1F539} **\u0627\u0644\u062A\u0623\u0634\u064A\u0631\u0627\u062A \u0648\u0627\u0644\u062A\u0639\u0642\u064A\u0628 \u0627\u0644\u062D\u0643\u0648\u0645\u064A (PRO)**: \u062A\u0623\u0634\u064A\u0631\u0627\u062A \u0627\u0644\u0645\u0633\u062A\u062B\u0645\u0631\u064A\u0646\u060C \u0627\u0644\u0625\u0642\u0627\u0645\u0627\u062A\u060C \u0648\u0627\u0644\u0627\u0645\u062A\u062B\u0627\u0644 \u0644\u0645\u0646\u0635\u062A\u064A \u0642\u0648\u0649 \u0648\u0645\u0642\u064A\u0645.
+- \u{1F539} **\u0627\u0644\u0639\u0642\u0627\u0631\u0627\u062A \u0627\u0644\u062A\u062C\u0627\u0631\u064A\u0629**: \u0639\u0642\u0648\u062F \u0625\u064A\u062C\u0627\u0631 \u0627\u0644\u0645\u0643\u0627\u062A\u0628 \u0627\u0644\u0645\u0639\u062A\u0645\u062F\u0629 (\u0625\u064A\u062C\u0627\u0631\u064A) \u0648\u0627\u0644\u0645\u0633\u062A\u0648\u062F\u0639\u0627\u062A \u0641\u064A \u0627\u0644\u0645\u062F\u0646 \u0627\u0644\u0635\u0646\u0627\u0639\u064A\u0629.
+- \u{1F539} **\u0627\u0644\u0645\u062D\u0627\u0633\u0628\u0629 \u0648\u0627\u0644\u0636\u0631\u0627\u0626\u0628**: \u0627\u0644\u0641\u0648\u062A\u0631\u0629 \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A\u0629 (ZATCA Phase 2)\u060C \u0648\u0645\u0633\u0643 \u0627\u0644\u062F\u0641\u0627\u062A\u0631\u060C \u0648\u0627\u0644\u062A\u062F\u0642\u064A\u0642 \u0627\u0644\u0642\u0627\u0646\u0648\u0646\u064A.
+- \u{1F539} **\u0627\u0644\u062A\u0648\u0633\u0639 \u0627\u0644\u062F\u0648\u0644\u064A**: \u062A\u0623\u0633\u064A\u0633 \u0627\u0644\u0634\u0631\u0643\u0627\u062A \u0641\u064A \u0627\u0644\u0648\u0644\u0627\u064A\u0627\u062A \u0627\u0644\u0645\u062A\u062D\u062F\u0629 \u0648\u0628\u0631\u064A\u0637\u0627\u0646\u064A\u0627 \u0648\u0627\u0644\u062D\u0633\u0627\u0628\u0627\u062A \u0627\u0644\u062F\u0648\u0644\u064A\u0629.
 
----
-> **\u0643\u064A\u0641 \u064A\u0645\u0643\u0646\u0646\u0627 \u0645\u0633\u0627\u0639\u062F\u062A\u0643 \u0627\u0644\u064A\u0648\u0645\u061F** \u0644\u0627 \u062A\u062A\u0631\u062F\u062F \u0641\u064A \u0637\u0631\u062D \u0623\u064A \u0627\u0633\u062A\u0641\u0633\u0627\u0631 \u062D\u0648\u0644 \u0627\u0644\u0625\u062C\u0631\u0627\u0621\u0627\u062A \u0648\u0627\u0644\u0645\u062F\u062F \u0627\u0644\u0646\u0638\u0627\u0645\u064A\u0629 \u0648\u0627\u0644\u0631\u0633\u0648\u0645.`,
+> \u{1F4A1} **\u0643\u064A\u0641 \u064A\u0645\u0643\u0646\u0646\u0627 \u0645\u0633\u0627\u0639\u062F\u062A\u0643 \u0627\u0644\u064A\u0648\u0645\u061F**  
+> \u062A\u0641\u0636\u0644 \u0628\u0637\u0631\u062D \u0623\u064A \u0627\u0633\u062A\u0641\u0633\u0627\u0631 \u062D\u0648\u0644 \u0627\u0644\u0625\u062C\u0631\u0627\u0621\u0627\u062A \u0648\u0627\u0644\u0645\u062F\u062F \u0627\u0644\u0646\u0638\u0627\u0645\u064A\u0629 \u0648\u0627\u0644\u0631\u0633\u0648\u0645 \u0648\u0633\u0623\u062C\u064A\u0628\u0643 \u0641\u0648\u0631\u0627\u064B!
+
+> \u{1F3DB}\uFE0F **\u0627\u0644\u0645\u0643\u062A\u0628 \u0627\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u064A \u0648\u0627\u0644\u062A\u0646\u0641\u064A\u0630\u064A \u0628\u0627\u0644\u0631\u064A\u0627\u0636**  
+> *\u062A\u0631\u064A\u0643 \u0644\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u0627\u062A | \u062A\u0623\u0633\u064A\u0633 \u0627\u0644\u0634\u0631\u0643\u0627\u062A \u0648\u062D\u0644\u0648\u0644 \u0627\u0644\u0623\u0639\u0645\u0627\u0644 \u0648\u0641\u0642 \u0631\u0624\u064A\u0629 2030*`,
         source: "AI"
       };
     }
     if (isBn) {
       return {
-        reply: `### \u099F\u09CD\u09B0\u09C7\u0995 \u0995\u09A8\u09B8\u09BE\u09B2\u099F\u09C7\u09A8\u09CD\u09B8\u09BF\u09A4\u09C7 \u09B8\u09CD\u09AC\u09BE\u0997\u09A4\u09AE \u2014 \u098F\u0995\u09CD\u09B8\u09BF\u0995\u09BF\u0989\u099F\u09BF\u09AD \u0985\u09CD\u09AF\u09BE\u09A1\u09AD\u09BE\u0987\u099C\u09B0\u09BF
+        reply: `### \u{1F3DB}\uFE0F \u099F\u09CD\u09B0\u09C7\u0995 \u0995\u09A8\u09B8\u09BE\u09B2\u099F\u09C7\u09A8\u09CD\u09B8\u09BF\u09A4\u09C7 \u09B8\u09CD\u09AC\u09BE\u0997\u09A4\u09AE \u2014 \u098F\u0995\u09CD\u09B8\u09BF\u0995\u09BF\u0989\u099F\u09BF\u09AD \u0985\u09CD\u09AF\u09BE\u09A1\u09AD\u09BE\u0987\u099C\u09B0\u09BF
 
 \u09A8\u09AE\u09B8\u09CD\u0995\u09BE\u09B0 / \u0986\u09B8\u09B8\u09BE\u09B2\u09BE\u09AE\u09C1 \u0986\u09B2\u09BE\u0987\u0995\u09C1\u09AE! **${memory.identity.brand}**-\u098F \u0986\u09AA\u09A8\u09BE\u0995\u09C7 \u09B8\u09CD\u09AC\u09BE\u0997\u09A4\u09AE\u0964 \u0986\u09AE\u09BF \u099F\u09CD\u09B0\u09C7\u0995\u09C7\u09B0 \u098F\u0986\u0987 \u09B8\u09BE\u09AA\u09CB\u09B0\u09CD\u099F \u0995\u09A8\u09B8\u09BE\u09B2\u099F\u09C7\u09A8\u09CD\u099F\u0964 \u0986\u09AE\u09BE\u09A6\u09C7\u09B0 \u09AA\u09CD\u09B0\u09BE\u09A4\u09BF\u09B7\u09CD\u09A0\u09BE\u09A8\u09BF\u0995 \u09AC\u09BF\u099C\u09A8\u09C7\u09B8 \u09AE\u09C7\u09AE\u09CB\u09B0\u09BF\u09B0 \u0986\u09B2\u09CB\u0995\u09C7 \u0986\u09AA\u09A8\u09BE\u0995\u09C7 \u09B8\u09B9\u09BE\u09AF\u09BC\u09A4\u09BE \u0995\u09B0\u09A4\u09C7 \u09AA\u09CD\u09B0\u09B8\u09CD\u09A4\u09C1\u09A4:
 
-- **\u09B8\u09CC\u09A6\u09BF \u09AC\u09BF\u099C\u09A8\u09C7\u09B8 \u09B8\u09C7\u099F\u0986\u09AA**: \u09E7\u09E6\u09E6% \u09AC\u09BF\u09A6\u09C7\u09B6\u09BF \u09AE\u09BE\u09B2\u09BF\u0995\u09BE\u09A8\u09BE, MISA \u09B2\u09BE\u0987\u09B8\u09C7\u09A8\u09CD\u09B8, \u0995\u09AE\u09BE\u09B0\u09CD\u09B6\u09BF\u09AF\u09BC\u09BE\u09B2 \u09B0\u09C7\u099C\u09BF\u09B8\u09CD\u099F\u09CD\u09B0\u09C7\u09B6\u09A8 (CR) \u0993 \u09AC\u09CD\u09AF\u09BE\u0982\u0995 \u098F\u0995\u09BE\u0989\u09A8\u09CD\u099F
-- **\u09B8\u09AB\u099F\u0993\u09AF\u09BC\u09CD\u09AF\u09BE\u09B0 \u0993 \u09A1\u09BF\u099C\u09BF\u099F\u09BE\u09B2 \u09B8\u09B2\u09BF\u0989\u09B6\u09A8\u09B8**: \u0995\u09BE\u09B8\u09CD\u099F\u09AE \u098F\u09A8\u09CD\u099F\u09BE\u09B0\u09AA\u09CD\u09B0\u09BE\u0987\u099C ERP, \u0993\u09AF\u09BC\u09C7\u09AC/\u09AE\u09CB\u09AC\u09BE\u0987\u09B2 \u0985\u09CD\u09AF\u09BE\u09AA\u09B8 \u098F\u09AC\u0982 \u0995\u09CD\u09B2\u09BE\u0989\u09A1 \u0986\u09B0\u09CD\u0995\u09BF\u099F\u09C7\u0995\u099A\u09BE\u09B0
-- **\u09AD\u09BF\u09B8\u09BE \u0993 \u09B8\u09B0\u0995\u09BE\u09B0\u09BF PRO \u09B8\u09C7\u09AC\u09BE**: \u0987\u09A8\u09AD\u09C7\u09B8\u09CD\u099F\u09B0 \u09AD\u09BF\u09B8\u09BE, \u0993\u09AF\u09BC\u09BE\u09B0\u09CD\u0995 \u09AA\u09BE\u09B0\u09AE\u09BF\u099F \u098F\u09AC\u0982 \u09B0\u09C7\u09B8\u09BF\u09A1\u09C7\u09A8\u09CD\u099F \u0987\u0995\u09BE\u09AE\u09BE \u09AA\u09CD\u09B0\u09B8\u09C7\u09B8\u09BF\u0982
-- **\u09AC\u09BE\u09A3\u09BF\u099C\u09CD\u09AF\u09BF\u0995 \u09B0\u09BF\u09AF\u09BC\u09C7\u09B2 \u098F\u09B8\u09CD\u099F\u09C7\u099F**: \u0985\u09A8\u09C1\u09AE\u09CB\u09A6\u09BF\u09A4 \u0985\u09AB\u09BF\u09B8 \u09B2\u09BF\u099C (Ejari) \u098F\u09AC\u0982 \u09B6\u09BF\u09B2\u09CD\u09AA\u09BE\u099E\u09CD\u099A\u09B2 \u0993\u09AF\u09BC\u09CD\u09AF\u09BE\u09B0\u09B9\u09BE\u0989\u09B8 \u09B2\u09BF\u099C
-- **\u0995\u09B0\u09AA\u09CB\u09B0\u09C7\u099F \u09B8\u09BE\u09AA\u09CB\u09B0\u09CD\u099F \u0993 \u099F\u09CD\u09AF\u09BE\u0995\u09CD\u09B8**: IFRS \u09AC\u09C1\u0995\u0995\u09BF\u09AA\u09BF\u0982, ZATCA \u09AB\u09C7\u099C \u09E8 \u09AD\u09CD\u09AF\u09BE\u099F \u098F\u09AC\u0982 \u09B8\u0982\u09AC\u09BF\u09A7\u09BF\u09AC\u09A6\u09CD\u09A7 \u0985\u09A1\u09BF\u099F
+- \u{1F539} **\u09B8\u09CC\u09A6\u09BF \u09AC\u09BF\u099C\u09A8\u09C7\u09B8 \u09B8\u09C7\u099F\u0986\u09AA (Pillar 1)**: \u09E7\u09E6\u09E6% \u09AC\u09BF\u09A6\u09C7\u09B6\u09BF \u09AE\u09BE\u09B2\u09BF\u0995\u09BE\u09A8\u09BE, MISA \u09B2\u09BE\u0987\u09B8\u09C7\u09A8\u09CD\u09B8, \u0995\u09AE\u09BE\u09B0\u09CD\u09B6\u09BF\u09AF\u09BC\u09BE\u09B2 \u09B0\u09C7\u099C\u09BF\u09B8\u09CD\u099F\u09CD\u09B0\u09C7\u09B6\u09A8 (CR) \u0993 \u09AC\u09CD\u09AF\u09BE\u0982\u0995 \u098F\u0995\u09BE\u0989\u09A8\u09CD\u099F
+- \u{1F539} **\u09B8\u09AB\u099F\u0993\u09AF\u09BC\u09CD\u09AF\u09BE\u09B0 \u0993 \u09A1\u09BF\u099C\u09BF\u099F\u09BE\u09B2 \u09B8\u09B2\u09BF\u0989\u09B6\u09A8\u09B8 (Pillar 2)**: \u0995\u09BE\u09B8\u09CD\u099F\u09AE \u098F\u09A8\u09CD\u099F\u09BE\u09B0\u09AA\u09CD\u09B0\u09BE\u0987\u099C ERP, \u0993\u09AF\u09BC\u09C7\u09AC/\u09AE\u09CB\u09AC\u09BE\u0987\u09B2 \u0985\u09CD\u09AF\u09BE\u09AA\u09B8 \u098F\u09AC\u0982 \u0995\u09CD\u09B2\u09BE\u0989\u09A1 \u0986\u09B0\u09CD\u0995\u09BF\u099F\u09C7\u0995\u099A\u09BE\u09B0
+- \u{1F539} **\u09AD\u09BF\u09B8\u09BE \u0993 \u09B8\u09B0\u0995\u09BE\u09B0\u09BF PRO \u09B8\u09C7\u09AC\u09BE (Pillar 3)**: \u0987\u09A8\u09AD\u09C7\u09B8\u09CD\u099F\u09B0 \u09AD\u09BF\u09B8\u09BE, \u0993\u09AF\u09BC\u09BE\u09B0\u09CD\u0995 \u09AA\u09BE\u09B0\u09AE\u09BF\u099F \u098F\u09AC\u0982 \u09B0\u09C7\u09B8\u09BF\u09A1\u09C7\u09A8\u09CD\u099F \u0987\u0995\u09BE\u09AE\u09BE \u09AA\u09CD\u09B0\u09B8\u09C7\u09B8\u09BF\u0982
+- \u{1F539} **\u09AC\u09BE\u09A3\u09BF\u099C\u09CD\u09AF\u09BF\u0995 \u09B0\u09BF\u09AF\u09BC\u09C7\u09B2 \u098F\u09B8\u09CD\u099F\u09C7\u099F (Pillar 4)**: \u0985\u09A8\u09C1\u09AE\u09CB\u09A6\u09BF\u09A4 \u0985\u09AB\u09BF\u09B8 \u09B2\u09BF\u099C (Ejari) \u098F\u09AC\u0982 \u09B6\u09BF\u09B2\u09CD\u09AA\u09BE\u099E\u09CD\u099A\u09B2 \u0993\u09AF\u09BC\u09CD\u09AF\u09BE\u09B0\u09B9\u09BE\u0989\u09B8 \u09B2\u09BF\u099C
+- \u{1F539} **\u0995\u09B0\u09AA\u09CB\u09B0\u09C7\u099F \u09B8\u09BE\u09AA\u09CB\u09B0\u09CD\u099F \u0993 \u099F\u09CD\u09AF\u09BE\u0995\u09CD\u09B8 (Pillar 5)**: IFRS \u09AC\u09C1\u0995\u0995\u09BF\u09AA\u09BF\u0982, ZATCA \u09AB\u09C7\u099C \u09E8 \u09AD\u09CD\u09AF\u09BE\u099F \u098F\u09AC\u0982 \u09B8\u0982\u09AC\u09BF\u09A7\u09BF\u09AC\u09A6\u09CD\u09A7 \u0985\u09A1\u09BF\u099F
+- \u{1F539} **\u0997\u09CD\u09B2\u09CB\u09AC\u09BE\u09B2 \u09AC\u09BF\u099C\u09A8\u09C7\u09B8 \u098F\u0995\u09CD\u09B8\u09AA\u09CD\u09AF\u09BE\u09A8\u09B6\u09A8 (Pillar 6)**: \u0986\u09AE\u09C7\u09B0\u09BF\u0995\u09BE (Delaware/Wyoming), \u0987\u0989\u0995\u09C7 \u0993 \u0986\u09A8\u09CD\u09A4\u09B0\u09CD\u099C\u09BE\u09A4\u09BF\u0995 \u09AC\u09CD\u09AF\u09BE\u0982\u0995\u09BF\u0982
 
----
-> **\u0986\u099C \u0986\u09AA\u09A8\u09BE\u0995\u09C7 \u0995\u09C0\u09AD\u09BE\u09AC\u09C7 \u09B8\u09B9\u09BE\u09AF\u09BC\u09A4\u09BE \u0995\u09B0\u09A4\u09C7 \u09AA\u09BE\u09B0\u09BF?** \u0986\u09AA\u09A8\u09BE\u09B0 \u09B8\u09C1\u09A8\u09BF\u09B0\u09CD\u09A6\u09BF\u09B7\u09CD\u099F \u09AA\u09CD\u09B0\u09B6\u09CD\u09A8 \u09AC\u09BE \u09AA\u09CD\u09B0\u09AF\u09BC\u09CB\u099C\u09A8\u09C0\u09AF\u09BC\u09A4\u09BE \u09B2\u09BF\u0996\u09C1\u09A8, \u0986\u09AE\u09BF \u098F\u0996\u09A8\u0987 \u09AA\u09C2\u09B0\u09CD\u09A3\u09BE\u0999\u09CD\u0997 \u09A4\u09A5\u09CD\u09AF \u09B8\u09B0\u09AC\u09B0\u09BE\u09B9 \u0995\u09B0\u09AC!`,
+> \u{1F4A1} **\u0986\u099C \u0986\u09AA\u09A8\u09BE\u0995\u09C7 \u0995\u09C0\u09AD\u09BE\u09AC\u09C7 \u09B8\u09B9\u09BE\u09AF\u09BC\u09A4\u09BE \u0995\u09B0\u09A4\u09C7 \u09AA\u09BE\u09B0\u09BF?**  
+> \u0986\u09AA\u09A8\u09BE\u09B0 \u09B8\u09C1\u09A8\u09BF\u09B0\u09CD\u09A6\u09BF\u09B7\u09CD\u099F \u09AA\u09CD\u09B0\u09B6\u09CD\u09A8 \u09AC\u09BE \u09AA\u09CD\u09B0\u09AF\u09BC\u09CB\u099C\u09A8\u09C0\u09AF\u09BC\u09A4\u09BE \u09B2\u09BF\u0996\u09C1\u09A8, \u0986\u09AE\u09BF \u098F\u0996\u09A8\u0987 \u09AA\u09C2\u09B0\u09CD\u09A3\u09BE\u0999\u09CD\u0997 \u09AA\u09CD\u09B0\u09BE\u09A4\u09BF\u09B7\u09CD\u09A0\u09BE\u09A8\u09BF\u0995 \u09A4\u09A5\u09CD\u09AF \u09B8\u09B0\u09AC\u09B0\u09BE\u09B9 \u0995\u09B0\u09AC!
+
+> \u{1F3DB}\uFE0F **\u09B8\u09BF\u09A8\u09BF\u09AF\u09BC\u09B0 \u0985\u09CD\u09AF\u09BE\u09A1\u09AD\u09BE\u0987\u099C\u09B0\u09BF \u0993 \u09B2\u09BF\u0997\u09CD\u09AF\u09BE\u09B2 \u09A1\u09C7\u09B8\u09CD\u0995 (\u09B0\u09BF\u09AF\u09BC\u09BE\u09A6)**  
+> *\u099F\u09CD\u09B0\u09C7\u0995 \u0995\u09A8\u09B8\u09BE\u09B2\u099F\u09C7\u09A8\u09CD\u09B8\u09BF | \u09AD\u09BF\u09B6\u09A8 \u09E8\u09E6\u09E9\u09E6 \u0995\u09B0\u09CD\u09AA\u09CB\u09B0\u09C7\u099F \u09AE\u09BE\u09B0\u09CD\u0995\u09C7\u099F \u098F\u09A8\u09CD\u099F\u09CD\u09B0\u09BF \u0993 \u098F\u09A8\u09CD\u099F\u09BE\u09B0\u09AA\u09CD\u09B0\u09BE\u0987\u099C \u09B8\u09B2\u09BF\u0989\u09B6\u09A8\u09B8*`,
         source: "AI"
       };
     }
     return {
-      reply: `### Welcome to Trek Consultancy \u2014 Executive Advisory
+      reply: `### \u{1F3DB}\uFE0F Welcome to Trek Consultancy \u2014 Executive Concierge
 
 Hello and welcome to **${memory.identity.brand}**! I am your AI Support Consultant. I am equipped with our verified business knowledge to assist you across our strategic service pillars:
 
-- **Saudi Business Setup**: 100% foreign ownership, MISA licensing, Commercial Registration (CR), and tier-1 corporate banking
-- **Software & Digital Engineering**: Custom enterprise ERPs, web & mobile applications, and resilient cloud systems
-- **Visa & PRO Government Liaison**: Investor visas, work permits, Iqama issuance, and Qiwa/Muqeem portals
-- **Commercial Real Estate**: Verified Ejari office leases and industrial park warehousing
-- **Corporate Support & Tax**: ZATCA Phase 2 e-invoicing, IFRS bookkeeping, and statutory audits
+- \u{1F539} **Saudi Business Setup (Pillar 1)**: 100% foreign ownership, MISA licensing, Commercial Registration (CR), and tier-1 corporate banking
+- \u{1F539} **Software & Digital Engineering (Pillar 2)**: Custom enterprise ERPs, web & mobile applications, and resilient cloud systems
+- \u{1F539} **Visa & PRO Government Liaison (Pillar 3)**: Investor visas, work permits, Iqama issuance, and Qiwa/Muqeem portals
+- \u{1F539} **Commercial Real Estate (Pillar 4)**: Verified Ejari office leases and industrial park warehousing
+- \u{1F539} **Corporate Support & Tax (Pillar 5)**: ZATCA Phase 2 e-invoicing, IFRS bookkeeping, and statutory audits
+- \u{1F539} **Global Business Expansion (Pillar 6)**: USA (Delaware/Wyoming), UK Companies House, and cross-border banking
 
----
-> **How may we assist you today?** Feel free to ask any question about requirements, turnaround timelines, fees, or our process!`,
+> \u{1F4A1} **How may we assist you today?**  
+> Feel free to ask any question about requirements, turnaround timelines, fees, or our implementation process!
+
+> \u{1F3DB}\uFE0F **Senior Advisory & Legal Desk (Riyadh)**  
+> *Trek Consultancy | Vision 2030 Corporate Market Entry & Enterprise Solutions*`,
       source: "AI"
     };
   }
@@ -1321,45 +1474,54 @@ Hello and welcome to **${memory.identity.brand}**! I am your AI Support Consulta
   if (isContactQuery) {
     if (isAr) {
       return {
-        reply: `### \u0637\u0644\u0628 \u0627\u0633\u062A\u0634\u0627\u0631\u0629 \u0645\u0628\u0627\u0634\u0631\u0629 \u2014 \u0627\u0644\u0645\u0643\u062A\u0628 \u0627\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u064A \u0627\u0644\u0623\u0648\u0644
+        reply: `### \u{1F3DB}\uFE0F \u0637\u0644\u0628 \u0627\u0633\u062A\u0634\u0627\u0631\u0629 \u062A\u0646\u0641\u064A\u0630\u064A\u0629 \u0645\u0628\u0627\u0634\u0631\u0629 \u2014 \u0627\u0644\u0645\u0643\u062A\u0628 \u0627\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u064A \u0627\u0644\u0623\u0648\u0644
 
 \u062A\u0645 \u062A\u062D\u0648\u064A\u0644 \u0637\u0644\u0628\u0643 \u0645\u0628\u0627\u0634\u0631\u0629 \u0625\u0644\u0649 **\u0627\u0644\u0645\u0643\u062A\u0628 \u0627\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u064A \u0648\u0627\u0644\u0642\u0627\u0646\u0648\u0646\u064A \u0644\u062A\u0631\u064A\u0643 \u0641\u064A \u0627\u0644\u0631\u064A\u0627\u0636** \u0644\u0644\u0645\u062A\u0627\u0628\u0639\u0629 \u0627\u0644\u0641\u0648\u0631\u064A\u0629.
 
-- **\u0627\u0644\u0628\u0631\u064A\u062F \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0627\u0644\u0631\u0633\u0645\u064A**: ${memory.identity.officialEmail}
-- **\u0627\u0644\u0645\u0642\u0631 \u0627\u0644\u0631\u0626\u064A\u0633\u064A \u0641\u064A \u0627\u0644\u0633\u0639\u0648\u062F\u064A\u0629**: ${memory.identity.headquarters}
-- **\u0645\u0643\u062A\u0628 \u0627\u0644\u0627\u062A\u0635\u0627\u0644 \u0627\u0644\u062F\u0648\u0644\u064A**: ${memory.identity.internationalDesk}
+- \u{1F539} **\u0627\u0644\u0628\u0631\u064A\u062F \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0627\u0644\u0631\u0633\u0645\u064A**: ${memory.identity.officialEmail}
+- \u{1F539} **\u0627\u0644\u0645\u0642\u0631 \u0627\u0644\u0631\u0626\u064A\u0633\u064A \u0641\u064A \u0627\u0644\u0633\u0639\u0648\u062F\u064A\u0629**: ${memory.identity.headquarters}
+- \u{1F539} **\u0645\u0643\u062A\u0628 \u0627\u0644\u0627\u062A\u0635\u0627\u0644 \u0627\u0644\u062F\u0648\u0644\u064A**: ${memory.identity.internationalDesk}
 
----
-> **\u0644\u0644\u062A\u0648\u0627\u0635\u0644 \u0627\u0644\u0641\u0648\u0631\u064A:** \u0634\u0627\u0631\u0643 \u0631\u0642\u0645 \u0627\u0644\u0648\u0627\u062A\u0633\u0627\u0628 \u0623\u0648 \u0627\u0644\u0647\u0627\u062A\u0641 \u0647\u0646\u0627 \u0641\u064A \u0627\u0644\u0645\u062D\u0627\u062F\u062B\u0629\u060C \u0648\u0633\u064A\u0642\u0648\u0645 \u0645\u0633\u062A\u0634\u0627\u0631 \u062A\u0646\u0641\u064A\u0630\u064A \u0623\u0648\u0644 \u0628\u0627\u0644\u062A\u0648\u0627\u0635\u0644 \u0645\u0639\u0643 \u0645\u0628\u0627\u0634\u0631\u0629 \u0644\u062A\u0631\u062A\u064A\u0628 \u0627\u0633\u062A\u0634\u0627\u0631\u062A\u0643.`,
+> \u{1F4A1} **\u0644\u0644\u062A\u0648\u0627\u0635\u0644 \u0627\u0644\u062A\u0646\u0641\u064A\u0630\u064A \u0627\u0644\u0641\u0648\u0631\u064A:**  
+> \u0634\u0627\u0631\u0643 \u0631\u0642\u0645 \u0627\u0644\u0648\u0627\u062A\u0633\u0627\u0628 \u0623\u0648 \u0627\u0644\u0647\u0627\u062A\u0641 \u0647\u0646\u0627 \u0641\u064A \u0627\u0644\u0645\u062D\u0627\u062F\u062B\u0629\u060C \u0648\u0633\u064A\u0642\u0648\u0645 \u0645\u0633\u062A\u0634\u0627\u0631 \u062A\u0646\u0641\u064A\u0630\u064A \u0623\u0648\u0644 \u0628\u0627\u0644\u062A\u0648\u0627\u0635\u0644 \u0645\u0639\u0643 \u0645\u0628\u0627\u0634\u0631\u0629 \u0644\u062A\u0631\u062A\u064A\u0628 \u0627\u0633\u062A\u0634\u0627\u0631\u062A\u0643.
+
+> \u{1F3DB}\uFE0F **\u0627\u0644\u0645\u0643\u062A\u0628 \u0627\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u064A \u0648\u0627\u0644\u062A\u0646\u0641\u064A\u0630\u064A \u0628\u0627\u0644\u0631\u064A\u0627\u0636**  
+> *\u062A\u0631\u064A\u0643 \u0644\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u0627\u062A | \u062A\u0623\u0633\u064A\u0633 \u0627\u0644\u0634\u0631\u0643\u0627\u062A \u0648\u062D\u0644\u0648\u0644 \u0627\u0644\u0623\u0639\u0645\u0627\u0644 \u0648\u0641\u0642 \u0631\u0624\u064A\u0629 2030*`,
         source: "AI"
       };
     }
     if (isBn) {
       return {
-        reply: `### \u09B8\u09B0\u09BE\u09B8\u09B0\u09BF \u09AA\u09B0\u09BE\u09AE\u09B0\u09CD\u09B6 \u0993 \u0995\u09A8\u09B8\u09BE\u09B2\u099F\u09C7\u09A8\u09CD\u09B8\u09BF \u2014 \u09B8\u09BF\u09A8\u09BF\u09AF\u09BC\u09B0 \u0985\u09CD\u09AF\u09BE\u09A1\u09AD\u09BE\u0987\u099C\u09B0\u09BF \u09A1\u09C7\u09B8\u09CD\u0995
+        reply: `### \u{1F3DB}\uFE0F \u09B8\u09B0\u09BE\u09B8\u09B0\u09BF \u098F\u0995\u09CD\u09B8\u09BF\u0995\u09BF\u0989\u099F\u09BF\u09AD \u0995\u09A8\u09B8\u09BE\u09B2\u099F\u09C7\u09A8\u09CD\u09B8\u09BF \u2014 \u09B8\u09BF\u09A8\u09BF\u09AF\u09BC\u09B0 \u0985\u09CD\u09AF\u09BE\u09A1\u09AD\u09BE\u0987\u099C\u09B0\u09BF \u09A1\u09C7\u09B8\u09CD\u0995
 
 \u0986\u09AA\u09A8\u09BE\u09B0 \u0985\u09A8\u09C1\u09B8\u09A8\u09CD\u09A7\u09BE\u09A8\u099F\u09BF \u0986\u09AE\u09BE\u09A6\u09C7\u09B0 \u09B0\u09BF\u09AF\u09BC\u09BE\u09A6\u09C7\u09B0 **\u09B8\u09BF\u09A8\u09BF\u09AF\u09BC\u09B0 \u0995\u09A8\u09B8\u09BE\u09B2\u099F\u09C7\u09A8\u09CD\u09B8\u09BF \u0993 \u09B2\u09BF\u0997\u09CD\u09AF\u09BE\u09B2 \u09A1\u09C7\u09B8\u09CD\u0995\u09C7** \u0985\u0997\u09CD\u09B0\u09BE\u09A7\u09BF\u0995\u09BE\u09B0 \u09AD\u09BF\u09A4\u09CD\u09A4\u09BF\u09A4\u09C7 \u09A4\u09BE\u09B2\u09BF\u0995\u09BE\u09AD\u09C1\u0995\u09CD\u09A4 \u0995\u09B0\u09BE \u09B9\u09AF\u09BC\u09C7\u099B\u09C7\u0964
 
-- **\u0995\u09B0\u09CD\u09AA\u09CB\u09B0\u09C7\u099F \u0987\u09AE\u09C7\u0987\u09B2**: ${memory.identity.officialEmail}
-- **\u09B8\u09CC\u09A6\u09BF \u0986\u09B0\u09AC \u09AA\u09CD\u09B0\u09A7\u09BE\u09A8 \u0995\u09BE\u09B0\u09CD\u09AF\u09BE\u09B2\u09AF\u09BC**: ${memory.identity.headquarters}
-- **\u0986\u09A8\u09CD\u09A4\u09B0\u09CD\u099C\u09BE\u09A4\u09BF\u0995 \u09B2\u09BF\u09AF\u09BC\u09BE\u099C\u09CB\u0981 \u0985\u09AB\u09BF\u09B8**: ${memory.identity.internationalDesk}
+- \u{1F539} **\u0995\u09B0\u09CD\u09AA\u09CB\u09B0\u09C7\u099F \u0987\u09AE\u09C7\u0987\u09B2**: ${memory.identity.officialEmail}
+- \u{1F539} **\u09B8\u09CC\u09A6\u09BF \u0986\u09B0\u09AC \u09AA\u09CD\u09B0\u09A7\u09BE\u09A8 \u0995\u09BE\u09B0\u09CD\u09AF\u09BE\u09B2\u09AF\u09BC**: ${memory.identity.headquarters}
+- \u{1F539} **\u0986\u09A8\u09CD\u09A4\u09B0\u09CD\u099C\u09BE\u09A4\u09BF\u0995 \u09B2\u09BF\u09AF\u09BC\u09BE\u099C\u09CB\u0981 \u0985\u09AB\u09BF\u09B8**: ${memory.identity.internationalDesk}
 
----
-> **\u09AC\u09CD\u09AF\u0995\u09CD\u09A4\u09BF\u0997\u09A4 \u09AA\u09B0\u09BE\u09AE\u09B0\u09CD\u09B6\u09C7\u09B0 \u099C\u09A8\u09CD\u09AF:** \u0986\u09AA\u09A8\u09BE\u09B0 \u09AB\u09CB\u09A8 \u09A8\u09AE\u09CD\u09AC\u09B0 \u09AC\u09BE \u09B9\u09CB\u09AF\u09BC\u09BE\u099F\u09B8\u0985\u09CD\u09AF\u09BE\u09AA \u09A8\u09AE\u09CD\u09AC\u09B0\u099F\u09BF \u098F\u0996\u09BE\u09A8\u09C7 \u09AA\u09CD\u09B0\u09A6\u09BE\u09A8 \u0995\u09B0\u09C1\u09A8, \u0986\u09AE\u09BE\u09A6\u09C7\u09B0 \u098F\u0995\u099C\u09A8 \u09B8\u09BF\u09A8\u09BF\u09AF\u09BC\u09B0 \u0995\u09A8\u09B8\u09BE\u09B2\u099F\u09C7\u09A8\u09CD\u099F \u09B8\u09B0\u09BE\u09B8\u09B0\u09BF \u0986\u09AA\u09A8\u09BE\u09B0 \u09B8\u09BE\u09A5\u09C7 \u09AF\u09CB\u0997\u09BE\u09AF\u09CB\u0997 \u0995\u09B0\u09C7 \u09AA\u09C2\u09B0\u09CD\u09A3\u09BE\u0999\u09CD\u0997 \u0997\u09BE\u0987\u09A1\u09B2\u09BE\u0987\u09A8 \u09AA\u09CD\u09B0\u09A6\u09BE\u09A8 \u0995\u09B0\u09AC\u09C7\u09A8\u0964`,
+> \u{1F4A1} **\u09AC\u09CD\u09AF\u0995\u09CD\u09A4\u09BF\u0997\u09A4 \u09AA\u09B0\u09BE\u09AE\u09B0\u09CD\u09B6\u09C7\u09B0 \u099C\u09A8\u09CD\u09AF:**  
+> \u0986\u09AA\u09A8\u09BE\u09B0 \u09AB\u09CB\u09A8 \u09A8\u09AE\u09CD\u09AC\u09B0 \u09AC\u09BE \u09B9\u09CB\u09AF\u09BC\u09BE\u099F\u09B8\u0985\u09CD\u09AF\u09BE\u09AA \u09A8\u09AE\u09CD\u09AC\u09B0\u099F\u09BF \u098F\u0996\u09BE\u09A8\u09C7 \u09AA\u09CD\u09B0\u09A6\u09BE\u09A8 \u0995\u09B0\u09C1\u09A8, \u0986\u09AE\u09BE\u09A6\u09C7\u09B0 \u098F\u0995\u099C\u09A8 \u09B8\u09BF\u09A8\u09BF\u09AF\u09BC\u09B0 \u0995\u09A8\u09B8\u09BE\u09B2\u099F\u09C7\u09A8\u09CD\u099F \u09B8\u09B0\u09BE\u09B8\u09B0\u09BF \u0986\u09AA\u09A8\u09BE\u09B0 \u09B8\u09BE\u09A5\u09C7 \u09AF\u09CB\u0997\u09BE\u09AF\u09CB\u0997 \u0995\u09B0\u09C7 \u09AA\u09C2\u09B0\u09CD\u09A3\u09BE\u0999\u09CD\u0997 \u0997\u09BE\u0987\u09A1\u09B2\u09BE\u0987\u09A8 \u09AA\u09CD\u09B0\u09A6\u09BE\u09A8 \u0995\u09B0\u09AC\u09C7\u09A8\u0964
+
+> \u{1F3DB}\uFE0F **\u09B8\u09BF\u09A8\u09BF\u09AF\u09BC\u09B0 \u0985\u09CD\u09AF\u09BE\u09A1\u09AD\u09BE\u0987\u099C\u09B0\u09BF \u0993 \u09B2\u09BF\u0997\u09CD\u09AF\u09BE\u09B2 \u09A1\u09C7\u09B8\u09CD\u0995 (\u09B0\u09BF\u09AF\u09BC\u09BE\u09A6)**  
+> *\u099F\u09CD\u09B0\u09C7\u0995 \u0995\u09A8\u09B8\u09BE\u09B2\u099F\u09C7\u09A8\u09CD\u09B8\u09BF | \u09AD\u09BF\u09B6\u09A8 \u09E8\u09E6\u09E9\u09E6 \u0995\u09B0\u09CD\u09AA\u09CB\u09B0\u09C7\u099F \u09AE\u09BE\u09B0\u09CD\u0995\u09C7\u099F \u098F\u09A8\u09CD\u099F\u09CD\u09B0\u09BF \u0993 \u098F\u09A8\u09CD\u099F\u09BE\u09B0\u09AA\u09CD\u09B0\u09BE\u0987\u099C \u09B8\u09B2\u09BF\u0989\u09B6\u09A8\u09B8*`,
         source: "AI"
       };
     }
     return {
-      reply: `### Direct Consultation Request \u2014 Senior Advisory Desk
+      reply: `### \u{1F3DB}\uFE0F Direct Executive Consultation \u2014 Senior Advisory Desk
 
 I have notified our **Senior Advisory & Legal Desk in Riyadh** to prioritize your consultation.
 
-- **Official Corporate Email**: ${memory.identity.officialEmail}
-- **Saudi Arabia Headquarters**: ${memory.identity.headquarters}
-- **International Liaison Desk**: ${memory.identity.internationalDesk}
+- \u{1F539} **Official Corporate Email**: ${memory.identity.officialEmail}
+- \u{1F539} **Saudi Arabia Headquarters**: ${memory.identity.headquarters}
+- \u{1F539} **International Liaison Desk**: ${memory.identity.internationalDesk}
 
----
-> **Personalized Briefing:** Share your direct WhatsApp or phone number right here in this chat, and an Executive Senior Consultant will reach out to schedule your personalized consultation.`,
+> \u{1F4A1} **Direct Executive Consultation:**  
+> Share your direct WhatsApp or phone number right here in this chat, and an Executive Senior Consultant will reach out to schedule your personalized consultation.
+
+> \u{1F3DB}\uFE0F **Senior Advisory & Legal Desk (Riyadh)**  
+> *Trek Consultancy | Vision 2030 Corporate Market Entry & Enterprise Solutions*`,
       source: "AI"
     };
   }
@@ -1395,359 +1557,296 @@ I have notified our **Senior Advisory & Legal Desk in Riyadh** to prioritize you
       source: "FAQ"
     };
   }
+  let bestDoc = null;
+  let bestDocScore = 0;
+  for (const doc of memory.knowledgeDocs || []) {
+    if (!doc.significantTokens || doc.significantTokens.length === 0) continue;
+    let matches = 0;
+    for (const t of tokens) {
+      if (doc.significantTokens.includes(t)) matches++;
+    }
+    const ratio = matches / Math.max(1, tokens.length);
+    const score = matches * 12 + ratio * 20;
+    if (score > bestDocScore && matches >= 2) {
+      bestDocScore = score;
+      bestDoc = doc;
+    }
+  }
+  let bestTicket = null;
+  let bestTicketScore = 0;
+  for (const tkt of memory.verifiedTickets || []) {
+    if (!tkt.significantTokens || tkt.significantTokens.length === 0) continue;
+    let matches = 0;
+    for (const t of tokens) {
+      if (tkt.significantTokens.includes(t)) matches++;
+    }
+    const ratio = matches / Math.max(1, tokens.length);
+    const score = matches * 12 + ratio * 20;
+    if (score > bestTicketScore && matches >= 2) {
+      bestTicketScore = score;
+      bestTicket = tkt;
+    }
+  }
   const isPillar1 = /(saudi|misa|cr|commercial registration|company formation|incorporat|foreign ownership|সৌদি|কোম্পানি গঠন|ব্যবসা শুরু|লাইসেন্স|تأسيس|شركة|شركات|استثمار|ميزا|سجل تجاري|ملكية أجنبية|رخصة استثمار)/i.test(lower);
   const isPillar2 = /(software|digital|app|website|erp|code|react|node|developer|সফটওয়্যার|ওয়েবসাইট|অ্যাপ|প্রযুক্তি|برمجة|تطبيق|موقع|سوفتوير|نظام|تقنية|تطوير)/i.test(lower);
-  const isPillar3 = /(visa|iqama|pro|work permit|qiwa|muqeem|ভিসা|ইকামা|ওয়ার্ক পারমিট|পিআরও|تأشيرة|فيزا|إقامة|اقامة|قوى|مقيم|جوازات|نقل كفالة)/i.test(lower);
-  const isPillar4 = /(real estate|property|ejari|office space|warehouse|রিয়েল এস্টেট|অফিস|জমি|ফ্ল্যাট|বাণিজ্যিক প্রপার্টি|عقار|مكتب|إيجار|ايجار|ايجاري|مستودع|أراضي)/i.test(lower);
-  const isPillar5 = /(accounting|tax|vat|zatca|audit|bookkeeping|ট্যাক্স|ভ্যাট|হিসাব|অডিট|محاسبة|ضرائب|ضريبة|زكاة|فاتورة|فوترة|مراجعة|تدقيق)/i.test(lower);
-  const isPillar6 = /(usa|uk|canada|delaware|wyoming|mercury|wise|আন্তর্জাতিক|আমেরিকা|ইউকে|أمريكا|امريكا|بريطانيا|كندا|دولي|عالمي|ديلوير|وايومنغ)/i.test(lower);
-  if (isPillar1) {
-    const p1 = memory.pillars[0];
+  const isPillar3 = /(visa|iqama|pro|work permit|qiwa|muqeem|engineer|workforce|employee|ভিসা|ইকামা|ওয়ার্ক পারমিট|পিআরও|ইঞ্জিনিয়ার|কর্মী|تأشيرة|فيزا|إقامة|اقامة|قوى|مقيم|جوازات|نقل كفالة)/i.test(lower);
+  const isPillar4 = /(real estate|property|ejari|office space|warehouse|office lease|রিয়েল এস্টেট|অফিস|জমি|ফ্ল্যাট|বাণিজ্যিক প্রপার্টি|عقار|مكتب|إيجار|ايجار|ايجاري|مستودع|أراضي)/i.test(lower);
+  const isPillar5 = /(accounting|tax|vat|zatca|audit|bookkeeping|e-invoicing|ট্যাক্স|ভ্যাট|হিসাব|অডিট|ই-ইনভয়েসিং|محاسبة|ضرائب|ضريبة|زكاة|فاتورة|فوترة|مراجعة|تدقيق)/i.test(lower);
+  const isPillar6 = /(usa|uk|canada|delaware|wyoming|mercury|wise|cross-border|holding|subsidiary|আন্তর্জাতিক|আমেরিকা|ইউকে|হোল্ডিং|أمريكا|امريكا|بريطانيا|كندا|دولي|عالمي|ديلوير|وايومنغ)/i.test(lower);
+  const matchedPillars = [];
+  if (isPillar1) matchedPillars.push({ pillar: memory.pillars[0], id: 1 });
+  if (isPillar2) matchedPillars.push({ pillar: memory.pillars[1], id: 2 });
+  if (isPillar3) matchedPillars.push({ pillar: memory.pillars[2], id: 3 });
+  if (isPillar4) matchedPillars.push({ pillar: memory.pillars[3], id: 4 });
+  if (isPillar5) matchedPillars.push({ pillar: memory.pillars[4], id: 5 });
+  if (isPillar6) matchedPillars.push({ pillar: memory.pillars[5], id: 6 });
+  const isTimeline = /(timeline|timeframe|duration|how long|how many days|turnaround|koto din|koto shomoy|somoy|shomoy lagbe|সময়|কত দিন|কত সময়|কম সময়|كم يستغرق|مدة|وقت|المدة الزمنية)/i.test(lower);
+  if (matchedPillars.length >= 2) {
     if (isAr) {
-      return {
-        reply: `### \u062A\u0623\u0633\u064A\u0633 \u0627\u0644\u0634\u0631\u0643\u0627\u062A \u0641\u064A \u0627\u0644\u0633\u0639\u0648\u062F\u064A\u0629 (MISA) \u2014 \u062F\u0644\u064A\u0644 \u0627\u0633\u062A\u0634\u0627\u0631\u064A \u0645\u062A\u0643\u0627\u0645\u0644
+      let roadmap2 = `### \u{1F3DB}\uFE0F \u0627\u0633\u062A\u0634\u0627\u0631\u0629 \u0645\u0624\u0633\u0633\u064A\u0629 \u0645\u062A\u0643\u0627\u0645\u0644\u0629 \u2014 \u062E\u0627\u0631\u0637\u0629 \u0627\u0644\u062A\u0648\u0633\u0639 \u0639\u0628\u0631 \u0627\u0644\u062E\u062F\u0645\u0627\u062A \u0627\u0644\u0645\u062A\u0639\u062F\u062F\u0629
 
-\u0641\u064A \u0625\u0637\u0627\u0631 \u0631\u0624\u064A\u0629 \u0627\u0644\u0633\u0639\u0648\u062F\u064A\u0629 2030\u060C \u064A\u0645\u0643\u0646 \u0644\u0644\u0645\u0633\u062A\u062B\u0645\u0631\u064A\u0646 \u0648\u0627\u0644\u0634\u0631\u0643\u0627\u062A \u0627\u0644\u062F\u0648\u0644\u064A\u0629 \u062A\u0623\u0633\u064A\u0633 \u0643\u064A\u0627\u0646\u0627\u062A\u0647\u0645 \u0628\u0645\u0644\u0643\u064A\u0629 \u0623\u062C\u0646\u0628\u064A\u0629 100% \u062F\u0648\u0646 \u0627\u0634\u062A\u0631\u0627\u0637 \u0634\u0631\u064A\u0643 \u0623\u0648 \u0643\u0641\u064A\u0644 \u0633\u0639\u0648\u062F\u064A \u0645\u062D\u0644\u064A.
+\u0646\u0639\u0645\u060C \u062A\u0642\u062F\u0645 **${memory.identity.name}** \u062D\u0644\u0648\u0644\u0627\u064B \u0627\u0633\u062A\u0634\u0627\u0631\u064A\u0629 \u0634\u0627\u0645\u0644\u0629 \u062A\u063A\u0637\u064A \u062C\u0645\u064A\u0639 \u0627\u0644\u0645\u0633\u0627\u0631\u0627\u062A \u0627\u0644\u0645\u0637\u0644\u0648\u0628\u0629 \u0628\u062A\u0646\u0633\u064A\u0642 \u0645\u0628\u0627\u0634\u0631 \u0628\u064A\u0646 \u0645\u0643\u0627\u062A\u0628\u0646\u0627 \u0627\u0644\u0645\u062A\u062E\u0635\u0635\u0629:
 
-- **\u0645\u0644\u0643\u064A\u0629 \u0623\u062C\u0646\u0628\u064A\u0629 100%**: \u064A\u062D\u062A\u0641\u0638 \u0627\u0644\u0645\u0633\u062A\u062B\u0645\u0631 \u0627\u0644\u0623\u062C\u0646\u0628\u064A \u0628\u0643\u0627\u0645\u0644 \u0627\u0644\u062D\u0635\u0635 \u0648\u0627\u0644\u0633\u064A\u0637\u0631\u0629 \u0627\u0644\u062A\u062C\u0627\u0631\u064A\u0629 \u0648\u0627\u0644\u0642\u0627\u0646\u0648\u0646\u064A\u0629.
-- **\u0631\u062E\u0635\u0629 \u0627\u0644\u0627\u0633\u062A\u062B\u0645\u0627\u0631 (MISA)**: \u0625\u0635\u062F\u0627\u0631 \u0633\u0631\u064A\u0639 \u0644\u062A\u0631\u062E\u064A\u0635 \u0627\u0644\u0627\u0633\u062A\u062B\u0645\u0627\u0631 \u0639\u0628\u0631 \u0648\u0632\u0627\u0631\u0629 \u0627\u0644\u0627\u0633\u062A\u062B\u0645\u0627\u0631 (${p1.turnaroundTime}).
-- **\u0627\u0644\u0633\u062C\u0644 \u0627\u0644\u062A\u062C\u0627\u0631\u064A (CR)**: \u0625\u0635\u062F\u0627\u0631 \u0627\u0644\u0633\u062C\u0644 \u0627\u0644\u062A\u062C\u0627\u0631\u064A \u0627\u0644\u0631\u0633\u0645\u064A \u0644\u0644\u0634\u0631\u0643\u0629 \u0645\u0628\u0627\u0634\u0631\u0629 \u0645\u0646 \u0648\u0632\u0627\u0631\u0629 \u0627\u0644\u062A\u062C\u0627\u0631\u0629.
-- **\u0639\u0642\u062F \u0627\u0644\u062A\u0623\u0633\u064A\u0633 (AoA)**: \u0635\u064A\u0627\u063A\u0629 \u0648\u062A\u0648\u062B\u064A\u0642 \u0639\u0642\u062F \u0627\u0644\u062A\u0623\u0633\u064A\u0633 \u0639\u0628\u0631 \u0643\u0627\u062A\u0628 \u0639\u062F\u0644 \u0645\u0639\u062A\u0645\u062F.
-- **\u0627\u0644\u062D\u0633\u0627\u0628 \u0627\u0644\u0628\u0646\u0643\u064A \u0648\u0627\u0644\u0639\u0646\u0648\u0627\u0646 \u0627\u0644\u0648\u0637\u0646\u064A (SPL)**: \u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u0639\u0646\u0648\u0627\u0646 \u0627\u0644\u0648\u0637\u0646\u064A \u0627\u0644\u062A\u062C\u0627\u0631\u064A \u0648\u0641\u062A\u062D \u062D\u0633\u0627\u0628 \u0628\u0646\u0643\u064A \u0644\u0644\u0634\u0631\u0643\u0627\u062A \u0644\u062F\u0649 \u0628\u0646\u0648\u0643 \u0627\u0644\u0641\u0626\u0629 \u0627\u0644\u0623\u0648\u0644\u0649.
+`;
+      for (const item of matchedPillars) {
+        roadmap2 += `- \u{1F539} **${item.pillar.title}**: ${item.pillar.highlights[0]} (\u23F1\uFE0F ${item.pillar.turnaroundTime}).
+`;
+      }
+      if (isTimeline) {
+        roadmap2 += `
+- \u{1F539} **\u0627\u0644\u062C\u062F\u0648\u0644 \u0627\u0644\u0632\u0645\u0646\u064A \u0627\u0644\u0645\u062F\u0645\u062C**: \u062A\u062A\u0645 \u0625\u062F\u0627\u0631\u0629 \u062C\u0645\u064A\u0639 \u0627\u0644\u0645\u0633\u0627\u0631\u0627\u062A \u0628\u0627\u0644\u062A\u0648\u0627\u0632\u064A \u0644\u062A\u0642\u0644\u064A\u0635 \u0645\u062F\u0629 \u0627\u0644\u062A\u0623\u0633\u064A\u0633 \u0648\u0628\u062F\u0621 \u0627\u0644\u0646\u0634\u0627\u0637 \u0627\u0644\u062A\u062C\u0627\u0631\u064A \u0627\u0644\u0641\u0639\u0644\u064A.`;
+      }
+      roadmap2 += `
 
----
-> **\u0627\u0644\u0645\u0643\u062A\u0628 \u0627\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u064A:** \u064A\u062A\u0648\u0644\u0649 \u0627\u0644\u0645\u0643\u062A\u0628 \u0627\u0644\u0642\u0627\u0646\u0648\u0646\u064A \u0648\u0627\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u064A \u0644\u062A\u0631\u064A\u0643 \u0641\u064A \u0627\u0644\u0631\u064A\u0627\u0636 \u0625\u062F\u0627\u0631\u0629 \u0643\u0627\u0641\u0629 \u0627\u0644\u0625\u062C\u0631\u0627\u0621\u0627\u062A \u062D\u062A\u0649 \u0627\u0644\u0627\u0646\u062A\u0647\u0627\u0621 \u0627\u0644\u062A\u0627\u0645.`,
-        source: "AI"
-      };
+> \u{1F4A1} **\u0627\u0644\u0645\u064A\u0632\u0629 \u0627\u0644\u062A\u0634\u063A\u064A\u0644\u064A\u0629 \u0627\u0644\u0645\u0648\u062D\u062F\u0629:**  
+> \u064A\u062A\u0648\u0644\u0649 \u0641\u0631\u064A\u0642\u0646\u0627 \u0627\u0644\u0645\u0634\u062A\u0631\u0643 \u0625\u062F\u0627\u0631\u0629 \u0627\u0644\u0645\u0644\u0641 \u0628\u0627\u0644\u0643\u0627\u0645\u0644 \u0628\u0645\u0633\u0624\u0648\u0644\u064A\u0629 \u0645\u0624\u0633\u0633\u064A\u0629 \u0645\u0648\u062D\u062F\u0629 \u0648\u062F\u0648\u0646 \u0627\u0644\u062D\u0627\u062C\u0629 \u0644\u062A\u0639\u062F\u062F \u0627\u0644\u062C\u0647\u0627\u062A.
+
+> \u{1F3DB}\uFE0F **\u0627\u0644\u0645\u0643\u062A\u0628 \u0627\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u064A \u0648\u0627\u0644\u062A\u0646\u0641\u064A\u0630\u064A \u0628\u0627\u0644\u0631\u064A\u0627\u0636**  
+> *\u062A\u0631\u064A\u0643 \u0644\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u0627\u062A | \u062A\u0623\u0633\u064A\u0633 \u0627\u0644\u0634\u0631\u0643\u0627\u062A \u0648\u062D\u0644\u0648\u0644 \u0627\u0644\u0623\u0639\u0645\u0627\u0644 \u0648\u0641\u0642 \u0631\u0624\u064A\u0629 2030*`;
+      return { reply: roadmap2, source: "AI" };
     }
     if (isBn) {
+      let roadmap2 = `### \u{1F3DB}\uFE0F \u09B8\u09AE\u09A8\u09CD\u09AC\u09BF\u09A4 \u09AE\u09BE\u09B2\u09CD\u099F\u09BF-\u09AA\u09BF\u09B2\u09BE\u09B0 \u09AA\u09CD\u09B0\u09BE\u09A4\u09BF\u09B7\u09CD\u09A0\u09BE\u09A8\u09BF\u0995 \u0997\u09BE\u0987\u09A1\u09B2\u09BE\u0987\u09A8 \u2014 \u09B8\u09BE\u09AE\u0997\u09CD\u09B0\u09BF\u0995 \u09B0\u09CB\u09A1\u09AE\u09CD\u09AF\u09BE\u09AA
+
+\u09B9\u09CD\u09AF\u09BE\u0981, **${memory.identity.name}** \u0986\u09AA\u09A8\u09BE\u09B0 \u0989\u09B2\u09CD\u09B2\u09C7\u0996\u09BF\u09A4 \u09AA\u09CD\u09B0\u09A4\u09BF\u099F\u09BF \u09B8\u09C7\u09AC\u09BE\u0987 \u09A8\u09BF\u099C\u09B8\u09CD\u09AC \u09AC\u09BF\u09B6\u09C7\u09B7\u09BE\u09AF\u09BC\u09BF\u09A4 \u09AC\u09BF\u09AD\u09BE\u0997\u09C7\u09B0 \u09AE\u09BE\u09A7\u09CD\u09AF\u09AE\u09C7 \u09B8\u09AE\u09A8\u09CD\u09AC\u09BF\u09A4\u09AD\u09BE\u09AC\u09C7 \u09AA\u09B0\u09BF\u099A\u09BE\u09B2\u09A8\u09BE \u0995\u09B0\u09C7:
+
+`;
+      for (const item of matchedPillars) {
+        roadmap2 += `- \u{1F539} **${item.pillar.titleBn} (${item.pillar.title})**: ${item.pillar.highlights[0]} (\u23F1\uFE0F \u0986\u09A8\u09C1\u09AE\u09BE\u09A8\u09BF\u0995 \u09B8\u09AE\u09AF\u09BC: ${item.pillar.turnaroundTime})\u0964
+`;
+      }
+      if (isTimeline) {
+        roadmap2 += `
+- \u{1F539} **\u09B8\u09AE\u09A8\u09CD\u09AC\u09BF\u09A4 \u09B8\u09AE\u09AF\u09BC\u09B8\u09C0\u09AE\u09BE**: \u09AA\u09CD\u09B0\u09A4\u09BF\u099F\u09BF \u09A7\u09BE\u09AA \u09B8\u09AE\u09BE\u09A8\u09CD\u09A4\u09B0\u09BE\u09B2\u09AD\u09BE\u09AC\u09C7 (parallel processing) \u09B8\u09AE\u09CD\u09AA\u09A8\u09CD\u09A8 \u0995\u09B0\u09BE \u09B9\u09AF\u09BC \u09AF\u09BE\u09A4\u09C7 \u09A6\u09CD\u09B0\u09C1\u09A4\u09A4\u09AE \u09B8\u09AE\u09AF\u09BC\u09C7 \u09AC\u09BE\u09A3\u09BF\u099C\u09CD\u09AF\u09BF\u0995 \u0995\u09BE\u09B0\u09CD\u09AF\u0995\u09CD\u09B0\u09AE \u099A\u09BE\u09B2\u09C1 \u0995\u09B0\u09BE \u09AF\u09BE\u09AF\u09BC\u0964`;
+      }
+      roadmap2 += `
+
+> \u{1F4A1} **\u09B8\u09BF\u0999\u09CD\u0997\u09C7\u09B2-\u09AA\u09AF\u09BC\u09C7\u09A8\u09CD\u099F \u0985\u09CD\u09AF\u09BE\u0995\u09BE\u0989\u09A8\u09CD\u099F\u09C7\u09AC\u09BF\u09B2\u09BF\u099F\u09BF:**  
+> \u099F\u09CD\u09B0\u09C7\u0995 \u0995\u09A8\u09B8\u09BE\u09B2\u099F\u09C7\u09A8\u09CD\u09B8\u09BF\u09B0 \u09B0\u09BF\u09AF\u09BC\u09BE\u09A6 \u09B2\u09BF\u0997\u09CD\u09AF\u09BE\u09B2 \u099F\u09BF\u09AE, \u099F\u09CD\u09AF\u09BE\u0995\u09CD\u09B8 \u0995\u09A8\u09B8\u09BE\u09B2\u099F\u09C7\u09A8\u09CD\u099F \u098F\u09AC\u0982 \u099F\u09C7\u0995 \u09A1\u09BF\u09AD\u09BF\u09B6\u09A8 \u098F\u0995\u09A4\u09CD\u09B0\u09BF\u09A4 \u09B9\u09AF\u09BC\u09C7 \u09B8\u09AE\u09A8\u09CD\u09AC\u09BF\u09A4 \u09A6\u09BE\u09AF\u09BC\u09BF\u09A4\u09CD\u09AC \u0997\u09CD\u09B0\u09B9\u09A3 \u0995\u09B0\u09C7\u0964
+
+> \u{1F3DB}\uFE0F **\u09B8\u09BF\u09A8\u09BF\u09AF\u09BC\u09B0 \u0985\u09CD\u09AF\u09BE\u09A1\u09AD\u09BE\u0987\u099C\u09B0\u09BF \u0993 \u09B2\u09BF\u0997\u09CD\u09AF\u09BE\u09B2 \u09A1\u09C7\u09B8\u09CD\u0995 (\u09B0\u09BF\u09AF\u09BC\u09BE\u09A6)**  
+> *\u099F\u09CD\u09B0\u09C7\u0995 \u0995\u09A8\u09B8\u09BE\u09B2\u099F\u09C7\u09A8\u09CD\u09B8\u09BF | \u09AD\u09BF\u09B6\u09A8 \u09E8\u09E6\u09E9\u09E6 \u0995\u09B0\u09CD\u09AA\u09CB\u09B0\u09C7\u099F \u09AE\u09BE\u09B0\u09CD\u0995\u09C7\u099F \u098F\u09A8\u09CD\u099F\u09CD\u09B0\u09BF \u0993 \u098F\u09A8\u09CD\u099F\u09BE\u09B0\u09AA\u09CD\u09B0\u09BE\u0987\u099C \u09B8\u09B2\u09BF\u0989\u09B6\u09A8\u09B8*`;
+      return { reply: roadmap2, source: "AI" };
+    }
+    let roadmap = `### \u{1F3DB}\uFE0F Integrated Multi-Pillar Advisory \u2014 Turnkey Corporate Roadmap
+
+Yes, **${memory.identity.name}** seamlessly coordinates your entire expansion plan across our specialized in-house desks:
+
+`;
+    for (const item of matchedPillars) {
+      roadmap += `- \u{1F539} **${item.pillar.title}**: ${item.pillar.highlights[0]} (\u23F1\uFE0F ${item.pillar.turnaroundTime}).
+`;
+    }
+    if (isTimeline) {
+      roadmap += `
+- \u{1F539} **Turnaround Timelines**: Tracks are executed concurrently to eliminate bureaucratic delays and ensure rapid commercial activation.
+`;
+    }
+    roadmap += `
+> \u{1F4A1} **Concurrent Processing Advantage:**  
+> Tracks are executed concurrently to eliminate bureaucratic delays and ensure rapid commercial activation.
+
+> \u{1F3DB}\uFE0F **Senior Advisory & Legal Desk (Riyadh)**  
+> *Trek Consultancy | Vision 2030 Corporate Market Entry & Enterprise Solutions*`;
+    return { reply: roadmap, source: "AI" };
+  }
+  if (matchedPillars.length === 1) {
+    const p = matchedPillars[0].pillar;
+    if (isAr) {
+      let details2 = `### \u{1F3DB}\uFE0F ${p.title} \u2014 \u0625\u062D\u0627\u0637\u0629 \u0627\u0633\u062A\u0634\u0627\u0631\u064A\u0629 \u062A\u0646\u0641\u064A\u0630\u064A\u0629
+
+${p.summaryEn}
+
+`;
+      for (const h of p.highlights) {
+        details2 += `- \u{1F539} **${h.split(" ")[0]}**: ${h}
+`;
+      }
+      if (isTimeline) {
+        details2 += `
+- \u{1F539} **\u0627\u0644\u0645\u062F\u0629 \u0627\u0644\u0632\u0645\u0646\u064A\u0629 \u0627\u0644\u0645\u0639\u062A\u0645\u062F\u0629**: \u23F1\uFE0F ${p.turnaroundTime}
+`;
+      }
+      details2 += `
+> \u{1F4A1} **\u0627\u0644\u0645\u0643\u062A\u0628 \u0627\u0644\u0645\u0633\u0624\u0648\u0644:**  
+> ${p.responsibleTeam} \u064A\u0631\u0627\u0641\u0642\u0643 \u0639\u0628\u0631 \u0643\u0627\u0641\u0629 \u0627\u0644\u0625\u062C\u0631\u0627\u0621\u0627\u062A \u0627\u0644\u0646\u0638\u0627\u0645\u064A\u0629 \u062D\u062A\u0649 \u0627\u0643\u062A\u0645\u0627\u0644 \u0627\u0644\u0645\u0639\u0627\u0645\u0644\u0629.
+
+> \u{1F3DB}\uFE0F **\u0627\u0644\u0645\u0643\u062A\u0628 \u0627\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u064A \u0648\u0627\u0644\u062A\u0646\u0641\u064A\u0630\u064A \u0628\u0627\u0644\u0631\u064A\u0627\u0636**  
+> *\u062A\u0631\u064A\u0643 \u0644\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u0627\u062A | \u062A\u0623\u0633\u064A\u0633 \u0627\u0644\u0634\u0631\u0643\u0627\u062A \u0648\u062D\u0644\u0648\u0644 \u0627\u0644\u0623\u0639\u0645\u0627\u0644 \u0648\u0641\u0642 \u0631\u0624\u064A\u0629 2030*`;
+      return { reply: details2, source: "AI" };
+    }
+    if (isBn) {
+      let details2 = `### \u{1F3DB}\uFE0F ${p.titleBn} (${p.title}) \u2014 \u09B8\u09C1\u09A8\u09BF\u09B0\u09CD\u09A6\u09BF\u09B7\u09CD\u099F \u09AA\u09CD\u09B0\u09BE\u09A4\u09BF\u09B7\u09CD\u09A0\u09BE\u09A8\u09BF\u0995 \u09A4\u09A5\u09CD\u09AF
+
+${p.summaryBn}
+
+`;
+      for (const h of p.highlights) {
+        details2 += `- \u{1F539} **${h.split(" ")[0]}**: ${h}
+`;
+      }
+      if (isTimeline) {
+        details2 += `
+- \u{1F539} **\u09AA\u09CD\u09B0\u0995\u09CD\u09B0\u09BF\u09AF\u09BC\u09BE \u09B8\u09AE\u09CD\u09AA\u09A8\u09CD\u09A8 \u09B9\u0993\u09AF\u09BC\u09BE\u09B0 \u09B8\u09AE\u09AF\u09BC\u09B8\u09C0\u09AE\u09BE**: \u23F1\uFE0F ${p.turnaroundTime}
+`;
+      }
+      details2 += `
+> \u{1F4A1} **\u09A6\u09BE\u09AF\u09BC\u09BF\u09A4\u09CD\u09AC\u09AA\u09CD\u09B0\u09BE\u09AA\u09CD\u09A4 \u09AC\u09BF\u09AD\u09BE\u0997:**  
+> ${p.responsibleTeam}-\u098F\u09B0 \u09B8\u09BE\u09B0\u09CD\u09AC\u09BF\u0995 \u09A4\u09A4\u09CD\u09A4\u09CD\u09AC\u09BE\u09AC\u09A7\u09BE\u09A8\u09C7 \u09AA\u09CD\u09B0\u09A4\u09BF\u099F\u09BF \u09A7\u09BE\u09AA \u0986\u0987\u09A8\u0997\u09A4\u09AD\u09BE\u09AC\u09C7 \u09B8\u09C1\u09B0\u0995\u09CD\u09B7\u09BF\u09A4\u0964
+
+> \u{1F3DB}\uFE0F **\u09B8\u09BF\u09A8\u09BF\u09AF\u09BC\u09B0 \u0985\u09CD\u09AF\u09BE\u09A1\u09AD\u09BE\u0987\u099C\u09B0\u09BF \u0993 \u09B2\u09BF\u0997\u09CD\u09AF\u09BE\u09B2 \u09A1\u09C7\u09B8\u09CD\u0995 (\u09B0\u09BF\u09AF\u09BC\u09BE\u09A6)**  
+> *\u099F\u09CD\u09B0\u09C7\u0995 \u0995\u09A8\u09B8\u09BE\u09B2\u099F\u09C7\u09A8\u09CD\u09B8\u09BF | \u09AD\u09BF\u09B6\u09A8 \u09E8\u09E6\u09E9\u09E6 \u0995\u09B0\u09CD\u09AA\u09CB\u09B0\u09C7\u099F \u09AE\u09BE\u09B0\u09CD\u0995\u09C7\u099F \u098F\u09A8\u09CD\u099F\u09CD\u09B0\u09BF \u0993 \u098F\u09A8\u09CD\u099F\u09BE\u09B0\u09AA\u09CD\u09B0\u09BE\u0987\u099C \u09B8\u09B2\u09BF\u0989\u09B6\u09A8\u09B8*`;
+      return { reply: details2, source: "AI" };
+    }
+    let details = `### \u{1F3DB}\uFE0F ${p.title} \u2014 Executive Advisory Briefing
+
+${p.summaryEn}
+
+`;
+    for (const h of p.highlights) {
+      details += `- \u{1F539} **${h.split(" ")[0]}**: ${h}
+`;
+    }
+    if (isTimeline) {
+      details += `
+- \u{1F539} **Turnaround Timeframe**: \u23F1\uFE0F ${p.turnaroundTime}
+`;
+    }
+    details += `
+> \u{1F4A1} **Operational Deliverable:**  
+> Managed directly by ${p.responsibleTeam} under formal institutional service level agreements.
+
+> \u{1F3DB}\uFE0F **Senior Advisory & Legal Desk (Riyadh)**  
+> *Trek Consultancy | Vision 2030 Corporate Market Entry & Enterprise Solutions*`;
+    return { reply: details, source: "AI" };
+  }
+  if (bestDoc && bestDocScore >= 20) {
+    if (isBn) {
       return {
-        reply: `### ${p1.titleBn} (${p1.title}) \u2014 \u09AA\u09C2\u09B0\u09CD\u09A3\u09BE\u0999\u09CD\u0997 \u099F\u09BE\u09B0\u09CD\u09A8\u0995\u09BF \u0997\u09BE\u0987\u09A1\u09B2\u09BE\u0987\u09A8
+        reply: `### \u{1F3DB}\uFE0F ${bestDoc.title} \u2014 \u09AA\u09CD\u09B0\u09BE\u09A4\u09BF\u09B7\u09CD\u09A0\u09BE\u09A8\u09BF\u0995 \u09A8\u09B2\u09C7\u099C \u09AC\u09C7\u09B8
 
-\u09B8\u09CC\u09A6\u09BF \u0986\u09B0\u09AC\u09C7\u09B0 \u09AD\u09BF\u09B6\u09A8 \u09E8\u09E6\u09E9\u09E6-\u098F\u09B0 \u0985\u09A7\u09C0\u09A8\u09C7 \u0995\u09CB\u09A8\u09CB \u09B8\u09CD\u09A5\u09BE\u09A8\u09C0\u09AF\u09BC \u09B8\u09CC\u09A6\u09BF \u09B8\u09CD\u09AA\u09A8\u09CD\u09B8\u09B0 \u099B\u09BE\u09A1\u09BC\u09BE\u0987 \u09AC\u09BF\u09A6\u09C7\u09B6\u09BF \u0989\u09A6\u09CD\u09AF\u09CB\u0995\u09CD\u09A4\u09BE\u09B0\u09BE \u09E7\u09E6\u09E6% \u0995\u09CB\u09AE\u09CD\u09AA\u09BE\u09A8\u09BF\u09B0 \u09AA\u09C2\u09B0\u09CD\u09A3 \u09AE\u09BE\u09B2\u09BF\u0995\u09BE\u09A8\u09BE \u09B2\u09BE\u09AD \u0995\u09B0\u09A4\u09C7 \u09AA\u09BE\u09B0\u09C7\u09A8\u0964
+${bestDoc.summary}
 
-- **\u09E7\u09E6\u09E6% \u09AC\u09BF\u09A6\u09C7\u09B6\u09BF \u09AE\u09BE\u09B2\u09BF\u0995\u09BE\u09A8\u09BE**: \u09B8\u09AE\u09CD\u09AA\u09C2\u09B0\u09CD\u09A3 \u0987\u0995\u09C1\u0987\u099F\u09BF \u098F\u09AC\u0982 \u09AC\u09BE\u09A3\u09BF\u099C\u09CD\u09AF\u09BF\u0995 \u09A8\u09BF\u09AF\u09BC\u09A8\u09CD\u09A4\u09CD\u09B0\u09A3 \u09AC\u09BF\u09A6\u09C7\u09B6\u09BF \u09AC\u09BF\u09A8\u09BF\u09AF\u09BC\u09CB\u0997\u0995\u09BE\u09B0\u09C0\u09B0 \u09A8\u09BF\u099C\u09B8\u09CD\u09AC \u09A5\u09BE\u0995\u09AC\u09C7\u0964
-- **MISA \u0987\u09A8\u09AD\u09C7\u09B8\u09CD\u099F\u09AE\u09C7\u09A8\u09CD\u099F \u09B2\u09BE\u0987\u09B8\u09C7\u09A8\u09CD\u09B8**: \u09AC\u09BE\u09A3\u09BF\u099C\u09CD\u09AF \u09AE\u09A8\u09CD\u09A4\u09CD\u09B0\u09A3\u09BE\u09B2\u09AF\u09BC\u09C7 \u0986\u09AC\u09C7\u09A6\u09A8\u09C7\u09B0 \u09AA\u09C2\u09B0\u09CD\u09AC\u09C7 Ministry of Investment \u09A5\u09C7\u0995\u09C7 \u09B2\u09BE\u0987\u09B8\u09C7\u09A8\u09CD\u09B8 \u09B8\u0982\u0997\u09CD\u09B0\u09B9 (${p1.turnaroundTime})\u0964
-- **\u0995\u09AE\u09BE\u09B0\u09CD\u09B6\u09BF\u09AF\u09BC\u09BE\u09B2 \u09B0\u09C7\u099C\u09BF\u09B8\u09CD\u099F\u09CD\u09B0\u09C7\u09B6\u09A8 (CR)**: \u09AC\u09BE\u09A3\u09BF\u099C\u09CD\u09AF \u09AE\u09A8\u09CD\u09A4\u09CD\u09B0\u09A3\u09BE\u09B2\u09AF\u09BC (MoC) \u09A5\u09C7\u0995\u09C7 \u0985\u09AB\u09BF\u09B8\u09BF\u09AF\u09BC\u09BE\u09B2 \u09AC\u09BE\u09A3\u09BF\u099C\u09CD\u09AF\u09BF\u0995 \u09A8\u09BF\u09AC\u09A8\u09CD\u09A7\u09A8\u09AA\u09A4\u09CD\u09B0 \u0987\u09B8\u09CD\u09AF\u09C1\u0964
-- **AoA \u0993 \u09A8\u09CB\u099F\u09BE\u09B0\u09BF \u09AA\u09BE\u09AC\u09B2\u09BF\u0995**: \u0985\u09A8\u09C1\u09AE\u09CB\u09A6\u09BF\u09A4 \u09A8\u09CB\u099F\u09BE\u09B0\u09BF\u09B0 \u09AE\u09BE\u09A7\u09CD\u09AF\u09AE\u09C7 \u0986\u09B0\u09CD\u099F\u09BF\u0995\u09C7\u09B2\u09B8 \u0985\u09AB \u0985\u09CD\u09AF\u09BE\u09B8\u09CB\u09B8\u09BF\u09AF\u09BC\u09C7\u09B6\u09A8 \u0986\u0987\u09A8\u0997\u09A4 \u0985\u09A8\u09C1\u09AE\u09CB\u09A6\u09A8\u0964
-- **\u0995\u09B0\u09CD\u09AA\u09CB\u09B0\u09C7\u099F \u09AC\u09CD\u09AF\u09BE\u0982\u0995 \u0985\u09CD\u09AF\u09BE\u0995\u09BE\u0989\u09A8\u09CD\u099F \u0993 \u09A8\u09CD\u09AF\u09BE\u09B6\u09A8\u09BE\u09B2 \u0985\u09CD\u09AF\u09BE\u09A1\u09CD\u09B0\u09C7\u09B8**: \u09B0\u09BF\u09AF\u09BC\u09BE\u09A6\u09C7 \u09A8\u09BF\u09AC\u09A8\u09CD\u09A7\u09BF\u09A4 \u09A8\u09CD\u09AF\u09BE\u09B6\u09A8\u09BE\u09B2 \u0985\u09CD\u09AF\u09BE\u09A1\u09CD\u09B0\u09C7\u09B8 (SPL) \u098F\u09AC\u0982 \u099F\u09BF\u09AF\u09BC\u09BE\u09B0-\u09E7 \u09AC\u09CD\u09AF\u09BE\u0982\u0995\u09C7 \u0995\u09B0\u09CD\u09AA\u09CB\u09B0\u09C7\u099F \u0985\u09CD\u09AF\u09BE\u0995\u09BE\u0989\u09A8\u09CD\u099F\u0964
+- \u{1F539} **\u0995\u09CD\u09AF\u09BE\u099F\u09C7\u0997\u09B0\u09BF**: ${bestDoc.category}
+- \u{1F539} **\u09AE\u09C2\u09B2 \u09AC\u09BF\u09AC\u09B0\u09A3**: ${bestDoc.content.slice(0, 300)}...
 
----
-> **\u09B8\u09BF\u09A8\u09BF\u09AF\u09BC\u09B0 \u09B2\u09BF\u0997\u09CD\u09AF\u09BE\u09B2 \u09A1\u09C7\u09B8\u09CD\u0995:** \u099F\u09CD\u09B0\u09C7\u0995 \u0995\u09A8\u09B8\u09BE\u09B2\u099F\u09C7\u09A8\u09CD\u09B8\u09BF\u09B0 \u09B0\u09BF\u09AF\u09BC\u09BE\u09A6 \u09B2\u09BF\u0997\u09CD\u09AF\u09BE\u09B2 \u0993 \u0985\u09CD\u09AF\u09BE\u09A1\u09AD\u09BE\u0987\u099C\u09B0\u09BF \u09A1\u09C7\u09B8\u09CD\u0995 \u098F\u0987 \u09B8\u09AE\u09CD\u09AA\u09C2\u09B0\u09CD\u09A3 \u09AA\u09CD\u09B0\u0995\u09CD\u09B0\u09BF\u09AF\u09BC\u09BE\u099F\u09BF \u099F\u09BE\u09B0\u09CD\u09A8\u0995\u09BF \u09AD\u09BF\u09A4\u09CD\u09A4\u09BF\u09A4\u09C7 \u09B8\u09B0\u09BE\u09B8\u09B0\u09BF \u09AA\u09B0\u09BF\u099A\u09BE\u09B2\u09A8\u09BE \u0995\u09B0\u09C7\u0964`,
-        source: "AI"
+> \u{1F4A1} **\u09B8\u09BF\u09A8\u09BF\u09AF\u09BC\u09B0 \u0985\u09CD\u09AF\u09BE\u09A1\u09AD\u09BE\u0987\u099C\u09B0\u09BF \u09A1\u09C7\u09B8\u09CD\u0995:**  
+> \u09AC\u09BF\u09B8\u09CD\u09A4\u09BE\u09B0\u09BF\u09A4 \u09A4\u09A5\u09CD\u09AF\u09C7\u09B0 \u099C\u09A8\u09CD\u09AF \u0986\u09AE\u09BE\u09A6\u09C7\u09B0 \u09B8\u09BE\u09AA\u09CB\u09B0\u09CD\u099F \u0995\u09A8\u09B8\u09BE\u09B2\u099F\u09C7\u09A8\u09CD\u099F\u09C7\u09B0 \u09B8\u09BE\u09A5\u09C7 \u09B8\u09B0\u09BE\u09B8\u09B0\u09BF \u09B8\u0982\u09AF\u09C1\u0995\u09CD\u09A4 \u09B9\u09A4\u09C7 \u09AA\u09BE\u09B0\u09C7\u09A8\u0964
+
+> \u{1F3DB}\uFE0F **\u09B8\u09BF\u09A8\u09BF\u09AF\u09BC\u09B0 \u0985\u09CD\u09AF\u09BE\u09A1\u09AD\u09BE\u0987\u099C\u09B0\u09BF \u0993 \u09B2\u09BF\u0997\u09CD\u09AF\u09BE\u09B2 \u09A1\u09C7\u09B8\u09CD\u0995 (\u09B0\u09BF\u09AF\u09BC\u09BE\u09A6)**  
+> *\u099F\u09CD\u09B0\u09C7\u0995 \u0995\u09A8\u09B8\u09BE\u09B2\u099F\u09C7\u09A8\u09CD\u09B8\u09BF | \u09AD\u09BF\u09B6\u09A8 \u09E8\u09E6\u09E9\u09E6 \u0995\u09B0\u09CD\u09AA\u09CB\u09B0\u09C7\u099F \u09AE\u09BE\u09B0\u09CD\u0995\u09C7\u099F \u098F\u09A8\u09CD\u099F\u09CD\u09B0\u09BF \u0993 \u098F\u09A8\u09CD\u099F\u09BE\u09B0\u09AA\u09CD\u09B0\u09BE\u0987\u099C \u09B8\u09B2\u09BF\u0989\u09B6\u09A8\u09B8*`,
+        source: "DOC"
       };
     }
     return {
-      reply: `### ${p1.title} \u2014 Turnkey Institutional Advisory
+      reply: `### \u{1F3DB}\uFE0F ${bestDoc.title} \u2014 Institutional Knowledge Base
 
-Under Saudi Vision 2030, foreign investors and global companies can establish fully owned entities in the Kingdom without requiring a local Saudi national sponsor.
+${bestDoc.summary}
 
-- **100% Foreign Ownership**: Foreign investors retain complete equity and full corporate control under Vision 2030.
-- **MISA Investment License**: Expedited licensing through the Ministry of Investment (${p1.turnaroundTime}).
-- **Commercial Registration (CR)**: Corporate registration issued directly by the Ministry of Commerce.
-- **Articles of Association (AoA)**: Legalized through an accredited Saudi notary public.
-- **Corporate Banking & National Address (SPL)**: Registered commercial address and corporate tier-1 bank account opening.
+- \u{1F539} **Category**: ${bestDoc.category}
+- \u{1F539} **Core Highlights**: ${bestDoc.content.slice(0, 300)}...
 
----
-> **Senior Advisory Desk:** Trek Consultancy's Senior Advisory & Legal Desk in Riyadh oversees your entire process end-to-end on a turnkey basis.`,
-      source: "AI"
+> \u{1F4A1} **Senior Advisory Desk:**  
+> Our corporate advisory team is available for deep-dive consultative guidance on this topic.
+
+> \u{1F3DB}\uFE0F **Senior Advisory & Legal Desk (Riyadh)**  
+> *Trek Consultancy | Vision 2030 Corporate Market Entry & Enterprise Solutions*`,
+      source: "DOC"
     };
   }
-  if (isPillar2) {
-    const p2 = memory.pillars[1];
-    if (isAr) {
-      return {
-        reply: `### \u0627\u0644\u062D\u0644\u0648\u0644 \u0627\u0644\u0628\u0631\u0645\u062C\u064A\u0629 \u0648\u0627\u0644\u0647\u0646\u062F\u0633\u0629 \u0627\u0644\u0631\u0642\u0645\u064A\u0629 \u2014 \u0623\u0646\u0638\u0645\u0629 \u0645\u0624\u0633\u0633\u064A\u0629 \u0645\u062A\u0637\u0648\u0631\u0629
-
-\u064A\u0642\u062F\u0645 \u0642\u0633\u0645 \u0627\u0644\u0647\u0646\u062F\u0633\u0629 \u0627\u0644\u0628\u0631\u0645\u062C\u064A\u0629 \u0641\u064A \u062A\u0631\u064A\u0643 \u062D\u0644\u0648\u0644\u0627\u064B \u0631\u0642\u0645\u064A\u0629 \u0645\u0635\u0645\u0645\u0629 \u062E\u0635\u064A\u0635\u0627\u064B \u0644\u0644\u0634\u0631\u0643\u0627\u062A \u0648\u0627\u0644\u0645\u0624\u0633\u0633\u0627\u062A \u0627\u0644\u0643\u0628\u0631\u0649.
-
-- **\u0623\u0646\u0638\u0645\u0629 ERP \u0645\u062E\u0635\u0635\u0629**: \u0623\u062A\u0645\u062A\u0629 \u0627\u0644\u0639\u0645\u0644\u064A\u0627\u062A \u0627\u0644\u0625\u062F\u0627\u0631\u064A\u0629\u060C \u0648\u0625\u062F\u0627\u0631\u0629 \u0627\u0644\u0645\u0633\u062A\u0648\u062F\u0639\u0627\u062A\u060C \u0648\u0644\u0648\u062D\u0627\u062A \u0627\u0644\u062A\u062D\u0643\u0645 \u0627\u0644\u062A\u0634\u063A\u064A\u0644\u064A\u0629.
-- **\u0645\u0646\u0635\u0627\u062A \u0627\u0644\u0648\u064A\u0628 \u0648\u062A\u0637\u0628\u064A\u0642\u0627\u062A \u0627\u0644\u062C\u0648\u0627\u0644**: \u062D\u0644\u0648\u0644 \u0645\u062A\u0643\u0627\u0645\u0644\u0629 \u0645\u0628\u0646\u064A\u0629 \u0628\u0623\u062D\u062F\u062B \u0627\u0644\u062A\u0642\u0646\u064A\u0627\u062A \u0645\u062B\u0644 React \u0648TypeScript \u0648Node.js.
-- **\u0633\u062D\u0627\u0628\u0629 \u0648\u0642\u0648\u0627\u0639\u062F \u0628\u064A\u0627\u0646\u0627\u062A \u0645\u0631\u0646\u0629**: \u0628\u0646\u064A\u0629 \u062A\u062D\u062A\u064A\u0629 \u0639\u0627\u0644\u064A\u0629 \u0627\u0644\u0623\u062F\u0627\u0621 \u0645\u0639 \u0642\u0648\u0627\u0639\u062F \u0628\u064A\u0627\u0646\u0627\u062A Neon PostgreSQL \u0648\u0648\u0627\u062C\u0647\u0627\u062A \u0628\u0631\u0645\u062C\u064A\u0629 \u0622\u0645\u0646\u0629.
-- **\u0623\u062A\u0645\u062A\u0629 \u0627\u0644\u0623\u0639\u0645\u0627\u0644 \u0628\u0627\u0644\u0630\u0643\u0627\u0621 \u0627\u0644\u0627\u0635\u0637\u0646\u0627\u0639\u064A**: \u0645\u0633\u0627\u0639\u062F\u0648\u0646 \u0623\u0630\u0643\u064A\u0627\u0621\u060C \u0648\u0645\u062D\u0631\u0643\u0627\u062A \u0623\u062A\u0645\u062A\u0629 \u0627\u0644\u0625\u062C\u0631\u0627\u0621\u0627\u062A \u0648\u0645\u0639\u0627\u0644\u062C\u0629 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A.
-
----
-> **\u0642\u0633\u0645 \u0627\u0644\u0647\u0646\u062F\u0633\u0629 \u0627\u0644\u062A\u0642\u0646\u064A\u0629:** \u062A\u0646\u0641\u0630 \u062C\u0645\u064A\u0639 \u0627\u0644\u0645\u0634\u0627\u0631\u064A\u0639 \u0645\u0628\u0627\u0634\u0631\u0629 \u0639\u0628\u0631 \u0641\u0631\u064A\u0642 \u0627\u0644\u0645\u0647\u0646\u062F\u0633\u064A\u0646 \u0627\u0644\u0645\u062A\u062E\u0635\u0635\u064A\u0646 \u0641\u064A \u062A\u0631\u064A\u0643 \u0645\u0639 \u0627\u0644\u062A\u0632\u0627\u0645 \u0643\u0627\u0645\u0644 \u0628\u0627\u062A\u0641\u0627\u0642\u064A\u0627\u062A \u0645\u0633\u062A\u0648\u0649 \u0627\u0644\u062E\u062F\u0645\u0629 (SLA).`,
-        source: "AI"
-      };
-    }
-    if (isBn) {
-      return {
-        reply: `### ${p2.titleBn} (${p2.title}) \u2014 \u09AA\u09CD\u09B0\u09BE\u09A4\u09BF\u09B7\u09CD\u09A0\u09BE\u09A8\u09BF\u0995 \u09AA\u09CD\u09B0\u09AF\u09C1\u0995\u09CD\u09A4\u09BF \u09B8\u09C7\u09AC\u09BE
-
-\u099F\u09CD\u09B0\u09C7\u0995 \u0995\u09A8\u09B8\u09BE\u09B2\u099F\u09C7\u09A8\u09CD\u09B8\u09BF\u09B0 \u0987\u09A8-\u09B9\u09BE\u0989\u09B8 \u099F\u09C7\u0995 \u09A1\u09BF\u09AD\u09BF\u09B6\u09A8 \u0986\u09A7\u09C1\u09A8\u09BF\u0995 \u098F\u09A8\u09CD\u099F\u09BE\u09B0\u09AA\u09CD\u09B0\u09BE\u0987\u099C \u09AA\u09CD\u09B0\u09AF\u09C1\u0995\u09CD\u09A4\u09BF\u09B0 \u09AE\u09BE\u09A7\u09CD\u09AF\u09AE\u09C7 \u09AC\u09CD\u09AF\u09AC\u09B8\u09BE \u09A1\u09BF\u099C\u09BF\u099F\u09BE\u09B2\u09BE\u0987\u099C\u09C7\u09B6\u09A8 \u09AA\u09B0\u09BF\u099A\u09BE\u09B2\u09A8\u09BE \u0995\u09B0\u09C7\u0964
-
-- **\u0995\u09BE\u09B8\u09CD\u099F\u09AE \u098F\u09A8\u09CD\u099F\u09BE\u09B0\u09AA\u09CD\u09B0\u09BE\u0987\u099C ERP**: \u09AC\u09CD\u09AF\u09AC\u09B8\u09BE\u09B0 \u09B8\u09BE\u09AE\u0997\u09CD\u09B0\u09BF\u0995 \u0995\u09BE\u099C\u09C7\u09B0 \u09A7\u09BE\u09B0\u09BE \u0985\u099F\u09CB\u09AE\u09C7\u09B6\u09A8, \u0987\u09A8\u09AD\u09C7\u09A8\u09CD\u099F\u09B0\u09BF \u0993 \u0985\u09AA\u09BE\u09B0\u09C7\u09B6\u09A8\u09BE\u09B2 \u09A1\u09CD\u09AF\u09BE\u09B6\u09AC\u09CB\u09B0\u09CD\u09A1\u0964
-- **\u09B8\u09CD\u0995\u09C7\u09B2\u09C7\u09AC\u09B2 \u0993\u09AF\u09BC\u09C7\u09AC \u0993 \u09AE\u09CB\u09AC\u09BE\u0987\u09B2 \u09AA\u09CD\u09B2\u09CD\u09AF\u09BE\u099F\u09AB\u09B0\u09CD\u09AE**: React, TypeScript, Node.js \u0993 \u0986\u09A7\u09C1\u09A8\u09BF\u0995 \u0995\u09CD\u09B2\u09BE\u0989\u09A1 \u0986\u09B0\u09CD\u0995\u09BF\u099F\u09C7\u0995\u099A\u09BE\u09B0 \u09A6\u09CD\u09AC\u09BE\u09B0\u09BE \u09A8\u09BF\u09B0\u09CD\u09AE\u09BF\u09A4 \u09B8\u09AE\u09BE\u09A7\u09BE\u09A8\u0964
-- **\u0995\u09CD\u09B2\u09BE\u0989\u09A1 \u0993 \u09A1\u09BE\u099F\u09BE\u09AC\u09C7\u099C \u09B8\u09BF\u0995\u09BF\u0989\u09B0\u09BF\u099F\u09BF**: Neon PostgreSQL \u09AA\u09BE\u09B0\u09B8\u09BF\u09B8\u09CD\u099F\u09C7\u09A8\u09CD\u09B8, \u0989\u099A\u09CD\u099A-\u0997\u09A4\u09BF\u09B8\u09AE\u09CD\u09AA\u09A8\u09CD\u09A8 \u09AE\u09BE\u0987\u0995\u09CD\u09B0\u09CB\u09B8\u09BE\u09B0\u09CD\u09AD\u09BF\u09B8\u09C7\u09B8 \u0993 \u09B8\u09BF\u0995\u09BF\u0989\u09B0 \u098F\u09AA\u09BF\u0986\u0987\u0964
-- **\u098F\u0986\u0987 \u09B8\u09BE\u09AA\u09CB\u09B0\u09CD\u099F \u0993 \u0985\u099F\u09CB\u09AE\u09C7\u09B6\u09A8**: \u0987\u09A8\u09CD\u099F\u09C7\u09B2\u09BF\u099C\u09C7\u09A8\u09CD\u099F \u099A\u09CD\u09AF\u09BE\u099F \u0985\u09CD\u09AF\u09BE\u09B8\u09BF\u09B8\u09CD\u099F\u09CD\u09AF\u09BE\u09A8\u09CD\u099F, \u0993\u09AF\u09BC\u09BE\u09B0\u09CD\u0995\u09AB\u09CD\u09B2\u09CB \u0987\u099E\u09CD\u099C\u09BF\u09A8 \u0993 \u09A1\u09C7\u099F\u09BE \u09AA\u09CD\u09B0\u09B8\u09C7\u09B8\u09BF\u0982\u0964
-
----
-> **\u099F\u09C7\u0995 \u09A1\u09BF\u09AD\u09BF\u09B6\u09A8:** \u09B8\u0995\u09B2 \u09AA\u09CD\u09B0\u09AF\u09C1\u0995\u09CD\u09A4\u09BF \u09AA\u09CD\u09B0\u0995\u09B2\u09CD\u09AA \u09B8\u09B0\u09BE\u09B8\u09B0\u09BF \u099F\u09CD\u09B0\u09C7\u0995 \u0995\u09A8\u09B8\u09BE\u09B2\u099F\u09C7\u09A8\u09CD\u09B8\u09BF\u09B0 \u09A8\u09BF\u099C\u09B8\u09CD\u09AC \u09A6\u0995\u09CD\u09B7 \u0987\u099E\u09CD\u099C\u09BF\u09A8\u09BF\u09AF\u09BC\u09BE\u09B0\u09BF\u0982 \u099F\u09BF\u09AE \u0995\u09B0\u09CD\u09A4\u09C3\u0995 \u09A1\u09C7\u09B2\u09BF\u09AD\u09BE\u09B0\u09BF \u0995\u09B0\u09BE \u09B9\u09AF\u09BC\u0964`,
-        source: "AI"
-      };
-    }
+  if (bestTicket && bestTicketScore >= 20) {
     return {
-      reply: `### ${p2.title} \u2014 Institutional Technology Solutions
+      reply: `### \u{1F3DB}\uFE0F ${bestTicket.subject} \u2014 Verified Consultant Resolution
 
-Trek Consultancy delivers mission-critical digital systems built specifically for enterprise scale and security.
+${bestTicket.adminAnswer}
 
-- **Custom Enterprise ERP**: Tailored business management, process automation, and operational dashboards.
-- **Scalable Web & Mobile Platforms**: Full-stack systems engineered with React, TypeScript, Node.js, and modern cloud stacks.
-- **Cloud & Database Resilience**: High-throughput microservices, Neon PostgreSQL persistence, and secure APIs.
-- **AI Business Automation**: Intelligent conversational assistants, automated workflow engines, and process optimization.
+> \u{1F4A1} **Verified Resolution by ${bestTicket.assignedTo}:**  
+> Case #${bestTicket.ticketNumber} verified institutional resolution.
 
----
-> **Engineering Division:** Delivered directly by Trek Consultancy's in-house engineering division with enterprise SLA.`,
-      source: "AI"
-    };
-  }
-  if (isPillar3) {
-    const p3 = memory.pillars[2];
-    if (isAr) {
-      return {
-        reply: `### \u062E\u062F\u0645\u0627\u062A \u0627\u0644\u062A\u0623\u0634\u064A\u0631\u0627\u062A \u0648\u0627\u0644\u062A\u0639\u0642\u064A\u0628 \u0627\u0644\u062D\u0643\u0648\u0645\u064A (PRO) \u2014 \u0627\u0644\u0627\u0645\u062A\u062B\u0627\u0644 \u0648\u0627\u0644\u0625\u0642\u0627\u0645\u0627\u062A
-
-\u0625\u062F\u0627\u0631\u0629 \u0645\u062A\u0643\u0627\u0645\u0644\u0629 \u0644\u0644\u0639\u0644\u0627\u0642\u0627\u062A \u0627\u0644\u062D\u0643\u0648\u0645\u064A\u0629 \u0648\u0625\u0635\u062F\u0627\u0631 \u062A\u0623\u0634\u064A\u0631\u0627\u062A \u0627\u0644\u0643\u0648\u0627\u062F\u0631 \u0627\u0644\u062A\u0646\u0641\u064A\u0630\u064A\u0629 \u0648\u0627\u0644\u0639\u0645\u0627\u0644\u064A\u0629 \u0648\u0641\u0642 \u0627\u0644\u0623\u0646\u0638\u0645\u0629 \u0627\u0644\u0633\u0639\u0648\u062F\u064A\u0629.
-
-- **\u062A\u0623\u0634\u064A\u0631\u0627\u062A \u0627\u0644\u0645\u0633\u062A\u062B\u0645\u0631\u064A\u0646 \u0648\u062A\u0635\u0627\u0631\u064A\u062D \u0627\u0644\u0639\u0645\u0644**: \u0623\u0630\u0648\u0646\u0627\u062A \u0627\u0644\u062F\u062E\u0648\u0644 \u0644\u0643\u0628\u0627\u0631 \u0627\u0644\u0645\u0633\u0624\u0648\u0644\u064A\u0646 \u0648\u0627\u0644\u0634\u0631\u0643\u0627\u0621 \u0648\u0627\u0644\u0645\u0648\u0638\u0641\u064A\u0646 \u0627\u0644\u0641\u0646\u064A\u064A\u0646.
-- **\u0625\u0635\u062F\u0627\u0631 \u0627\u0644\u0625\u0642\u0627\u0645\u0627\u062A \u0648\u062A\u062C\u062F\u064A\u062F\u0647\u0627**: \u0625\u062F\u0627\u0631\u0629 \u0633\u0646\u0648\u064A\u0629 \u0643\u0627\u0645\u0644\u0629 \u0644\u0625\u0635\u062F\u0627\u0631 \u0648\u062A\u062C\u062F\u064A\u062F \u0647\u0648\u064A\u0627\u062A \u0645\u0642\u064A\u0645 \u0627\u0644\u0646\u0638\u0627\u0645\u064A\u0629.
-- **\u0645\u0646\u0635\u062A\u0627 \u0642\u0648\u0649 \u0648\u0645\u0642\u064A\u0645**: \u062A\u0648\u062B\u064A\u0642 \u0639\u0642\u0648\u062F \u0627\u0644\u0639\u0645\u0644\u060C \u0648\u0646\u0633\u0628 \u0627\u0644\u062A\u0648\u0637\u064A\u0646\u060C \u0648\u0625\u062F\u0627\u0631\u0629 \u062A\u0641\u0648\u064A\u0636\u0627\u062A \u0627\u0644\u0639\u0627\u0645\u0644\u064A\u0646 \u0639\u0628\u0631 \u0648\u0632\u0627\u0631\u0629 \u0627\u0644\u0645\u0648\u0627\u0631\u062F \u0627\u0644\u0628\u0634\u0631\u064A\u0629.
-- **\u062A\u0635\u062F\u064A\u0642\u0627\u062A \u0648\u0632\u0627\u0631\u0629 \u0627\u0644\u062E\u0627\u0631\u062C\u064A\u0629 (MOFA)**: \u062A\u0635\u062F\u064A\u0642 \u0627\u0644\u0645\u0633\u062A\u0646\u062F\u0627\u062A \u0648\u0627\u0644\u0648\u062B\u0627\u0626\u0642 \u0639\u0628\u0631 \u0627\u0644\u062E\u0627\u0631\u062C\u064A\u0629 \u0648\u0627\u0644\u0633\u0641\u0627\u0631\u0627\u062A \u0627\u0644\u0645\u0639\u062A\u0645\u062F\u0629.
-
----
-> **\u0645\u0643\u062A\u0628 \u0627\u0644\u062A\u0639\u0642\u064A\u0628 \u0627\u0644\u062D\u0643\u0648\u0645\u064A:** \u062A\u062F\u0627\u0631 \u0627\u0644\u0645\u0639\u0627\u0645\u0644\u0627\u062A \u0645\u0628\u0627\u0634\u0631\u0629 \u0639\u0628\u0631 \u0645\u0639\u0642\u0628\u064A\u0646\u0627 \u0627\u0644\u0645\u0639\u062A\u0645\u062F\u064A\u0646 \u0641\u064A \u0627\u0644\u0631\u064A\u0627\u0636 \u0644\u0636\u0645\u0627\u0646 \u0633\u0631\u0639\u0629 \u0627\u0644\u0625\u0646\u062C\u0627\u0632.`,
-        source: "AI"
-      };
-    }
-    if (isBn) {
-      return {
-        reply: `### ${p3.titleBn} (${p3.title}) \u2014 \u09B0\u09C7\u09B8\u09BF\u09A1\u09C7\u09A8\u09CD\u09B8\u09BF \u0993 \u09B6\u09CD\u09B0\u09AE \u09AE\u09A8\u09CD\u09A4\u09CD\u09B0\u09A3\u09BE\u09B2\u09AF\u09BC \u09B2\u09BF\u09AF\u09BC\u09BE\u099C\u09CB\u0981
-
-\u09B8\u09CC\u09A6\u09BF \u0986\u09B0\u09AC\u09C7\u09B0 \u09B6\u09CD\u09B0\u09AE \u0986\u0987\u09A8 \u0993 \u09B8\u09B0\u0995\u09BE\u09B0\u09BF \u09AA\u09CB\u09B0\u09CD\u099F\u09BE\u09B2\u09B8\u09AE\u09C2\u09B9\u09C7 \u09B8\u09AE\u09CD\u09AA\u09C2\u09B0\u09CD\u09A3 \u0986\u0987\u09A8\u0997\u09A4 \u09B8\u09B9\u09BE\u09AF\u09BC\u09A4\u09BE \u0993 \u09B0\u09C7\u09B8\u09BF\u09A1\u09C7\u09A8\u09CD\u09B8\u09BF \u09AC\u09CD\u09AF\u09AC\u09B8\u09CD\u09A5\u09BE\u09AA\u09A8\u09BE\u0964
-
-- **\u0987\u09A8\u09AD\u09C7\u09B8\u09CD\u099F\u09B0 \u09AD\u09BF\u09B8\u09BE \u0993 \u0993\u09AF\u09BC\u09BE\u09B0\u09CD\u0995 \u09AA\u09BE\u09B0\u09AE\u09BF\u099F**: \u09AC\u09BF\u09A6\u09C7\u09B6\u09BF \u09AC\u09BF\u09A8\u09BF\u09AF\u09BC\u09CB\u0997\u0995\u09BE\u09B0\u09C0, \u09AA\u09BE\u09B0\u09CD\u099F\u09A8\u09BE\u09B0 \u0993 \u0995\u09BE\u09B0\u09BF\u0997\u09B0\u09BF \u09A8\u09BF\u09B0\u09CD\u09AC\u09BE\u09B9\u09C0\u09A6\u09C7\u09B0 \u099C\u09A8\u09CD\u09AF \u098F\u09A8\u09CD\u099F\u09CD\u09B0\u09BF \u09AA\u09BE\u09B0\u09AE\u09BF\u099F\u0964
-- **\u09B0\u09C7\u09B8\u09BF\u09A1\u09C7\u09A8\u09CD\u099F \u0987\u0995\u09BE\u09AE\u09BE (Iqama)**: \u09AC\u09BE\u09B0\u09CD\u09B7\u09BF\u0995 \u09B8\u0982\u09AC\u09BF\u09A7\u09BF\u09AC\u09A6\u09CD\u09A7 \u09B0\u09C7\u09B8\u09BF\u09A1\u09C7\u09A8\u09CD\u09B8\u09BF \u0995\u09BE\u09B0\u09CD\u09A1 \u0987\u09B8\u09CD\u09AF\u09C1 \u0993 \u09B0\u09BF\u09A8\u09BF\u0989\u09AF\u09BC\u09BE\u09B2 \u09AC\u09CD\u09AF\u09AC\u09B8\u09CD\u09A5\u09BE\u09AA\u09A8\u09BE\u0964
-- **Qiwa \u0993 Muqeem \u09AA\u09CB\u09B0\u09CD\u099F\u09BE\u09B2**: \u09B8\u09B0\u0995\u09BE\u09B0\u09BF \u09B6\u09CD\u09B0\u09AE \u09AE\u09A8\u09CD\u09A4\u09CD\u09B0\u09A3\u09BE\u09B2\u09AF\u09BC\u09C7\u09B0 \u09A1\u09BF\u099C\u09BF\u099F\u09BE\u09B2 \u0995\u09AE\u09AA\u09CD\u09B2\u09BE\u09AF\u09BC\u09C7\u09A8\u09CD\u09B8, \u099A\u09C1\u0995\u09CD\u09A4\u09BF \u09A8\u09BF\u09AC\u09A8\u09CD\u09A7\u09A8 \u0993 \u099F\u09CD\u09B0\u09BE\u09A8\u09CD\u09B8\u09AB\u09BE\u09B0\u0964
-- **\u09B8\u09B0\u0995\u09BE\u09B0\u09BF \u09B8\u09A4\u09CD\u09AF\u09BE\u09AF\u09BC\u09A8 (MOFA)**: \u09AA\u09B0\u09B0\u09BE\u09B7\u09CD\u099F\u09CD\u09B0 \u09AE\u09A8\u09CD\u09A4\u09CD\u09B0\u09A3\u09BE\u09B2\u09AF\u09BC \u0993 \u09B8\u09CC\u09A6\u09BF \u09A6\u09C2\u09A4\u09BE\u09AC\u09BE\u09B8 \u09B2\u09BF\u09AF\u09BC\u09BE\u099C\u09CB\u0981\u09B0 \u09AE\u09BE\u09A7\u09CD\u09AF\u09AE\u09C7 \u09A1\u0995\u09C1\u09AE\u09C7\u09A8\u09CD\u099F \u09AD\u09C7\u09B0\u09BF\u09AB\u09BF\u0995\u09C7\u09B6\u09A8\u0964
-
----
-> **\u09B8\u09B0\u0995\u09BE\u09B0\u09BF \u09B2\u09BF\u09AF\u09BC\u09BE\u099C\u09CB\u0981 \u09A1\u09C7\u09B8\u09CD\u0995:** \u09B0\u09BF\u09AF\u09BC\u09BE\u09A6\u09C7\u09B0 \u0985\u09A8\u09C1\u09AE\u09CB\u09A6\u09BF\u09A4 \u09B8\u09B0\u0995\u09BE\u09B0\u09BF \u099C\u09A8\u09B8\u0982\u09AF\u09CB\u0997 \u09A6\u09B2\u09C7\u09B0 \u09AE\u09BE\u09A7\u09CD\u09AF\u09AE\u09C7 \u09A6\u09CD\u09B0\u09C1\u09A4\u09A4\u09AE \u09B8\u09AE\u09AF\u09BC\u09C7 \u09AA\u09CD\u09B0\u0995\u09CD\u09B0\u09BF\u09AF\u09BC\u09BE \u09B8\u09AE\u09CD\u09AA\u09A8\u09CD\u09A8 \u09B9\u09AF\u09BC\u0964`,
-        source: "AI"
-      };
-    }
-    return {
-      reply: `### ${p3.title} \u2014 Government Liaison & Residency
-
-Complete workforce legal mobilization and official government relations across all Saudi labor portals.
-
-- **Investor Visas & Work Permits**: Entry authorizations for foreign executives, partners, and technical personnel.
-- **Executive Iqama Issuance**: Annual statutory residency permits and renewals managed end-to-end.
-- **Qiwa & Muqeem Portals**: Ministry of Human Resources labor contracts, Saudization quotas, and employee authorizations.
-- **Document Legalization**: Ministry of Foreign Affairs (MOFA) and Embassy attestations for foreign certificates.
-
----
-> **PRO Desk:** Managed directly through our authorized government liaisons in Riyadh.`,
-      source: "AI"
-    };
-  }
-  if (isPillar4) {
-    const p4 = memory.pillars[3];
-    if (isAr) {
-      return {
-        reply: `### \u0627\u0644\u0639\u0642\u0627\u0631\u0627\u062A \u0627\u0644\u062A\u062C\u0627\u0631\u064A\u0629 \u2014 \u0639\u0642\u0648\u062F \u0625\u064A\u062C\u0627\u0631\u064A \u0648\u0645\u0642\u0631\u0627\u062A \u0627\u0644\u0634\u0631\u0643\u0627\u062A
-
-\u062A\u0648\u0641\u064A\u0631 \u0627\u0644\u0645\u0642\u0631\u0627\u062A \u0648\u0627\u0644\u0645\u0643\u0627\u062A\u0628 \u0627\u0644\u0646\u0638\u0627\u0645\u064A\u0629 \u0627\u0644\u0645\u0639\u062A\u0645\u062F\u0629 \u0644\u0627\u0633\u062A\u064A\u0641\u0627\u0621 \u0627\u0634\u062A\u0631\u0627\u0637\u0627\u062A \u0627\u0644\u0633\u062C\u0644 \u0627\u0644\u062A\u062C\u0627\u0631\u064A \u0648\u0627\u0644\u0628\u0644\u062F\u064A\u0629 \u0641\u064A \u0627\u0644\u0633\u0639\u0648\u062F\u064A\u0629.
-
-- **\u0639\u0642\u0648\u062F \u0625\u064A\u062C\u0627\u0631 \u0627\u0644\u0645\u0643\u0627\u062A\u0628 \u0627\u0644\u0645\u0639\u062A\u0645\u062F\u0629 (\u0625\u064A\u062C\u0627\u0631\u064A)**: \u0645\u0643\u0627\u062A\u0628 \u062A\u062C\u0627\u0631\u064A\u0629 \u0645\u0637\u0627\u0628\u0642\u0629 \u0644\u0644\u0627\u0634\u062A\u0631\u0627\u0637\u0627\u062A \u0641\u064A \u0627\u0644\u0631\u064A\u0627\u0636 \u0648\u062C\u062F\u0629 \u0648\u0627\u0644\u062E\u0628\u0631.
-- **\u0627\u0644\u0645\u0633\u062A\u0648\u062F\u0639\u0627\u062A \u0648\u0627\u0644\u062E\u062F\u0645\u0627\u062A \u0627\u0644\u0644\u0648\u062C\u0633\u062A\u064A\u0629**: \u062A\u0623\u062C\u064A\u0631 \u0627\u0644\u0645\u0633\u062A\u0648\u062F\u0639\u0627\u062A \u0641\u064A \u0627\u0644\u0645\u062F\u0646 \u0627\u0644\u0635\u0646\u0627\u0639\u064A\u0629 \u0648\u0627\u0644\u0645\u0646\u0627\u0637\u0642 \u0627\u0644\u0627\u0642\u062A\u0635\u0627\u062F\u064A\u0629 \u0627\u0644\u062E\u0627\u0635\u0629.
-- **\u0627\u0644\u062A\u0645\u0644\u0643 \u0627\u0644\u0639\u0642\u0627\u0631\u064A \u0644\u0644\u0634\u0631\u0643\u0627\u062A \u0627\u0644\u0623\u062C\u0646\u0628\u064A\u0629**: \u062A\u0648\u062C\u064A\u0647 \u0642\u0627\u0646\u0648\u0646\u064A \u0628\u0634\u0623\u0646 \u0627\u0644\u0623\u0637\u0631 \u0627\u0644\u0646\u0638\u0627\u0645\u064A\u0629 \u0644\u062A\u0645\u0644\u0643 \u0627\u0644\u0634\u0631\u0643\u0627\u062A \u0627\u0644\u0623\u062C\u0646\u0628\u064A\u0629 \u0644\u0644\u0639\u0642\u0627\u0631\u0627\u062A.
-- **\u0627\u0644\u062A\u062D\u0642\u0642 \u0645\u0646 \u0627\u0644\u0635\u0643\u0648\u0643 \u0648\u0627\u0644\u0639\u0642\u0648\u062F**: \u062A\u062F\u0642\u064A\u0642 \u0648\u062A\u0648\u062B\u064A\u0642 \u0635\u0643\u0648\u0643 \u0627\u0644\u0645\u0644\u0643\u064A\u0629 \u0648\u0639\u0642\u0648\u062F \u0627\u0644\u0625\u064A\u062C\u0627\u0631 \u0627\u0644\u062A\u062C\u0627\u0631\u064A\u0629.
-
----
-> **\u0627\u0644\u0645\u0643\u062A\u0628 \u0627\u0644\u0639\u0642\u0627\u0631\u064A:** \u0628\u0627\u0644\u062A\u0646\u0633\u064A\u0642 \u0645\u0639 \u0648\u0633\u0637\u0627\u0621 \u0639\u0642\u0627\u0631\u064A\u064A\u0646 \u0645\u0639\u062A\u0645\u062F\u064A\u0646 \u0644\u0636\u0645\u0627\u0646 \u0627\u0644\u0645\u0637\u0627\u0628\u0642\u0629 \u0627\u0644\u0643\u0627\u0645\u0644\u0629 \u0644\u0645\u0646\u0635\u0629 \u0628\u0644\u062F\u064A \u0648\u0648\u0632\u0627\u0631\u0629 \u0627\u0644\u062A\u062C\u0627\u0631\u0629.`,
-        source: "AI"
-      };
-    }
-    if (isBn) {
-      return {
-        reply: `### ${p4.titleBn} (${p4.title}) \u2014 \u0985\u09A8\u09C1\u09AE\u09CB\u09A6\u09BF\u09A4 Ejari \u0985\u09AB\u09BF\u09B8 \u09B2\u09BF\u099C \u0993 \u09AA\u09CD\u09B0\u09AA\u09BE\u09B0\u09CD\u099F\u09BF
-
-\u0995\u09AE\u09BE\u09B0\u09CD\u09B6\u09BF\u09AF\u09BC\u09BE\u09B2 \u09B0\u09C7\u099C\u09BF\u09B8\u09CD\u099F\u09CD\u09B0\u09C7\u09B6\u09A8 \u0993 \u09AC\u09CD\u09AF\u09AC\u09B8\u09BE\u09AF\u09BC\u09BF\u0995 \u09B2\u09BE\u0987\u09B8\u09C7\u09A8\u09CD\u09B8\u09C7\u09B0 \u099C\u09A8\u09CD\u09AF \u09AA\u09CD\u09B0\u09AF\u09BC\u09CB\u099C\u09A8\u09C0\u09AF\u09BC \u09B8\u0982\u09AC\u09BF\u09A7\u09BF\u09AC\u09A6\u09CD\u09A7 \u09AC\u09BE\u09A3\u09BF\u099C\u09CD\u09AF\u09BF\u0995 \u0985\u09AB\u09BF\u09B8 \u0993 \u09B8\u09CD\u09AA\u09C7\u09B8 \u09AC\u09CD\u09AF\u09AC\u09B8\u09CD\u09A5\u09BE\u09AA\u09A8\u09BE\u0964
-
-- **\u09AC\u09BE\u09A3\u09BF\u099C\u09CD\u09AF\u09BF\u0995 \u0985\u09AB\u09BF\u09B8 \u09B8\u09CD\u09AA\u09C7\u09B8 (Ejari)**: \u09B0\u09BF\u09AF\u09BC\u09BE\u09A6, \u099C\u09C7\u09A6\u09CD\u09A6\u09BE \u0993 \u09A6\u09BE\u09AE\u09CD\u09AE\u09BE\u09AE\u09C7\u09B0 \u09AA\u09CD\u09B0\u09BE\u0987\u09AE \u09AC\u09BE\u09A3\u09BF\u099C\u09CD\u09AF\u09BF\u0995 \u0985\u099E\u09CD\u099A\u09B2\u09C7 \u0985\u09A8\u09C1\u09AE\u09CB\u09A6\u09BF\u09A4 \u0985\u09AB\u09BF\u09B8 \u09B2\u09BF\u099C\u0964
-- **\u09B6\u09BF\u09B2\u09CD\u09AA\u09BE\u099E\u09CD\u099A\u09B2 \u0993 \u0997\u09C1\u09A6\u09BE\u09AE (Warehousing)**: \u09AC\u09BF\u09B6\u09C7\u09B7 \u0985\u09B0\u09CD\u09A5\u09A8\u09C8\u09A4\u09BF\u0995 \u0985\u099E\u09CD\u099A\u09B2 (SEZ) \u0993 \u09B2\u099C\u09BF\u09B8\u09CD\u099F\u09BF\u0995 \u09AA\u09BE\u09B0\u09CD\u0995\u09C7 \u0993\u09AF\u09BC\u09CD\u09AF\u09BE\u09B0\u09B9\u09BE\u0989\u09B8 \u09B2\u09BF\u099C\u0964
-- **\u09AC\u09BF\u09A6\u09C7\u09B6\u09BF \u09AE\u09BE\u09B2\u09BF\u0995\u09BE\u09A8\u09BE\u09AF\u09BC \u09B0\u09BF\u09AF\u09BC\u09C7\u09B2 \u098F\u09B8\u09CD\u099F\u09C7\u099F**: \u09AC\u09BF\u09A8\u09BF\u09AF\u09BC\u09CB\u0997\u0995\u09BE\u09B0\u09C0\u09A6\u09C7\u09B0 \u099C\u09A8\u09CD\u09AF \u09B8\u09AE\u09CD\u09AA\u09A4\u09CD\u09A4\u09BF \u0985\u09A7\u09BF\u0997\u09CD\u09B0\u09B9\u09A3 \u09B8\u0982\u0995\u09CD\u09B0\u09BE\u09A8\u09CD\u09A4 \u0986\u0987\u09A8\u09BF \u09AA\u09B0\u09BE\u09AE\u09B0\u09CD\u09B6\u0964
-- **\u099F\u09BE\u0987\u099F\u09C7\u09B2 \u09A1\u09BF\u09A1 \u0993 \u09A1\u09BF\u0989 \u09A1\u09BF\u09B2\u09BF\u099C\u09C7\u09A8\u09CD\u09B8**: \u099C\u09AE\u09BF\u09B0 \u09AE\u09BE\u09B2\u09BF\u0995\u09BE\u09A8\u09BE \u0993 \u099A\u09C1\u0995\u09CD\u09A4\u09BF\u09B0 \u09B6\u09A4\u09AD\u09BE\u0997 \u0986\u0987\u09A8\u09BF \u09AF\u09BE\u099A\u09BE\u0987 \u0993 \u09B0\u09C7\u099C\u09BF\u09B8\u09CD\u099F\u09CD\u09B0\u09BF\u0964
-
----
-> **\u09B0\u09BF\u09AF\u09BC\u09C7\u09B2 \u098F\u09B8\u09CD\u099F\u09C7\u099F \u09A1\u09C7\u09B8\u09CD\u0995:** \u09B8\u09CC\u09A6\u09BF \u09AA\u09CC\u09B0\u09B8\u09AD\u09BE (Balady) \u0993 \u09AC\u09BE\u09A3\u09BF\u099C\u09CD\u09AF \u09AE\u09A8\u09CD\u09A4\u09CD\u09B0\u09A3\u09BE\u09B2\u09AF\u09BC\u09C7\u09B0 \u09B6\u09A4\u09AD\u09BE\u0997 \u09A8\u09BF\u09AF\u09BC\u09AE \u09AE\u09C7\u09A8\u09C7 \u0985\u09A8\u09C1\u09AE\u09CB\u09A6\u09BF\u09A4 \u099A\u09C1\u0995\u09CD\u09A4\u09BF\u09AA\u09A4\u09CD\u09B0 \u09AA\u09CD\u09B0\u09A6\u09BE\u09A8\u0964`,
-        source: "AI"
-      };
-    }
-    return {
-      reply: `### ${p4.title} \u2014 Certified Leases & Land Acquisition
-
-Statutory physical premises required for commercial registration and operational setup across Saudi Arabia.
-
-- **Certified Office Leases (Ejari)**: Compliant physical office spaces across prime business districts in Riyadh, Jeddah, and Khobar.
-- **Industrial Warehousing**: Logistics facilities and warehouse leasing in authorized special economic zones (SEZ).
-- **Foreign Property Ownership**: Legal navigation of statutory frameworks for international entities.
-- **Title Deed & Due Diligence**: Certified deed verification and lease contract execution.
-
----
-> **Real Estate Advisory:** Coordinated with certified Saudi real estate brokers ensuring 100% Balady and MoC compliance.`,
-      source: "AI"
-    };
-  }
-  if (isPillar5) {
-    const p5 = memory.pillars[4];
-    if (isAr) {
-      return {
-        reply: `### \u0627\u0644\u0645\u062D\u0627\u0633\u0628\u0629 \u0648\u0627\u0644\u0636\u0631\u0627\u0626\u0628 \u2014 \u0627\u0644\u0627\u0645\u062A\u062B\u0627\u0644 \u0644\u0647\u064A\u0626\u0629 \u0627\u0644\u0632\u0643\u0627\u0629 \u0648\u0627\u0644\u0636\u0631\u064A\u0628\u0629 (ZATCA)
-
-\u062D\u0648\u0643\u0645\u0629 \u0645\u0627\u0644\u064A\u0629 \u0645\u062A\u0643\u0627\u0645\u0644\u0629 \u0644\u0636\u0645\u0627\u0646 \u0627\u0644\u0627\u0645\u062A\u062B\u0627\u0644 \u0627\u0644\u062A\u0627\u0645 \u0645\u0639 \u0645\u062A\u0637\u0644\u0628\u0627\u062A \u0647\u064A\u0626\u0629 \u0627\u0644\u0632\u0643\u0627\u0629 \u0648\u0627\u0644\u0636\u0631\u064A\u0628\u0629 \u0648\u0627\u0644\u062C\u0645\u0627\u0631\u0643.
-
-- **\u0645\u0633\u0643 \u0627\u0644\u062F\u0641\u0627\u062A\u0631 \u0627\u0644\u0645\u062D\u0627\u0633\u0628\u064A\u0629**: \u0625\u0639\u062F\u0627\u062F \u062A\u0642\u0627\u0631\u064A\u0631 \u0645\u0627\u0644\u064A\u0629 \u0648\u0642\u0648\u0627\u0626\u0645 \u062F\u062E\u0644 \u0648\u0645\u0631\u0643\u0632 \u0645\u0627\u0644\u064A \u0634\u0647\u0631\u064A\u0629 \u0648\u0641\u0642 \u0645\u0639\u0627\u064A\u064A\u0631 IFRS.
-- **\u0627\u0644\u0641\u0648\u062A\u0631\u0629 \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A\u0629 (\u0627\u0644\u0645\u0631\u062D\u0644\u0629 \u0627\u0644\u062B\u0627\u0646\u064A\u0629)**: \u0631\u0628\u0637 \u0645\u0628\u0627\u0634\u0631 \u0645\u0639 \u0645\u0646\u0635\u0629 \u0641\u0627\u062A\u0648\u0631\u0629 \u0648\u062A\u0642\u062F\u064A\u0645 \u0625\u0642\u0631\u0627\u0631\u0627\u062A \u0636\u0631\u064A\u0628\u0629 \u0627\u0644\u0642\u064A\u0645\u0629 \u0627\u0644\u0645\u0636\u0627\u0641\u0629 15%.
-- **\u0627\u0644\u062A\u062F\u0642\u064A\u0642 \u0648\u0627\u0644\u0645\u0631\u0627\u062C\u0639\u0629 \u0627\u0644\u0642\u0627\u0646\u0648\u0646\u064A\u0629**: \u062A\u0642\u0627\u0631\u064A\u0631 \u0645\u0631\u0627\u062C\u0639\u0629 \u0645\u0639\u062A\u0645\u062F\u0629 \u0645\u0646 \u0645\u062D\u0627\u0633\u0628\u064A\u0646 \u0642\u0627\u0646\u0648\u0646\u064A\u064A\u0646 \u0644\u062A\u062C\u062F\u064A\u062F \u0627\u0644\u0633\u062C\u0644 \u0627\u0644\u062A\u062C\u0627\u0631\u064A.
-- **\u0627\u0644\u062A\u0623\u0645\u064A\u0646\u0627\u062A \u0627\u0644\u0627\u062C\u062A\u0645\u0627\u0639\u064A\u0629 \u0648\u062D\u0645\u0627\u064A\u0629 \u0627\u0644\u0623\u062C\u0648\u0631**: \u0627\u0644\u0627\u0645\u062A\u062B\u0627\u0644 \u0644\u0646\u0638\u0627\u0645 \u062D\u0645\u0627\u064A\u0629 \u0627\u0644\u0623\u062C\u0648\u0631 (WPS) \u0648\u0645\u0624\u0633\u0633\u0629 \u0627\u0644\u062A\u0623\u0645\u064A\u0646\u0627\u062A (GOSI).
-
----
-> **\u0645\u0643\u062A\u0628 \u0627\u0644\u0645\u062D\u0627\u0633\u0628\u0629 \u0648\u0627\u0644\u062A\u062F\u0642\u064A\u0642:** \u064A\u062F\u0627\u0631 \u0639\u0628\u0631 \u0645\u062D\u0627\u0633\u0628\u064A\u0646 \u0648\u0645\u0633\u062A\u0634\u0627\u0631\u064A\u0646 \u0636\u0631\u064A\u0628\u064A\u064A\u0646 \u0645\u0639\u062A\u0645\u062F\u064A\u0646 \u0645\u0646 \u0627\u0644\u0647\u064A\u0626\u0629 \u0627\u0644\u0633\u0639\u0648\u062F\u064A\u0629 \u0644\u0644\u0645\u0631\u0627\u062C\u0639\u064A\u0646 \u0648\u0627\u0644\u0645\u062D\u0627\u0633\u0628\u064A\u0646 (SOCPA).`,
-        source: "AI"
-      };
-    }
-    if (isBn) {
-      return {
-        reply: `### ${p5.titleBn} (${p5.title}) \u2014 ZATCA \u09AB\u09C7\u099C \u09E8 \u0993 \u09AD\u09CD\u09AF\u09BE\u099F \u0995\u09AE\u09AA\u09CD\u09B2\u09BE\u09AF\u09BC\u09C7\u09A8\u09CD\u09B8
-
-\u09B8\u09CC\u09A6\u09BF \u0995\u09B0 \u0995\u09B0\u09CD\u09A4\u09C3\u09AA\u0995\u09CD\u09B7\u09C7\u09B0 (ZATCA) \u0986\u0987\u09A8 \u09AE\u09C7\u09A8\u09C7 \u09AA\u09C2\u09B0\u09CD\u09A3\u09BE\u0999\u09CD\u0997 \u09B8\u0982\u09AC\u09BF\u09A7\u09BF\u09AC\u09A6\u09CD\u09A7 \u0986\u09B0\u09CD\u09A5\u09BF\u0995 \u09B9\u09BF\u09B8\u09BE\u09AC \u0993 \u09A8\u09BF\u09B0\u09C0\u0995\u09CD\u09B7\u09BE \u09AC\u09CD\u09AF\u09AC\u09B8\u09CD\u09A5\u09BE\u09AA\u09A8\u09BE\u0964
-
-- **IFRS \u09AC\u09C1\u0995\u0995\u09BF\u09AA\u09BF\u0982**: \u0986\u09A8\u09CD\u09A4\u09B0\u09CD\u099C\u09BE\u09A4\u09BF\u0995 \u09AE\u09BE\u09A8\u09B8\u09AE\u09CD\u09AA\u09A8\u09CD\u09A8 \u09A8\u09BF\u09B0\u09CD\u09AD\u09C1\u09B2 \u09AE\u09BE\u09B8\u09BF\u0995 \u09B9\u09BF\u09B8\u09BE\u09AC, \u09AC\u09CD\u09AF\u09BE\u09B2\u09C7\u09A8\u09CD\u09B8 \u09B6\u09BF\u099F \u0993 \u0986\u09B0\u09CD\u09A5\u09BF\u0995 \u09AA\u09CD\u09B0\u09A4\u09BF\u09AC\u09C7\u09A6\u09A8\u0964
-- **ZATCA \u09AB\u09C7\u099C \u09E8 \u0987-\u0987\u09A8\u09AD\u09AF\u09BC\u09C7\u09B8\u09BF\u0982**: ZATCA-\u09B0 Fatoora \u09AA\u09CB\u09B0\u09CD\u099F\u09BE\u09B2\u09C7\u09B0 \u09B8\u09BE\u09A5\u09C7 \u09B8\u09B0\u09BE\u09B8\u09B0\u09BF \u09B8\u09BF\u09B8\u09CD\u099F\u09C7\u09AE \u0987\u09A8\u09CD\u099F\u09BF\u0997\u09CD\u09B0\u09C7\u09B6\u09A8 \u098F\u09AC\u0982 \u0995\u09CB\u09AF\u09BC\u09BE\u09B0\u09CD\u099F\u09BE\u09B0\u09B2\u09BF \u09E7\u09EB% \u09AD\u09CD\u09AF\u09BE\u099F \u09B0\u09BF\u099F\u09BE\u09B0\u09CD\u09A8\u0964
-- **\u09AC\u09BE\u09A7\u09CD\u09AF\u09A4\u09BE\u09AE\u09C2\u09B2\u0995 \u09B8\u0982\u09AC\u09BF\u09A7\u09BF\u09AC\u09A6\u09CD\u09A7 \u0985\u09A1\u09BF\u099F**: \u09B8\u09BF\u0986\u09B0 \u0993 \u09B2\u09BE\u0987\u09B8\u09C7\u09A8\u09CD\u09B8 \u09A8\u09AC\u09BE\u09AF\u09BC\u09A8\u09C7\u09B0 \u099C\u09A8\u09CD\u09AF \u09B8\u09BE\u09B0\u09CD\u099F\u09BF\u09AB\u09BE\u0987\u09A1 \u099A\u09BE\u09B0\u09CD\u099F\u09BE\u09B0\u09CD\u09A1 \u0985\u09A1\u09BF\u099F \u09B0\u09BF\u09AA\u09CB\u09B0\u09CD\u099F \u09AA\u09CD\u09B0\u09B8\u09CD\u09A4\u09C1\u09A4\u0995\u09B0\u09A3\u0964
-- **GOSI \u0993 \u09AA\u09C7\u09B0\u09CB\u09B2 \u0995\u09AE\u09AA\u09CD\u09B2\u09BE\u09AF\u09BC\u09C7\u09A8\u09CD\u09B8**: \u0993\u09AF\u09BC\u09C7\u099C \u09AA\u09CD\u09B0\u09CB\u099F\u09C7\u0995\u09B6\u09A8 \u09B8\u09BF\u09B8\u09CD\u099F\u09C7\u09AE (WPS) \u0993 \u09B8\u09BE\u09AE\u09BE\u099C\u09BF\u0995 \u09A8\u09BF\u09B0\u09BE\u09AA\u09A4\u09CD\u09A4\u09BE \u09AC\u09CD\u09AF\u09AC\u09B8\u09CD\u09A5\u09BE\u09AA\u09A8\u09BE\u0964
-
----
-> **\u099F\u09CD\u09AF\u09BE\u0995\u09CD\u09B8 \u0993 \u0985\u09A1\u09BF\u099F \u09A1\u09C7\u09B8\u09CD\u0995:** SOCPA-\u0985\u09A8\u09C1\u09AE\u09CB\u09A6\u09BF\u09A4 \u09B8\u09BE\u09B0\u09CD\u099F\u09BF\u09AB\u09BE\u0987\u09A1 \u0985\u09A1\u09BF\u099F\u09B0 \u0993 \u0985\u09AD\u09BF\u099C\u09CD\u099E \u099F\u09CD\u09AF\u09BE\u0995\u09CD\u09B8 \u0995\u09A8\u09B8\u09BE\u09B2\u099F\u09C7\u09A8\u09CD\u099F\u09A6\u09C7\u09B0 \u09A6\u09CD\u09AC\u09BE\u09B0\u09BE \u09B8\u09B0\u09BE\u09B8\u09B0\u09BF \u09AA\u09B0\u09BF\u099A\u09BE\u09B2\u09BF\u09A4\u0964`,
-        source: "AI"
-      };
-    }
-    return {
-      reply: `### ${p5.title} \u2014 ZATCA Phase 2 Compliance
-
-Institutional financial governance ensuring complete statutory compliance with the Zakat, Tax and Customs Authority.
-
-- **Full-Cycle Bookkeeping**: Monthly IFRS-compliant financial reporting, balance sheets, and profit & loss statements.
-- **ZATCA Phase 2 E-Invoicing**: Direct integration with ZATCA's Fatoora portal and quarterly 15% VAT return filings.
-- **Statutory Financial Audits**: Certified independent audit reports mandated for Commercial Registration renewals.
-- **Payroll & GOSI Compliance**: Wage Protection System (WPS) and General Organization for Social Insurance administration.
-
----
-> **Tax & Audit Desk:** Handled by certified Saudi tax advisors and SOCPA-accredited auditors.`,
-      source: "AI"
-    };
-  }
-  if (isPillar6) {
-    const p6 = memory.pillars[5];
-    if (isAr) {
-      return {
-        reply: `### \u062A\u0623\u0633\u064A\u0633 \u0627\u0644\u0634\u0631\u0643\u0627\u062A \u0627\u0644\u062F\u0648\u0644\u064A\u0629 \u2014 \u0627\u0644\u0648\u0644\u0627\u064A\u0627\u062A \u0627\u0644\u0645\u062A\u062D\u062F\u0629\u060C \u0628\u0631\u064A\u0637\u0627\u0646\u064A\u0627\u060C \u0648\u0643\u0646\u062F\u0627
-
-\u062D\u0644\u0648\u0644 \u062A\u0648\u0633\u0639 \u062A\u062C\u0627\u0631\u064A \u0645\u062A\u0643\u0627\u0645\u0644\u0629 \u0641\u064A \u0627\u0644\u0645\u0631\u0627\u0643\u0632 \u0627\u0644\u0645\u0627\u0644\u064A\u0629 \u0627\u0644\u0639\u0627\u0644\u0645\u064A\u0629 \u0644\u0644\u0645\u062F\u0641\u0648\u0639\u0627\u062A \u0648\u0627\u0644\u062A\u062C\u0627\u0631\u0629 \u0627\u0644\u062F\u0648\u0644\u064A\u0629.
-
-- **\u0627\u0644\u0648\u0644\u0627\u064A\u0627\u062A \u0627\u0644\u0645\u062A\u062D\u062F\u0629 (USA LLC / C-Corp)**: \u062A\u0623\u0633\u064A\u0633 \u0627\u0644\u0634\u0631\u0643\u0627\u062A \u0641\u064A \u062F\u064A\u0644\u0627\u0648\u064A\u0631 \u0648\u0648\u0627\u064A\u0648\u0645\u0646\u063A \u0645\u0639 \u0625\u0635\u062F\u0627\u0631 \u0631\u0642\u0645 EIN \u0627\u0644\u0636\u0631\u064A\u0628\u064A (${p6.turnaroundTime}).
-- **\u0627\u0644\u0645\u0645\u0644\u0643\u0629 \u0627\u0644\u0645\u062A\u062D\u062F\u0629 (UK Ltd)**: \u062A\u0633\u062C\u064A\u0644 \u0645\u0639\u062A\u0645\u062F \u0644\u062F\u0649 Companies House \u0645\u0639 \u062A\u0648\u0641\u064A\u0631 \u0639\u0646\u0648\u0627\u0646 \u0631\u0633\u0645\u064A \u0641\u064A \u0644\u0646\u062F\u0646.
-- **\u0627\u0644\u0634\u0631\u0643\u0627\u062A \u0627\u0644\u0643\u0646\u062F\u064A\u0629**: \u062A\u0633\u062C\u064A\u0644 \u0641\u064A\u062F\u0631\u0627\u0644\u064A \u0648\u0625\u0642\u0644\u064A\u0645\u064A \u0645\u0639 \u0644\u0648\u0627\u0626\u062D \u062A\u0646\u0638\u064A\u0645\u064A\u0629 \u0645\u0639\u062A\u0645\u062F\u0629.
-- **\u062D\u0633\u0627\u0628\u0627\u062A \u0628\u0646\u0643\u064A\u0629 \u062F\u0648\u0644\u064A\u0629**: \u0641\u062A\u062D \u062D\u0633\u0627\u0628\u0627\u062A \u062A\u062C\u0627\u0631\u064A\u0629 \u0645\u0639 Mercury \u0648Wise Business \u0648\u0628\u0646\u0648\u0643 \u0627\u0644\u0641\u0626\u0629 \u0627\u0644\u0623\u0648\u0644\u0649.
-
----
-> **\u0627\u0644\u0645\u0643\u0627\u062A\u0628 \u0627\u0644\u062F\u0648\u0644\u064A\u0629:** \u062A\u062A\u064A\u062D \u0644\u0643 \u0625\u062F\u0627\u0631\u0629 \u0627\u0644\u0639\u0645\u0644\u064A\u0627\u062A \u0627\u0644\u0645\u0627\u0644\u064A\u0629 \u0639\u0628\u0631 \u0627\u0644\u062D\u062F\u0648\u062F \u0628\u0633\u0644\u0627\u0633\u0629 \u0628\u0627\u0644\u062A\u0648\u0627\u0632\u064A \u0645\u0639 \u0634\u0631\u0643\u062A\u0643 \u0641\u064A \u0627\u0644\u0633\u0639\u0648\u062F\u064A\u0629.`,
-        source: "AI"
-      };
-    }
-    if (isBn) {
-      return {
-        reply: `### ${p6.titleBn} (${p6.title}) \u2014 \u0986\u09A8\u09CD\u09A4\u09B0\u09CD\u099C\u09BE\u09A4\u09BF\u0995 \u0995\u09CB\u09AE\u09CD\u09AA\u09BE\u09A8\u09BF \u0997\u09A0\u09A8
-
-\u0986\u09A8\u09CD\u09A4\u09B0\u09CD\u099C\u09BE\u09A4\u09BF\u0995 \u0986\u09B0\u09CD\u09A5\u09BF\u0995 \u09B9\u09BE\u09AC\u09B8\u09AE\u09C2\u09B9\u09C7 \u09AC\u09CD\u09AF\u09AC\u09B8\u09BE \u09B8\u09AE\u09CD\u09AA\u09CD\u09B0\u09B8\u09BE\u09B0\u09A3 \u098F\u09AC\u0982 \u0997\u09CD\u09B2\u09CB\u09AC\u09BE\u09B2 \u09AA\u09C7\u09AE\u09C7\u09A8\u09CD\u099F \u0997\u09C7\u099F\u0993\u09AF\u09BC\u09C7 \u099A\u09BE\u09B2\u09C1\u0995\u09B0\u09A3\u0964
-
-- **\u09AF\u09C1\u0995\u09CD\u09A4\u09B0\u09BE\u09B7\u09CD\u099F\u09CD\u09B0 (USA LLC / C-Corp)**: \u09A1\u09C7\u09B2\u09BE\u0993\u09AF\u09BC\u09CD\u09AF\u09BE\u09B0 \u0993 \u0993\u09AF\u09BC\u09BE\u0987\u09AF\u09BC\u09CB\u09AE\u09BF\u0982-\u098F \u0995\u09CB\u09AE\u09CD\u09AA\u09BE\u09A8\u09BF \u0997\u09A0\u09A8, IRS EIN \u0993 \u09B0\u09C7\u099C\u09BF\u09B8\u09CD\u099F\u09BE\u09B0\u09CD\u09A1 \u098F\u099C\u09C7\u09A8\u09CD\u099F \u09B8\u09C7\u09AC\u09BE (${p6.turnaroundTime})\u0964
-- **\u09AF\u09C1\u0995\u09CD\u09A4\u09B0\u09BE\u099C\u09CD\u09AF (UK Ltd)**: Companies House-\u098F \u09A6\u09CD\u09B0\u09C1\u09A4\u09A4\u09AE \u09A8\u09BF\u09AC\u09A8\u09CD\u09A7\u09A8 \u0993 \u09B2\u09A8\u09CD\u09A1\u09A8 \u0985\u09AB\u09BF\u09B8\u09BF\u09AF\u09BC\u09BE\u09B2 \u0985\u09CD\u09AF\u09BE\u09A1\u09CD\u09B0\u09C7\u09B8\u0964
-- **\u0995\u09BE\u09A8\u09BE\u09A1\u09BF\u09AF\u09BC\u09BE\u09A8 \u0995\u09B0\u09CD\u09AA\u09CB\u09B0\u09C7\u09B6\u09A8**: \u09AB\u09C7\u09A1\u09BE\u09B0\u09C7\u09B2 \u0993 \u09AA\u09CD\u09B0\u09AD\u09BF\u09A8\u09CD\u09B8\u09BF\u09AF\u09BC\u09BE\u09B2 \u09B0\u09C7\u099C\u09BF\u09B8\u09CD\u099F\u09CD\u09B0\u09C7\u09B6\u09A8 \u098F\u09AC\u0982 \u0995\u09B0\u09CD\u09AA\u09CB\u09B0\u09C7\u099F \u09AC\u09BE\u0987-\u09B2 \u0985\u09A8\u09C1\u09AE\u09CB\u09A6\u09A8\u0964
-- **\u0997\u09CD\u09B2\u09CB\u09AC\u09BE\u09B2 \u09AC\u09CD\u09AF\u09BE\u0982\u0995\u09BF\u0982**: Mercury, Wise Business \u0993 \u099F\u09BF\u09AF\u09BC\u09BE\u09B0-\u09E7 \u09AC\u09CD\u09AF\u09BE\u0982\u0995\u09C7 \u09AE\u09BE\u09B2\u09CD\u099F\u09BF-\u0995\u09BE\u09B0\u09C7\u09A8\u09CD\u09B8\u09BF \u0995\u09B0\u09CD\u09AA\u09CB\u09B0\u09C7\u099F \u0985\u09CD\u09AF\u09BE\u0995\u09BE\u0989\u09A8\u09CD\u099F\u0964
-
----
-> **\u0997\u09CD\u09B2\u09CB\u09AC\u09BE\u09B2 \u09A1\u09C7\u09B8\u09CD\u0995:** \u09B8\u09CC\u09A6\u09BF \u0986\u09B0\u09AC\u09C7\u09B0 \u09AA\u09BE\u09B6\u09BE\u09AA\u09BE\u09B6\u09BF \u09AC\u09BF\u09B6\u09CD\u09AC\u099C\u09C1\u09A1\u09BC\u09C7 \u0986\u09AA\u09A8\u09BE\u09B0 \u09AC\u09CD\u09AF\u09AC\u09B8\u09BE \u09AA\u09B0\u09BF\u099A\u09BE\u09B2\u09A8\u09BE\u09B0 \u09A8\u09BF\u09B0\u09CD\u09AD\u09B0\u09AF\u09CB\u0997\u09CD\u09AF \u0986\u09A8\u09CD\u09A4\u09B0\u09CD\u099C\u09BE\u09A4\u09BF\u0995 \u09B8\u09AE\u09BE\u09A7\u09BE\u09A8\u0964`,
-        source: "AI"
-      };
-    }
-    return {
-      reply: `### ${p6.title} \u2014 Global Corporate Formation
-
-Turnkey corporate expansion into major international financial hubs for cross-border operations and trade.
-
-- **United States (USA LLC / C-Corp)**: Delaware & Wyoming registration, IRS EIN issuance, and Registered Agent service (${p6.turnaroundTime}).
-- **United Kingdom (UK Ltd)**: Companies House registration with official London registered office address.
-- **Canadian Corporation**: Federal and provincial incorporation with certified corporate bylaws.
-- **Global Tier-1 Banking**: Turnkey business accounts with Mercury, Wise Business, and global multi-currency clearing banks.
-
----
-> **Global Desks:** Enabling seamless multi-currency international commerce alongside your Saudi enterprise.`,
-      source: "AI"
+> \u{1F3DB}\uFE0F **Senior Advisory & Legal Desk (Riyadh)**  
+> *Trek Consultancy | Vision 2030 Corporate Market Entry & Enterprise Solutions*`,
+      source: "TICKET"
     };
   }
   if (isAr) {
     return {
-      reply: `### ${memory.identity.brand} \u2014 \u0627\u0644\u0645\u0643\u062A\u0628 \u0627\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u064A \u0627\u0644\u062A\u0646\u0641\u064A\u0630\u064A
+      reply: `### \u{1F3DB}\uFE0F ${memory.identity.brand} \u2014 \u0627\u0644\u0645\u0643\u062A\u0628 \u0627\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u064A \u0627\u0644\u062A\u0646\u0641\u064A\u0630\u064A
 
-\u0623\u0646\u0627 \u0627\u0644\u0645\u0633\u062A\u0634\u0627\u0631 \u0627\u0644\u0622\u0644\u064A \u0627\u0644\u0645\u0633\u0627\u0639\u062F \u0644\u0640 **${memory.identity.brand}**. \u064A\u0633\u0639\u062F\u0646\u064A \u062A\u0642\u062F\u064A\u0645 \u0627\u0644\u0645\u0633\u0627\u0639\u062F\u0629 \u0627\u0644\u062F\u0642\u064A\u0642\u0629 \u0628\u0646\u0627\u0621\u064B \u0639\u0644\u0649 \u0627\u0644\u0630\u0627\u0643\u0631\u0629 \u0627\u0644\u0645\u0624\u0633\u0633\u064A\u0629 \u0627\u0644\u0645\u0639\u062A\u0645\u062F\u0629.
+\u0623\u0646\u0627 \u0627\u0644\u0645\u0633\u062A\u0634\u0627\u0631 \u0627\u0644\u0622\u0644\u064A \u0627\u0644\u0645\u0633\u0627\u0639\u062F \u0644\u0640 **${memory.identity.brand}**. \u064A\u0633\u0639\u062F\u0646\u064A \u062A\u0642\u062F\u064A\u0645 \u0627\u0644\u0645\u0633\u0627\u0639\u062F\u0629 \u0627\u0644\u062F\u0642\u064A\u0642\u0629 \u0628\u0646\u0627\u0621\u064B \u0639\u0644\u0649 \u0631\u0643\u0627\u0626\u0632\u0646\u0627 \u0627\u0644\u0645\u0624\u0633\u0633\u064A\u0629 \u0627\u0644\u0645\u0639\u062A\u0645\u062F\u0629:
 
-- **\u062A\u0623\u0633\u064A\u0633 \u0627\u0644\u0634\u0631\u0643\u0627\u062A \u0641\u064A \u0627\u0644\u0633\u0639\u0648\u062F\u064A\u0629 \u0648\u0631\u062E\u0635\u0629 MISA** (\u0645\u0644\u0643\u064A\u0629 \u0623\u062C\u0646\u0628\u064A\u0629 100%)
-- **\u0627\u0644\u0647\u0646\u062F\u0633\u0629 \u0648\u0627\u0644\u062D\u0644\u0648\u0644 \u0627\u0644\u0628\u0631\u0645\u062C\u064A\u0629 \u0627\u0644\u0645\u062A\u0637\u0648\u0631\u0629**
-- **\u062A\u0623\u0634\u064A\u0631\u0627\u062A \u0627\u0644\u0645\u0633\u062A\u062B\u0645\u0631\u064A\u0646 \u0648\u0627\u0644\u0625\u0642\u0627\u0645\u0627\u062A \u0648\u0627\u0644\u062A\u0639\u0642\u064A\u0628 \u0627\u0644\u062D\u0643\u0648\u0645\u064A**
-- **\u0627\u0644\u0639\u0642\u0627\u0631\u0627\u062A \u0627\u0644\u062A\u062C\u0627\u0631\u064A\u0629 \u0648\u0639\u0642\u0648\u062F \u0625\u064A\u062C\u0627\u0631\u064A \u0627\u0644\u0645\u0639\u062A\u0645\u062F\u0629**
-- **\u0627\u0644\u0645\u062D\u0627\u0633\u0628\u0629 \u0648\u0627\u0644\u0627\u0645\u062A\u062B\u0627\u0644 \u0627\u0644\u0636\u0631\u064A\u0628\u064A \u0648\u0647\u064A\u0626\u0629 \u0627\u0644\u0632\u0643\u0627\u0629 (ZATCA)**
-- **\u062A\u0623\u0633\u09BF\u09B8 \u0627\u0644\u0634\u0631\u0643\u0627\u062A \u0627\u0644\u062F\u0648\u0644\u064A\u0629** (USA LLC, UK Ltd)
+- \u{1F539} **\u062A\u0623\u0633\u064A\u0633 \u0627\u0644\u0634\u0631\u0643\u0627\u062A \u0641\u064A \u0627\u0644\u0633\u0639\u0648\u062F\u064A\u0629 \u0648\u0631\u062E\u0635\u0629 MISA** (\u0645\u0644\u0643\u064A\u0629 \u0623\u062C\u0646\u0628\u064A\u0629 100%)
+- \u{1F539} **\u0627\u0644\u0647\u0646\u062F\u0633\u0629 \u0648\u0627\u0644\u062D\u0644\u0648\u0644 \u0627\u0644\u0628\u0631\u0645\u062C\u064A\u0629 \u0627\u0644\u0645\u062A\u0637\u0648\u0631\u0629**
+- \u{1F539} **\u062A\u0623\u0634\u064A\u0631\u0627\u062A \u0627\u0644\u0645\u0633\u062A\u062B\u0645\u0631\u064A\u0646 \u0648\u0627\u0644\u0625\u0642\u0627\u0645\u0627\u062A \u0648\u0627\u0644\u062A\u0639\u0642\u064A\u0628 \u0627\u0644\u062D\u0643\u0648\u0645\u064A**
+- \u{1F539} **\u0627\u0644\u0639\u0642\u0627\u0631\u0627\u062A \u0627\u0644\u062A\u062C\u0627\u0631\u064A\u0629 \u0648\u0639\u0642\u0648\u062F \u0625\u064A\u062C\u0627\u0631\u064A \u0627\u0644\u0645\u0639\u062A\u0645\u062F\u0629**
+- \u{1F539} **\u0627\u0644\u0645\u062D\u0627\u0633\u0628\u0629 \u0648\u0627\u0644\u0627\u0645\u062A\u062B\u0627\u0644 \u0627\u0644\u0636\u0631\u064A\u0628\u064A \u0648\u0647\u064A\u0626\u0629 \u0627\u0644\u0632\u0643\u0627\u0629 (ZATCA)**
+- \u{1F539} **\u062A\u0623\u0633\u064A\u0633 \u0627\u0644\u0634\u0631\u0643\u0627\u062A \u0627\u0644\u062F\u0648\u0644\u064A\u0629** (USA LLC, UK Ltd)
 
----
-> **\u062A\u0641\u0636\u0644 \u0628\u0637\u0631\u062D \u0627\u0633\u062A\u0641\u0633\u0627\u0631\u0643:** \u064A\u0631\u062C\u0649 \u0643\u062A\u0627\u0628\u0629 \u0645\u062A\u0637\u0644\u0628\u0627\u062A\u0643 \u0623\u0648 \u0633\u0624\u0627\u0644\u0643 \u0628\u062F\u0642\u0629 \u0648\u0633\u0623\u0642\u062F\u0645 \u0644\u0643 \u0627\u0644\u0625\u062C\u0627\u0628\u0629 \u0627\u0644\u0646\u0638\u0627\u0645\u064A\u0629 \u0627\u0644\u0641\u0648\u0631\u064A\u0629!`,
+> \u{1F4A1} **\u062A\u0641\u0636\u0644 \u0628\u0637\u0631\u062D \u0627\u0633\u062A\u0641\u0633\u0627\u0631\u0643:**  
+> \u064A\u0631\u062C\u0649 \u0643\u062A\u0627\u0628\u0629 \u0645\u062A\u0637\u0644\u0628\u0627\u062A\u0643 \u0623\u0648 \u0633\u0624\u0627\u0644\u0643 \u0628\u062F\u0642\u0629 \u0648\u0633\u0623\u0642\u062F\u0645 \u0644\u0643 \u0627\u0644\u0625\u062C\u0627\u0628\u0629 \u0627\u0644\u0646\u0638\u0627\u0645\u064A\u0629 \u0627\u0644\u0641\u0648\u0631\u064A\u0629!
+
+> \u{1F3DB}\uFE0F **\u0627\u0644\u0645\u0643\u062A\u0628 \u0627\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u064A \u0648\u0627\u0644\u062A\u0646\u0641\u064A\u0630\u064A \u0628\u0627\u0644\u0631\u064A\u0627\u0636**  
+> *\u062A\u0631\u064A\u0643 \u0644\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u0627\u062A | \u062A\u0623\u0633\u064A\u0633 \u0627\u0644\u0634\u0631\u0643\u0627\u062A \u0648\u062D\u0644\u0648\u0644 \u0627\u0644\u0623\u0639\u0645\u0627\u0644 \u0648\u0641\u0642 \u0631\u0624\u064A\u0629 2030*`,
       source: "AI"
     };
   }
   if (isBn) {
     return {
-      reply: `### ${memory.identity.brand} \u2014 \u098F\u0995\u09CD\u09B8\u09BF\u0995\u09BF\u0989\u099F\u09BF\u09AD \u0985\u09CD\u09AF\u09BE\u09A1\u09AD\u09BE\u0987\u099C\u09B0\u09BF \u09A1\u09C7\u09B8\u09CD\u0995
+      reply: `### \u{1F3DB}\uFE0F ${memory.identity.brand} \u2014 \u098F\u0995\u09CD\u09B8\u09BF\u0995\u09BF\u0989\u099F\u09BF\u09AD \u0985\u09CD\u09AF\u09BE\u09A1\u09AD\u09BE\u0987\u099C\u09B0\u09BF \u09A1\u09C7\u09B8\u09CD\u0995
 
-\u0986\u09AE\u09BF **${memory.identity.brand}**-\u098F\u09B0 \u098F\u0986\u0987 \u09B8\u09BE\u09AA\u09CB\u09B0\u09CD\u099F \u0985\u09CD\u09AF\u09BE\u09B8\u09BF\u09B8\u09CD\u099F\u09CD\u09AF\u09BE\u09A8\u09CD\u099F\u0964 \u0986\u09AE\u09BF \u0986\u09AE\u09BE\u09A6\u09C7\u09B0 \u09B8\u09AE\u0997\u09CD\u09B0 \u09AA\u09CD\u09B0\u09BE\u09A4\u09BF\u09B7\u09CD\u09A0\u09BE\u09A8\u09BF\u0995 \u09AC\u09BF\u099C\u09A8\u09C7\u09B8 \u09AE\u09C7\u09AE\u09CB\u09B0\u09BF\u09B0 \u09A4\u09A5\u09CD\u09AF\u09C7\u09B0 \u0986\u09B2\u09CB\u0995\u09C7 \u0986\u09AA\u09A8\u09BE\u0995\u09C7 \u09B8\u09B9\u09BE\u09AF\u09BC\u09A4\u09BE \u0995\u09B0\u09A4\u09C7 \u09AA\u09CD\u09B0\u09B8\u09CD\u09A4\u09C1\u09A4\u0964
+\u0986\u09AE\u09BF **${memory.identity.brand}**-\u098F\u09B0 \u098F\u0986\u0987 \u09B8\u09BE\u09AA\u09CB\u09B0\u09CD\u099F \u0985\u09CD\u09AF\u09BE\u09B8\u09BF\u09B8\u09CD\u099F\u09CD\u09AF\u09BE\u09A8\u09CD\u099F\u0964 \u0986\u09AE\u09BF \u0986\u09AE\u09BE\u09A6\u09C7\u09B0 \u09B8\u09AE\u0997\u09CD\u09B0 \u09AA\u09CD\u09B0\u09BE\u09A4\u09BF\u09B7\u09CD\u09A0\u09BE\u09A8\u09BF\u0995 \u09AC\u09BF\u099C\u09A8\u09C7\u09B8 \u09AE\u09C7\u09AE\u09CB\u09B0\u09BF\u09B0 \u09A4\u09A5\u09CD\u09AF\u09C7\u09B0 \u0986\u09B2\u09CB\u0995\u09C7 \u0986\u09AA\u09A8\u09BE\u0995\u09C7 \u09B8\u09B9\u09BE\u09AF\u09BC\u09A4\u09BE \u0995\u09B0\u09A4\u09C7 \u09AA\u09CD\u09B0\u09B8\u09CD\u09A4\u09C1\u09A4:
 
-- **\u09B8\u09CC\u09A6\u09BF \u0995\u09CB\u09AE\u09CD\u09AA\u09BE\u09A8\u09BF \u0997\u09A0\u09A8 \u0993 MISA \u09B2\u09BE\u0987\u09B8\u09C7\u09A8\u09CD\u09B8** (\u09E7\u09E6\u09E6% \u09AC\u09BF\u09A6\u09C7\u09B6\u09BF \u09AE\u09BE\u09B2\u09BF\u0995\u09BE\u09A8\u09BE)
-- **\u0987\u09A8-\u09B9\u09BE\u0989\u09B8 \u09B8\u09AB\u099F\u0993\u09AF\u09BC\u09CD\u09AF\u09BE\u09B0 \u0993 \u09A1\u09BF\u099C\u09BF\u099F\u09BE\u09B2 \u0987\u099E\u09CD\u099C\u09BF\u09A8\u09BF\u09AF\u09BC\u09BE\u09B0\u09BF\u0982**
-- **\u09AD\u09BF\u09B8\u09BE, \u0987\u0995\u09BE\u09AE\u09BE \u0993 \u09B8\u09B0\u0995\u09BE\u09B0\u09BF PRO \u09B2\u09BF\u09AF\u09BC\u09BE\u099C\u09CB\u0981**
-- **\u09AC\u09BE\u09A3\u09BF\u099C\u09CD\u09AF\u09BF\u0995 \u09B0\u09BF\u09AF\u09BC\u09C7\u09B2 \u098F\u09B8\u09CD\u099F\u09C7\u099F \u0993 Ejari \u0985\u09AB\u09BF\u09B8 \u09B2\u09BF\u099C**
-- **\u0995\u09B0\u09CD\u09AA\u09CB\u09B0\u09C7\u099F \u098F\u0995\u09BE\u0989\u09A8\u09CD\u099F\u09BF\u0982, ZATCA \u09AD\u09CD\u09AF\u09BE\u099F \u0993 \u0985\u09A1\u09BF\u099F**
-- **\u0986\u09A8\u09CD\u09A4\u09B0\u09CD\u099C\u09BE\u09A4\u09BF\u0995 \u0995\u09CB\u09AE\u09CD\u09AA\u09BE\u09A8\u09BF \u0997\u09A0\u09A8** (USA LLC, UK Ltd)
+- \u{1F539} **\u09B8\u09CC\u09A6\u09BF \u0995\u09CB\u09AE\u09CD\u09AA\u09BE\u09A8\u09BF \u0997\u09A0\u09A8 \u0993 MISA \u09B2\u09BE\u0987\u09B8\u09C7\u09A8\u09CD\u09B8** (\u09E7\u09E6\u09E6% \u09AC\u09BF\u09A6\u09C7\u09B6\u09BF \u09AE\u09BE\u09B2\u09BF\u0995\u09BE\u09A8\u09BE)
+- \u{1F539} **\u0987\u09A8-\u09B9\u09BE\u0989\u09B8 \u09B8\u09AB\u099F\u0993\u09AF\u09BC\u09CD\u09AF\u09BE\u09B0 \u0993 \u09A1\u09BF\u099C\u09BF\u099F\u09BE\u09B2 \u0987\u099E\u09CD\u099C\u09BF\u09A8\u09BF\u09AF\u09BC\u09BE\u09B0\u09BF\u0982**
+- \u{1F539} **\u09AD\u09BF\u09B8\u09BE, \u0987\u0995\u09BE\u09AE\u09BE \u0993 \u09B8\u09B0\u0995\u09BE\u09B0\u09BF PRO \u09B2\u09BF\u09AF\u09BC\u09BE\u099C\u09CB\u0981**
+- \u{1F539} **\u09AC\u09BE\u09A3\u09BF\u099C\u09CD\u09AF\u09BF\u0995 \u09B0\u09BF\u09AF\u09BC\u09C7\u09B2 \u098F\u09B8\u09CD\u099F\u09C7\u099F \u0993 Ejari \u0985\u09AB\u09BF\u09B8 \u09B2\u09BF\u099C**
+- \u{1F539} **\u0995\u09B0\u09CD\u09AA\u09CB\u09B0\u09C7\u099F \u098F\u0995\u09BE\u0989\u09A8\u09CD\u099F\u09BF\u0982, ZATCA \u09AD\u09CD\u09AF\u09BE\u099F \u0993 \u0985\u09A1\u09BF\u099F**
+- \u{1F539} **\u0986\u09A8\u09CD\u09A4\u09B0\u09CD\u099C\u09BE\u09A4\u09BF\u0995 \u0995\u09CB\u09AE\u09CD\u09AA\u09BE\u09A8\u09BF \u0997\u09A0\u09A8** (USA LLC, UK Ltd)
 
----
-> **\u0986\u09AA\u09A8\u09BE\u09B0 \u09AA\u09CD\u09B0\u09AF\u09BC\u09CB\u099C\u09A8\u099F\u09BF \u099C\u09BE\u09A8\u09BE\u09A8:** \u0986\u09AA\u09A8\u09BE\u09B0 \u09B8\u09C1\u09A8\u09BF\u09B0\u09CD\u09A6\u09BF\u09B7\u09CD\u099F \u099A\u09BE\u09B9\u09BF\u09A6\u09BE \u09AC\u09BE \u09AA\u09CD\u09B0\u09B6\u09CD\u09A8\u099F\u09BF \u09B2\u09BF\u0996\u09C1\u09A8, \u0986\u09AE\u09BF \u098F\u0996\u09A8\u0987 \u09B8\u09A0\u09BF\u0995 \u09AA\u09CD\u09B0\u09BE\u09A4\u09BF\u09B7\u09CD\u09A0\u09BE\u09A8\u09BF\u0995 \u09A4\u09A5\u09CD\u09AF \u0993 \u0997\u09BE\u0987\u09A1\u09B2\u09BE\u0987\u09A8 \u09B8\u09B0\u09AC\u09B0\u09BE\u09B9 \u0995\u09B0\u09AC!`,
+> \u{1F4A1} **\u0986\u09AA\u09A8\u09BE\u09B0 \u09AA\u09CD\u09B0\u09AF\u09BC\u09CB\u099C\u09A8\u099F\u09BF \u099C\u09BE\u09A8\u09BE\u09A8:**  
+> \u0986\u09AA\u09A8\u09BE\u09B0 \u09B8\u09C1\u09A8\u09BF\u09B0\u09CD\u09A6\u09BF\u09B7\u09CD\u099F \u099A\u09BE\u09B9\u09BF\u09A6\u09BE \u09AC\u09BE \u09AA\u09CD\u09B0\u09B6\u09CD\u09A8\u099F\u09BF \u09B2\u09BF\u0996\u09C1\u09A8, \u0986\u09AE\u09BF \u098F\u0996\u09A8\u0987 \u09B8\u09A0\u09BF\u0995 \u09AA\u09CD\u09B0\u09BE\u09A4\u09BF\u09B7\u09CD\u09A0\u09BE\u09A8\u09BF\u0995 \u09A4\u09A5\u09CD\u09AF \u0993 \u0997\u09BE\u0987\u09A1\u09B2\u09BE\u0987\u09A8 \u09B8\u09B0\u09AC\u09B0\u09BE\u09B9 \u0995\u09B0\u09AC!
+
+> \u{1F3DB}\uFE0F **\u09B8\u09BF\u09A8\u09BF\u09AF\u09BC\u09B0 \u0985\u09CD\u09AF\u09BE\u09A1\u09AD\u09BE\u0987\u099C\u09B0\u09BF \u0993 \u09B2\u09BF\u0997\u09CD\u09AF\u09BE\u09B2 \u09A1\u09C7\u09B8\u09CD\u0995 (\u09B0\u09BF\u09AF\u09BC\u09BE\u09A6)**  
+> *\u099F\u09CD\u09B0\u09C7\u0995 \u0995\u09A8\u09B8\u09BE\u09B2\u099F\u09C7\u09A8\u09CD\u09B8\u09BF | \u09AD\u09BF\u09B6\u09A8 \u09E8\u09E6\u09E9\u09E6 \u0995\u09B0\u09CD\u09AA\u09CB\u09B0\u09C7\u099F \u09AE\u09BE\u09B0\u09CD\u0995\u09C7\u099F \u098F\u09A8\u09CD\u099F\u09CD\u09B0\u09BF \u0993 \u098F\u09A8\u09CD\u099F\u09BE\u09B0\u09AA\u09CD\u09B0\u09BE\u0987\u099C \u09B8\u09B2\u09BF\u0989\u09B6\u09A8\u09B8*`,
       source: "AI"
     };
   }
   return {
-    reply: `### ${memory.identity.brand} \u2014 Executive Advisory Desk
+    reply: `### \u{1F3DB}\uFE0F ${memory.identity.brand} \u2014 Executive Advisory Desk
 
-I am the AI Support Consultant for **${memory.identity.brand}**. I draw directly from our verified institutional business memory to assist your corporate journey.
+I am the AI Support Consultant for **${memory.identity.brand}**. I draw directly from our verified institutional business memory to assist your corporate journey:
 
-- **Saudi Business Setup & MISA Licensing** (100% foreign ownership)
-- **In-House Software & Digital Engineering**
-- **Investor Visas, Executive Iqamas & PRO Portals**
-- **Commercial Real Estate & Certified Ejari Leases**
-- **Corporate Accounting, ZATCA Phase 2 VAT & Audits**
-- **Global Business Formation** (USA LLC, UK Ltd)
+- \u{1F539} **Saudi Business Setup & MISA Licensing** (100% foreign ownership)
+- \u{1F539} **In-House Software & Digital Engineering** (Custom ERPs & apps)
+- \u{1F539} **Investor Visas, Executive Iqamas & PRO Portals** (Qiwa & Muqeem)
+- \u{1F539} **Commercial Real Estate & Certified Ejari Leases** (Offices & warehouses)
+- \u{1F539} **Corporate Accounting, ZATCA Phase 2 VAT & Audits**
+- \u{1F539} **Global Business Formation** (USA LLC, UK Ltd)
 
----
-> **How can we assist you?** Please let me know your specific business requirement or question, and I will guide you with accurate regulatory information!`,
+> \u{1F4A1} **How can we assist you?**  
+> Please let me know your specific business requirement or question, and I will guide you with accurate regulatory information!
+
+> \u{1F3DB}\uFE0F **Senior Advisory & Legal Desk (Riyadh)**  
+> *Trek Consultancy | Vision 2030 Corporate Market Entry & Enterprise Solutions*`,
     source: "AI"
   };
 }
@@ -1831,16 +1930,35 @@ async function getAiConfigFromDb() {
 }
 async function getEffectiveAiRuntime() {
   const dbConfig = await getAiConfigFromDb();
-  const rawDbKey = (dbConfig.apiKey || "").trim();
-  const envKey = (process.env.GEMINI_API_KEY || "").trim();
+  const rawProvider = (dbConfig.provider || "gemini").toLowerCase();
+  const provider = rawProvider === "openai" ? "openai" : "gemini";
+  let rawDbKey = "";
+  if (dbConfig.providerApiKeys && typeof dbConfig.providerApiKeys === "object" && dbConfig.providerApiKeys[provider]) {
+    rawDbKey = (dbConfig.providerApiKeys[provider] || "").trim();
+  } else if (dbConfig.apiKey) {
+    rawDbKey = (dbConfig.apiKey || "").trim();
+  }
+  let envKey = "";
+  if (provider === "gemini") {
+    envKey = (process.env.GEMINI_API_KEY || "").trim();
+  } else if (provider === "openai") {
+    envKey = (process.env.OPENAI_API_KEY || "").trim();
+  }
   const effectiveApiKey = rawDbKey || envKey;
-  const selectedModel = (dbConfig.selectedModel || "gemini-2.5-flash").trim();
-  const rawFallbacks = Array.isArray(dbConfig.fallbackModels) ? dbConfig.fallbackModels : ["gemini-2.0-flash", "gemini-1.5-flash"];
+  let baseUrl = (dbConfig.baseUrl || "").trim();
+  if (!baseUrl || dbConfig.provider !== provider) {
+    baseUrl = DEFAULT_PROVIDER_BASE_URLS[provider] || (provider === "openai" ? "https://api.openai.com/v1" : "https://generativelanguage.googleapis.com");
+  }
+  const selectedModel = (dbConfig.selectedModel && dbConfig.provider === provider ? dbConfig.selectedModel : provider === "gemini" ? "gemini-3.8-flash" : "gpt-4o-mini").trim();
+  const rawFallbacks = Array.isArray(dbConfig.fallbackModels) ? dbConfig.fallbackModels : [];
   const fallbackModels = rawFallbacks.filter((m) => m && m !== selectedModel);
   const candidateModels = [selectedModel, ...fallbackModels];
+  const isKeyConfigured = Boolean(effectiveApiKey);
   return {
+    provider,
     apiKey: effectiveApiKey,
-    isKeyConfigured: Boolean(effectiveApiKey),
+    baseUrl,
+    isKeyConfigured,
     hasCustomDbKey: Boolean(rawDbKey),
     usingEnvKey: Boolean(!rawDbKey && envKey),
     selectedModel,
@@ -1849,8 +1967,128 @@ async function getEffectiveAiRuntime() {
     maxOutputTokens: typeof dbConfig.maxOutputTokens === "number" ? dbConfig.maxOutputTokens : 2048,
     customSystemInstruction: (dbConfig.customSystemInstruction || "").trim(),
     status: dbConfig.status || "active",
+    providerApiKeys: dbConfig.providerApiKeys && typeof dbConfig.providerApiKeys === "object" ? dbConfig.providerApiKeys : {},
     dbConfig
   };
+}
+async function executeAiCompletion({
+  provider,
+  apiKey,
+  baseUrl,
+  model,
+  systemInstruction,
+  messages,
+  temperature = 0.4,
+  maxTokens = 2048,
+  timeoutMs = 12e3
+}) {
+  const normProvider = (provider || "gemini").toLowerCase();
+  if (normProvider === "gemini") {
+    const ai = new import_genai.GoogleGenAI({ apiKey });
+    const contents = [];
+    for (const msg of messages) {
+      const role = msg.role === "assistant" ? "model" : "user";
+      if (contents.length > 0 && contents[contents.length - 1].role === role) {
+        contents[contents.length - 1].parts[0].text += `
+
+${msg.content}`;
+      } else {
+        contents.push({ role, parts: [{ text: msg.content }] });
+      }
+    }
+    while (contents.length > 0 && contents[0].role !== "user") {
+      contents.shift();
+    }
+    const response = await withTimeout(
+      ai.models.generateContent({
+        model,
+        contents,
+        config: {
+          systemInstruction,
+          temperature,
+          maxOutputTokens: maxTokens
+        }
+      }),
+      timeoutMs
+    );
+    return { text: (response.text || "").trim(), model };
+  }
+  const effectiveBaseUrl = (baseUrl || DEFAULT_PROVIDER_BASE_URLS.openai || "https://api.openai.com/v1").replace(/\/+$/, "");
+  const url = `${effectiveBaseUrl}/chat/completions`;
+  const requestMessages = [
+    ...systemInstruction ? [{ role: "system", content: systemInstruction }] : [],
+    ...messages
+  ];
+  const headers = {
+    "Content-Type": "application/json"
+  };
+  if (apiKey) {
+    headers["Authorization"] = `Bearer ${apiKey}`;
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model,
+        messages: requestMessages,
+        temperature,
+        max_tokens: maxTokens
+      }),
+      signal: controller.signal
+    });
+    clearTimeout(timer);
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      let errMsg = `HTTP ${res.status} from ${normProvider}`;
+      try {
+        const errJson = JSON.parse(errText);
+        const rawDetail = errJson.error?.metadata?.raw || errJson.error?.metadata?.error?.message;
+        const remedy = errJson.error?.metadata?.remedy_hint;
+        const primaryMsg = errJson.error?.message || errJson.message;
+        if (rawDetail && rawDetail !== primaryMsg) {
+          errMsg = rawDetail;
+        } else if (primaryMsg) {
+          errMsg = primaryMsg;
+        }
+        if (remedy && !errMsg.includes(remedy)) {
+          errMsg += ` (${remedy})`;
+        }
+      } catch {
+        if (errText) errMsg += `: ${errText.slice(0, 300)}`;
+      }
+      throw new Error(errMsg);
+    }
+    const data = await res.json();
+    if (data?.error) {
+      const detail = data.error?.metadata?.raw || data.error?.message || JSON.stringify(data.error);
+      throw new Error(`Upstream provider error: ${detail}`);
+    }
+    let text = data?.choices?.[0]?.message?.content || "";
+    text = text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+    if (/^here('?s| is) a thinking process:?/i.test(text)) {
+      const parts = text.split(/(?:\n\n(?=[#A-Z0-9\*])|###\s+|Answer:|Resolution:)/i);
+      if (parts.length > 1) {
+        text = parts.slice(1).join("\n\n").trim();
+      }
+    }
+    if (/^(?:1\.\s+)?\*\*(?:Analyze User Input|Analyze Input|Understanding|Thinking Process|Plan|Analysis):?\*\*/i.test(text)) {
+      const markerRegex = /(?:###\s+[^\n]+|\n\n(?=> \*\*Senior)|\n\n(?=[A-Z][A-Za-z0-9\s—–-]+—[^\n]+)|(?:Draft (?:Response|Structure|Response Structure)|Final (?:Response|Answer)|Actual Response):?\s*\n+|(?:Hello|Welcome|Greetings|Thank you|Dear)[,\s][^\n]+)/i;
+      const markerMatch = text.search(markerRegex);
+      if (markerMatch !== -1) {
+        const candidate = text.slice(markerMatch).replace(/^(?:Draft (?:Response|Structure|Response Structure)|Final (?:Response|Answer)|Actual Response):?\s*\n+/i, "").trim();
+        if (candidate.length > 30) {
+          text = candidate;
+        }
+      }
+    }
+    return { text: text.trim(), model };
+  } catch (err) {
+    clearTimeout(timer);
+    throw err;
+  }
 }
 async function createApp() {
   const app = (0, import_express.default)();
@@ -1921,9 +2159,13 @@ async function createApp() {
     }
     const aiRuntime = await getEffectiveAiRuntime();
     if (aiRuntime.isKeyConfigured && aiRuntime.status !== "disabled") {
+      const providerLabels = {
+        gemini: "Google Gemini",
+        openai: "OpenAI"
+      };
       checks.aiApi = {
         status: "configured",
-        provider: "Google Gemini",
+        provider: providerLabels[aiRuntime.provider] || aiRuntime.provider,
         model: aiRuntime.selectedModel,
         hasCustomKey: aiRuntime.hasCustomDbKey,
         usingEnvKey: aiRuntime.usingEnvKey
@@ -1931,7 +2173,7 @@ async function createApp() {
     } else {
       checks.aiApi = {
         status: "not_configured",
-        provider: "Local Heuristic / PostgreSQL RAG",
+        provider: "Local Dynamic Knowledge Synthesizer / PostgreSQL RAG",
         model: "PostgreSQL Knowledge Fallback"
       };
     }
@@ -2658,6 +2900,11 @@ async function createApp() {
       console.log(`[Email Verification] Code for ${cleanEmail} (${cleanName}): ${code}`);
       let emailSent = false;
       let emailDeliveryError = null;
+      try {
+        const dotenv3 = await import("dotenv");
+        dotenv3.default.config({ override: true });
+      } catch {
+      }
       const resendApiKey = process.env.RESEND_API_KEY?.trim();
       if (resendApiKey && resendApiKey !== "re_123456789") {
         try {
@@ -2813,22 +3060,22 @@ If you did not request this code, you can safely ignore this email.`,
           await pool.query(`
             UPDATE conversations
             SET user_id = $1, user_email = $2, user_name = COALESCE(user_name, $3), is_guest = FALSE, updated_at = NOW()
-            WHERE id = $4 OR session_id = $4
+            WHERE (id = $4 OR session_id = $4) AND (is_guest = TRUE OR user_email IS NULL OR LOWER(user_email) = $2)
           `, [id, cleanEmail, cleanName, cleanSession]);
           await pool.query(`
             UPDATE messages
             SET user_id = $1, user_email = $2, is_guest = FALSE
-            WHERE conversation_id = $3 OR session_id = $3
+            WHERE (conversation_id = $3 OR session_id = $3) AND (is_guest = TRUE OR user_email IS NULL OR LOWER(user_email) = $2)
           `, [id, cleanEmail, cleanSession]);
           await pool.query(`
             UPDATE support_conversations
             SET user_id = $1, user_email = $2, user_name = COALESCE(user_name, $3), is_guest = FALSE, updated_at = NOW()
-            WHERE id = $4
+            WHERE id = $4 AND (is_guest = TRUE OR user_email IS NULL OR LOWER(user_email) = $2)
           `, [id, cleanEmail, cleanName, cleanSession]);
           await pool.query(`
             UPDATE support_messages
             SET user_id = $1, user_email = $2, is_guest = FALSE
-            WHERE session_id = $3
+            WHERE session_id = $3 AND (is_guest = TRUE OR user_email IS NULL OR LOWER(user_email) = $2)
           `, [id, cleanEmail, cleanSession]);
         } catch (claimErr) {
           console.error("Failed to claim guest conversation on register:", claimErr);
@@ -2886,22 +3133,22 @@ If you did not request this code, you can safely ignore this email.`,
           await pool.query(`
             UPDATE conversations
             SET user_id = $1, user_email = $2, user_name = COALESCE(user_name, $3), is_guest = FALSE, updated_at = NOW()
-            WHERE id = $4 OR session_id = $4
+            WHERE (id = $4 OR session_id = $4) AND (is_guest = TRUE OR user_email IS NULL OR LOWER(user_email) = $2)
           `, [user.id, cleanEmail, user.name, cleanSession]);
           await pool.query(`
             UPDATE messages
             SET user_id = $1, user_email = $2, is_guest = FALSE
-            WHERE conversation_id = $3 OR session_id = $3
+            WHERE (conversation_id = $3 OR session_id = $3) AND (is_guest = TRUE OR user_email IS NULL OR LOWER(user_email) = $2)
           `, [user.id, cleanEmail, cleanSession]);
           await pool.query(`
             UPDATE support_conversations
             SET user_id = $1, user_email = $2, user_name = COALESCE(user_name, $3), is_guest = FALSE, updated_at = NOW()
-            WHERE id = $4
+            WHERE id = $4 AND (is_guest = TRUE OR user_email IS NULL OR LOWER(user_email) = $2)
           `, [user.id, cleanEmail, user.name, cleanSession]);
           await pool.query(`
             UPDATE support_messages
             SET user_id = $1, user_email = $2, is_guest = FALSE
-            WHERE session_id = $3
+            WHERE session_id = $3 AND (is_guest = TRUE OR user_email IS NULL OR LOWER(user_email) = $2)
           `, [user.id, cleanEmail, cleanSession]);
         } catch (claimErr) {
           console.error("Failed to claim guest conversation on login:", claimErr);
@@ -2947,6 +3194,170 @@ If you did not request this code, you can safely ignore this email.`,
         VALUES ($1, 'Subscribed to Newsletter', $2, 'Weekly Blueprint Digest', 'Just now', 'newsletter')
       `, [`act-${Date.now()}`, cleanEmail]);
       res.status(201).json({ success: true, message: "Successfully subscribed to the newsletter!" });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+  const defaultNewsletterCampaigns = [
+    {
+      id: "camp-44",
+      issueNumber: 44,
+      subject: "Weekly Blueprint Digest #44: Scalable Cloud Architecture & Multi-Tenant Partitioning",
+      previewText: "Best practices for zero-downtime database migrations, microservice resilience, and Saudi cloud compliance.",
+      author: "Trek Consultancy Advisory Team",
+      sentAt: "2026-10-06T09:00:00.000Z",
+      recipientCount: 1420,
+      status: "sent",
+      tags: ["Cloud Architecture", "Database", "Microservices"],
+      content: `## Welcome to Weekly Blueprint Digest #44
+
+In this edition, our senior engineering team breaks down mission-critical database scaling patterns:
+
+### 1. Zero-Downtime Multi-Tenant Schema Migrations
+How enterprise SaaS platforms partition tenant databases while maintaining 99.999% uptime guarantees.
+
+### 2. Redis Cache Lease Locking
+Preventing thundering herds with atomic token leases and distributed leases.
+
+### 3. Saudi Vision 2030 Cloud Compliance
+Key regulatory mandates for hosting customer records within Saudi Arabian data centers (CITC & NCA compliance).
+
+---
+*Need private advisory on your architectural roadmap? Reply directly to this digest or visit our forum portal.*`
+    },
+    {
+      id: "camp-43",
+      issueNumber: 43,
+      subject: "Weekly Blueprint Digest #43: High-Throughput Redis Cache Tuning & Latency Reductions",
+      previewText: "Deep dive into memory fragmentation, pipelining, and sub-millisecond response guarantees.",
+      author: "Liam Foster, Cloud Lead",
+      sentAt: "2026-09-29T09:00:00.000Z",
+      recipientCount: 1385,
+      status: "sent",
+      tags: ["Performance", "Caching", "Redis"],
+      content: `## Weekly Blueprint Digest #43: Latency Optimization
+
+High-traffic systems live or die by their cache invalidation architecture. In this issue:
+
+- **Memory Fragmentation**: Detecting and compacting Jemalloc memory overhead in Redis clusters.
+- **Pipelining**: Bundling 500+ read operations in a single round-trip to reduce latency from 45ms to 1.8ms.
+- **Connection Pooling**: Managing pool starvation under high concurrent HTTP thread spikes.`
+    },
+    {
+      id: "camp-42",
+      issueNumber: 42,
+      subject: "Weekly Blueprint Digest #42: Enterprise Security, API Gateways, & Mutual TLS",
+      previewText: "Implementing zero-trust perimeter defenses, mTLS certificates, and rate limiting across microservices.",
+      author: "Trek Consultancy Advisory Team",
+      sentAt: "2026-09-22T09:00:00.000Z",
+      recipientCount: 1310,
+      status: "sent",
+      tags: ["Security", "API Gateway", "DevOps"],
+      content: `## Weekly Blueprint Digest #42: Zero-Trust Security
+
+Securing internal microservice communications across hybrid multi-cloud topologies:
+
+- **Mutual TLS (mTLS)**: Automatic certificate rotation with SPIFFE/SPIRE.
+- **Rate Limiting**: Sliding window rate limits at the API Gateway.
+- **Audit Compliance**: Tamper-proof logging with cryptographic hashing.`
+    }
+  ];
+  app.delete(["/api/admin/newsletter/:id", "/api/newsletter/:id"], async (req, res) => {
+    try {
+      const { id } = req.params;
+      await pool.query("DELETE FROM newsletter_subscribers WHERE id = $1 OR email = $1", [id]);
+      res.json({ success: true, message: "Subscriber removed successfully" });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+  app.post("/api/admin/newsletter", async (req, res) => {
+    try {
+      const { email } = req.body;
+      const cleanEmail = (email || "").trim().toLowerCase();
+      if (!cleanEmail || !cleanEmail.includes("@")) {
+        return res.status(400).json({ error: "A valid email address is required." });
+      }
+      const id = `sub-${Date.now()}`;
+      await pool.query(`
+        INSERT INTO newsletter_subscribers (id, email)
+        VALUES ($1, $2)
+        ON CONFLICT (email) DO NOTHING
+      `, [id, cleanEmail]);
+      res.status(201).json({ success: true, subscriber: { id, email: cleanEmail, subscribed_at: (/* @__PURE__ */ new Date()).toISOString(), status: "active" } });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+  app.get("/api/admin/newsletter/campaigns", async (_req, res) => {
+    try {
+      const result = await pool.query("SELECT value FROM settings WHERE key = 'newsletter_campaigns'");
+      if (result.rows.length > 0 && result.rows[0].value) {
+        const val = typeof result.rows[0].value === "string" ? JSON.parse(result.rows[0].value) : result.rows[0].value;
+        if (Array.isArray(val) && val.length > 0) {
+          return res.json(val);
+        }
+      }
+      res.json(defaultNewsletterCampaigns);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+  app.post("/api/admin/newsletter/broadcast", async (req, res) => {
+    try {
+      const { subject, previewText, content, author, tags } = req.body;
+      if (!subject?.trim() || !content?.trim()) {
+        return res.status(400).json({ error: "Subject and content are required." });
+      }
+      const cur = await pool.query("SELECT value FROM settings WHERE key = 'newsletter_campaigns'");
+      let campaigns = defaultNewsletterCampaigns;
+      if (cur.rows.length > 0 && cur.rows[0].value) {
+        try {
+          const parsed = typeof cur.rows[0].value === "string" ? JSON.parse(cur.rows[0].value) : cur.rows[0].value;
+          if (Array.isArray(parsed)) campaigns = parsed;
+        } catch {
+        }
+      }
+      const subsRes = await pool.query("SELECT COUNT(*) as count FROM newsletter_subscribers");
+      const subCount = parseInt(subsRes.rows[0]?.count || "0", 10);
+      const nextIssue = (campaigns[0]?.issueNumber || 44) + 1;
+      const newCampaign = {
+        id: `camp-${Date.now()}`,
+        issueNumber: nextIssue,
+        subject: subject.trim(),
+        previewText: (previewText || "").trim(),
+        content: content.trim(),
+        author: author?.trim() || "Trek Consultancy Editorial Team",
+        sentAt: (/* @__PURE__ */ new Date()).toISOString(),
+        recipientCount: subCount || 1,
+        status: "sent",
+        tags: Array.isArray(tags) ? tags : ["Weekly Digest", "Architecture"]
+      };
+      const updated = [newCampaign, ...campaigns];
+      await pool.query(`
+        INSERT INTO settings (key, value) VALUES ('newsletter_campaigns', $1)
+        ON CONFLICT (key) DO UPDATE SET value = $1
+      `, [JSON.stringify(updated)]);
+      const resendApiKey = process.env.RESEND_API_KEY?.trim();
+      if (resendApiKey && subCount > 0) {
+        try {
+          const resend = new import_resend.Resend(resendApiKey);
+          const subs = await pool.query("SELECT email FROM newsletter_subscribers LIMIT 50");
+          const emailList = subs.rows.map((r) => r.email).filter(Boolean);
+          if (emailList.length > 0) {
+            await resend.emails.send({
+              from: "Trek Consultancy Forum <onboarding@resend.dev>",
+              to: emailList[0],
+              bcc: emailList.slice(1),
+              subject: newCampaign.subject,
+              text: newCampaign.content
+            });
+          }
+        } catch (mailErr) {
+          console.warn("[Newsletter Broadcast Warning]", mailErr);
+        }
+      }
+      res.status(201).json({ success: true, campaign: newCampaign, sentCount: subCount });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -3064,7 +3475,57 @@ If you did not request this code, you can safely ignore this email.`,
   });
   app.get("/api/support/messages", async (req, res) => {
     try {
-      const sessionId = req.query.sessionId || "default";
+      const sessionId = (req.query.sessionId || "").trim();
+      const userId = (req.query.userId || "").trim();
+      const userEmail = (req.query.userEmail || "").trim().toLowerCase();
+      if (userId || userEmail) {
+        const result2 = await pool.query(`
+          SELECT id, 
+                 COALESCE(sender, CASE WHEN role = 'assistant' THEN 'bot' ELSE role END) as sender,
+                 COALESCE(message, content) as message,
+                 content,
+                 role,
+                 source,
+                 user_id as "userId",
+                 user_email as "userEmail",
+                 is_guest as "isGuest",
+                 created_at as "createdAt"
+          FROM messages
+          WHERE (user_id IS NOT NULL AND user_id = $1)
+             OR (user_email IS NOT NULL AND LOWER(user_email) = $2)
+             OR (
+                 (conversation_id = $3 OR session_id = $3)
+                 AND (
+                   (user_id IS NOT NULL AND user_id = $1)
+                   OR (user_email IS NOT NULL AND LOWER(user_email) = $2)
+                   OR (is_guest = FALSE AND LOWER(user_email) = $2)
+                 )
+             )
+          ORDER BY created_at ASC
+          LIMIT 100
+        `, [userId || null, userEmail || null, sessionId || ""]);
+        return res.json(result2.rows);
+      }
+      if (!sessionId) {
+        return res.json([]);
+      }
+      const ownerCheck = await pool.query(`
+        SELECT user_email 
+        FROM conversations 
+        WHERE (id = $1 OR session_id = $1) 
+          AND (is_guest = FALSE OR user_email IS NOT NULL) 
+        LIMIT 1
+      `, [sessionId]);
+      const msgOwnerCheck = await pool.query(`
+        SELECT user_email 
+        FROM messages 
+        WHERE (conversation_id = $1 OR session_id = $1) 
+          AND (is_guest = FALSE OR user_email IS NOT NULL) 
+        LIMIT 1
+      `, [sessionId]);
+      if (ownerCheck.rows.length > 0 || msgOwnerCheck.rows.length > 0 || sessionId.startsWith("user-")) {
+        return res.json([]);
+      }
       const result = await pool.query(`
         SELECT id, 
                COALESCE(sender, CASE WHEN role = 'assistant' THEN 'bot' ELSE role END) as sender,
@@ -3077,10 +3538,12 @@ If you did not request this code, you can safely ignore this email.`,
                is_guest as "isGuest",
                created_at as "createdAt"
         FROM messages
-        WHERE conversation_id = $1 OR session_id = $1
+        WHERE (conversation_id = $1 OR session_id = $1)
+          AND (is_guest = TRUE OR user_email IS NULL)
         ORDER BY created_at ASC
+        LIMIT 100
       `, [sessionId]);
-      res.json(result.rows);
+      return res.json(result.rows);
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -3129,6 +3592,16 @@ If you did not request this code, you can safely ignore this email.`,
       if (!cleanSession || !cleanEmail) {
         return res.status(400).json({ error: "sessionId and userEmail are required." });
       }
+      const existingConv = await pool.query(
+        `SELECT user_email, is_guest FROM conversations WHERE (id = $1 OR session_id = $1) AND user_email IS NOT NULL LIMIT 1`,
+        [cleanSession]
+      );
+      if (existingConv.rows.length > 0) {
+        const existingEmail = (existingConv.rows[0].user_email || "").toLowerCase();
+        if (existingEmail && existingEmail !== cleanEmail) {
+          return res.status(403).json({ error: "Cannot claim a conversation belonging to another user." });
+        }
+      }
       if (cleanEmail) {
         try {
           const userMatch = await pool.query("SELECT id, name FROM users WHERE LOWER(email) = $1 LIMIT 1", [cleanEmail]);
@@ -3151,6 +3624,7 @@ If you did not request this code, you can safely ignore this email.`,
           is_guest = FALSE,
           status = 'active',
           updated_at = NOW()
+        WHERE conversations.is_guest = TRUE OR conversations.user_email IS NULL OR LOWER(conversations.user_email) = $3
         RETURNING id as "sessionId", user_id as "userId", user_email as "userEmail", user_name as "userName", is_guest as "isGuest", message_count as "messageCount", updated_at as "updatedAt"
       `, [cleanSession, cleanUserId, cleanEmail, cleanUserName]);
       await pool.query(`
@@ -3165,16 +3639,19 @@ If you did not request this code, you can safely ignore this email.`,
           is_guest = FALSE,
           status = 'active',
           updated_at = NOW()
+        WHERE support_conversations.is_guest = TRUE OR support_conversations.user_email IS NULL OR LOWER(support_conversations.user_email) = $3
       `, [cleanSession, cleanUserId, cleanEmail, cleanUserName]);
       await pool.query(`
         UPDATE messages
         SET user_id = $1, user_email = $2, is_guest = FALSE
-        WHERE conversation_id = $3 OR session_id = $3
+        WHERE (conversation_id = $3 OR session_id = $3)
+          AND (is_guest = TRUE OR user_email IS NULL OR LOWER(user_email) = $2)
       `, [cleanUserId, cleanEmail, cleanSession]);
       await pool.query(`
         UPDATE support_messages
         SET user_id = $1, user_email = $2, is_guest = FALSE
         WHERE session_id = $3
+          AND (is_guest = TRUE OR user_email IS NULL OR LOWER(user_email) = $2)
       `, [cleanUserId, cleanEmail, cleanSession]);
       res.json({
         success: true,
@@ -4073,7 +4550,7 @@ Could you share a bit more detail on what you are looking to achieve? I will pro
   app.post("/api/support/messages", async (req, res) => {
     try {
       const { sessionId, message, language, userEmail, userId, userName } = req.body;
-      const cleanSession = sessionId || "default";
+      let cleanSession = (sessionId || "").trim();
       const cleanMsg = (message || "").trim();
       const cleanEmail = (userEmail || "").trim().toLowerCase();
       let cleanUserId = (userId || "").trim() || null;
@@ -4088,7 +4565,53 @@ Could you share a bit more detail on what you are looking to achieve? I will pro
         } catch {
         }
       }
+      if (!cleanUserName || cleanUserName === "Guest User") {
+        const nameMatch = cleanMsg.match(/(?:my name is|i am|i'm|this is|call me|اسمي|أنا|আমি|আমার নাম)\s+([A-Z][a-zA-Z0-9_\s]{1,25}|[\u0600-\u06FF\s]{2,25}|[\u0980-\u09FF\s]{2,25})/i);
+        if (nameMatch && nameMatch[1]) {
+          const detected = nameMatch[1].trim().split(/\s+/).slice(0, 2).join(" ");
+          if (detected && !["here", "interested", "looking", "asking", "wondering", "ready", "fine"].includes(detected.toLowerCase())) {
+            cleanUserName = detected;
+          }
+        }
+      }
       const isGuest = !cleanEmail && !cleanUserId;
+      if (!isGuest) {
+        if (!cleanSession || cleanSession.startsWith("guest-") || cleanSession === "default") {
+          cleanSession = `user-${cleanUserId || cleanEmail.replace(/[^a-zA-Z0-9]/g, "_")}`;
+        }
+        const existingConv = await pool.query(`
+          SELECT id FROM conversations 
+          WHERE (user_id IS NOT NULL AND user_id = $1) 
+             OR (user_email IS NOT NULL AND LOWER(user_email) = $2) 
+          ORDER BY updated_at DESC LIMIT 1
+        `, [cleanUserId, cleanEmail]);
+        if (existingConv.rows.length > 0) {
+          cleanSession = existingConv.rows[0].id;
+        }
+      } else {
+        if (!cleanSession || cleanSession.startsWith("user-") || cleanSession === "default") {
+          cleanSession = `guest-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        } else {
+          const ownerCheck = await pool.query(`
+            SELECT user_email FROM conversations 
+            WHERE (id = $1 OR session_id = $1) 
+              AND (is_guest = FALSE OR user_email IS NOT NULL) 
+            LIMIT 1
+          `, [cleanSession]);
+          if (ownerCheck.rows.length > 0) {
+            cleanSession = `guest-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+          }
+        }
+      }
+      if (!cleanUserName) {
+        try {
+          const convMatch = await pool.query("SELECT user_name FROM conversations WHERE id = $1 OR session_id = $1 LIMIT 1", [cleanSession]);
+          if (convMatch.rows.length > 0 && convMatch.rows[0]?.user_name) {
+            cleanUserName = convMatch.rows[0].user_name;
+          }
+        } catch {
+        }
+      }
       const hasBengaliScript = /[\u0980-\u09FF]/.test(cleanMsg);
       const hasArabicScript = /[\u0600-\u06FF]/.test(cleanMsg);
       const BANGLISH_REGEX = /\b(ki|kivabe|ki\s*vabe|kivabhe|ki\s*ki|ki\s*hobe|ki\s*kora|lagbe|lagbo|lage|korte|korbo|korben|koren|korle|kore|kora|korche|korchen|chai|chan|chassi|ache|achhe|ase|asi|asen|nai|nay|nei|kothay|kothai|keno|kemon|amake|apnake|apnader|apnar|amader|amar|tader|tar|koto|shomoy|somoy|taka|khoroch|khroch|khulbo|khulte|shuru|suru|bolen|bolben|janan|janaben|sahajjo|sahayyo|sahata|bujhte|parbo|parben|pabo|paben|hobe|hoise|hoyeche|shob|sob|ektu|bepare|shomporke|somporke|thake|thakbe|deben|dite|apnara|amra|tara|dorkar|kichu|kisu|konta|konti|sathe|shathe)\b/i;
@@ -4163,14 +4686,24 @@ Could you share a bit more detail on what you are looking to achieve? I will pro
         cleanMsg
       ]);
       const userMsgId = `msg-${Date.now()}-u`;
+      const historyPromise = !isGuest ? pool.query(`
+            SELECT COALESCE(sender, role) as sender, COALESCE(message, content) as message, source
+            FROM messages
+            WHERE (user_id IS NOT NULL AND user_id = $1) 
+               OR (user_email IS NOT NULL AND LOWER(user_email) = $2)
+               OR (conversation_id = $3 OR session_id = $3)
+            ORDER BY created_at DESC
+            LIMIT 6
+          `, [cleanUserId, cleanEmail, cleanSession]) : pool.query(`
+            SELECT COALESCE(sender, role) as sender, COALESCE(message, content) as message, source
+            FROM messages
+            WHERE (conversation_id = $1 OR session_id = $1)
+              AND (is_guest = TRUE OR user_email IS NULL)
+            ORDER BY created_at DESC
+            LIMIT 6
+          `, [cleanSession]);
       const [historyRes, { faqsData, docsData, topicsData, blogsData, settingsData, answeredTicketsData }, businessMemory] = await Promise.all([
-        pool.query(`
-          SELECT COALESCE(sender, role) as sender, COALESCE(message, content) as message, source
-          FROM messages
-          WHERE conversation_id = $1 OR session_id = $1
-          ORDER BY created_at DESC
-          LIMIT 6
-        `, [cleanSession]),
+        historyPromise,
         getRagData(),
         getOrCompileBusinessMemory(pool)
       ]);
@@ -4358,20 +4891,32 @@ VERIFIED HUMAN SUPPORT TICKETS & SENIOR CONSULTANT RESOLUTIONS:
       const aiRuntime = await getEffectiveAiRuntime();
       if (aiRuntime.isKeyConfigured && aiRuntime.status !== "disabled") {
         const candidateModels = aiRuntime.candidateModels;
-        const ai = new import_genai.GoogleGenAI({ apiKey: aiRuntime.apiKey });
         const memoryPromptBlock = formatBusinessMemoryForPrompt(businessMemory);
+        const clientDisplayName = cleanUserName && cleanUserName !== "Guest User" ? cleanUserName : "";
         const systemInstruction = `You are Trek Support Assistant, the premier AI Executive Consultant and support assistant for Trek Consultancy Forum.
+
+CLIENT IDENTITY & CONTEXT:
+- Client Name: ${clientDisplayName || "Esteemed Client / Guest"}
+- Client Status: ${isGuest ? "Guest Investor" : "Registered Corporate Member"}
+- Support Email: ${supportEmail}
+- Forum: ${forumName}
+- SLA: ${slaHours} Hours
 
 ${memoryPromptBlock}
 
 ============================================================
 ADDITIONAL LIVE DATABASE CONTEXT & RECENT PLATFORM POSTS:
 ============================================================
-- Support Email: ${supportEmail}
-- Forum: ${forumName}
-- SLA: ${slaHours} Hours
 
 Guidelines:
+- MANDATORY GREETING IN EVERY SINGLE RESPONSE (STRICT REQUIREMENT):
+  * You MUST start EVERY response with a polite, warm, personalized executive greeting on the very first line before anything else. Never omit this greeting, even on follow-up questions, subsequent conversation turns, or quick inquiries!
+  * If the client's name is known (${clientDisplayName ? `"${clientDisplayName}"` : "or provided by user"}), address them directly by name:
+    - English: "Hello ${clientDisplayName || "there"}! Welcome to Trek Consultancy Support." or "Greetings, ${clientDisplayName || "esteemed client"}!"
+    - Arabic: "\u0645\u0631\u062D\u0628\u0627\u064B \u0628\u0643 \u064A\u0627 ${clientDisplayName || "\u0636\u064A\u0641\u0646\u0627 \u0627\u0644\u0643\u0631\u064A\u0645"}! \u064A\u0633\u0639\u062F\u0646\u0627 \u062A\u0648\u0627\u0635\u0644\u0643 \u0645\u0639 \u062A\u0631\u064A\u0643 \u0644\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u0627\u062A." or "\u0623\u0647\u0644\u0627\u064B \u0648\u0633\u0647\u0644\u0627\u064B \u0628\u0643 \u064A\u0627 ${clientDisplayName || "\u0623\u062E\u064A \u0627\u0644\u0643\u0631\u064A\u0645"}!"
+    - Bengali: "\u0986\u09B8\u09B8\u09BE\u09B2\u09BE\u09AE\u09C1 \u0986\u09B2\u09BE\u0987\u0995\u09C1\u09AE ${clientDisplayName || "\u09B8\u09AE\u09CD\u09AE\u09BE\u09A8\u09BF\u09A4 \u0995\u09CD\u09B2\u09BE\u09AF\u09BC\u09C7\u09A8\u09CD\u099F"}! \u099F\u09CD\u09B0\u09C7\u0995 \u0995\u09A8\u09B8\u09BE\u09B2\u099F\u09C7\u09A8\u09CD\u09B8\u09BF\u09A4\u09C7 \u0986\u09AA\u09A8\u09BE\u0995\u09C7 \u09B8\u09CD\u09AC\u09BE\u0997\u09A4\u09AE\u0964" or "\u09B8\u09CD\u09AC\u09BE\u0997\u09A4\u09AE ${clientDisplayName || "\u09B8\u09AE\u09CD\u09AE\u09BE\u09A8\u09BF\u09A4 \u0985\u09A4\u09BF\u09A5\u09BF"}!"
+  * If the client's name is not yet specified, greet them warmly as an esteemed client: "Greetings! Welcome to Trek Consultancy Support." / "\u0623\u0647\u0644\u0627\u064B \u0648\u0633\u0647\u0644\u0627\u064B \u0648\u0645\u0631\u062D\u0628\u0627\u064B \u0628\u0643\u0645 \u0641\u064A \u062A\u0631\u064A\u0643 \u0644\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u0627\u062A!" / "\u0986\u09B8\u09B8\u09BE\u09B2\u09BE\u09AE\u09C1 \u0986\u09B2\u09BE\u0987\u0995\u09C1\u09AE! \u099F\u09CD\u09B0\u09C7\u0995 \u0995\u09A8\u09B8\u09BE\u09B2\u099F\u09C7\u09A8\u09CD\u09B8\u09BF\u09A4\u09C7 \u0986\u09AA\u09A8\u09BE\u0995\u09C7 \u09B8\u09CD\u09AC\u09BE\u0997\u09A4\u09AE\u0964".
+  * The greeting must ALWAYS be on the very first line before any headers, analysis, or body text.
 - Ground your answers in the verified Business Memory, Pillars, FAQs, and institutional documentation provided above.
 - COMPANY ORIGINS & FOUNDING: When asked about when the business started, founded era, or background, reference the verified founding era and story from Business Memory (Vision 2030 corporate advisory).
 - RESPONSIBILITY & LEADERSHIP: When asked who is responsible for setup, licensing, or services, reference the Senior Advisory & Legal Desk in Riyadh and the accredited team structure.
@@ -4383,65 +4928,72 @@ Guidelines:
 - If the user wrote in Arabic, reply in polished, executive Arabic. If the user wrote in Bengali script OR in Banglish (phonetic Bengali written using English alphabet like "kivabe post korbo", "ki ki lagbe"), you MUST reply completely in natural, polished, professional Bengali. If in English, reply in professional, warm English.
 - NEVER repeat the user's question back to them as a title, quote, or heading.
 - NEVER start with robotic boilerplate phrases like "Based on our verified knowledge base...". Jump directly into the answer.
-- PRESENTATION & TYPOGRAPHY: Present answers with executive institutional clarity.
-  * Headers: Use '### Title \u2014 Subtitle' for main section headings.
-  * Lists: ALWAYS use standard markdown list hyphens ('- Item') preceded by a blank line before the list. NEVER use unicode bullets ('\u2022') or clump items together into single paragraphs.
-  * Bold terms: Bold the primary concept at the beginning of each item (e.g. '- **Milestone**: Concise details').
-  * Paragraphs: Use double linebreaks between paragraphs for clean executive spacing.
-  * Closing: When concluding advice, include an executive advisory blockquote signature ('> **Senior Advisory Desk:** ...').`;
-        const conversationContents = [];
+- STRICT OUTPUT DIRECTIVE:
+  * Output ONLY the final customer-facing decorated answer.
+  * NEVER output thinking scratchpads, numbered planning steps (such as "1. Analyze User Input" or "2. Identify Relevant Knowledge"), or internal developer notes.
+- SIGNATURE EXECUTIVE DECORATION PATTERN:
+  * Greeting & Concierge Opening: Open warmly and contextually (e.g. "Welcome, Walid." or "Greetings!").
+  * Decorated Section Headers: Use '### \u{1F3DB}\uFE0F Main Topic \u2014 Strategic Pillar/Scope' for visual hierarchy.
+  * Decorated Lists & Cards: Use standard markdown list hyphens with decorated bullet pips:
+    - \u{1F539} **Key Framework**: Direct, precise explanation with numbers, fees, and timelines.
+    - \u{1F539} **Regulatory Milestone**: Clear, step-by-step compliance criteria.
+    - \u{1F539} **Operational Deliverable**: Exact action taken by Trek's dedicated desk.
+  * Executive Strategic Callout: Include an executive takeaway callout when detailing multi-step processes:
+    > \u{1F4A1} **Executive Strategic Takeaway:** Key milestone or advantage for the client.
+  * Official Closing Signature: ALWAYS conclude with our official executive advisory signature:
+    > \u{1F3DB}\uFE0F **Senior Advisory & Legal Desk (Riyadh)**  
+    > *Trek Consultancy | Vision 2030 Corporate Market Entry & Enterprise Solutions*`;
+        const multiTurnMessages = [];
         for (const item of conversationHistory) {
-          const role = item.sender === "user" ? "user" : "model";
+          const role = item.sender === "user" ? "user" : "assistant";
           const text = (item.message || "").trim();
           if (!text) continue;
-          if (conversationContents.length > 0 && conversationContents[conversationContents.length - 1].role === role) {
-            conversationContents[conversationContents.length - 1].parts[0].text += `
+          if (multiTurnMessages.length > 0 && multiTurnMessages[multiTurnMessages.length - 1].role === role) {
+            multiTurnMessages[multiTurnMessages.length - 1].content += `
 
 ${text}`;
           } else {
-            conversationContents.push({
-              role,
-              parts: [{ text }]
-            });
+            multiTurnMessages.push({ role, content: text });
           }
         }
-        if (conversationContents.length > 0 && conversationContents[conversationContents.length - 1].role === "user") {
-          conversationContents[conversationContents.length - 1].parts[0].text += `
+        if (multiTurnMessages.length > 0 && multiTurnMessages[multiTurnMessages.length - 1].role === "user") {
+          multiTurnMessages[multiTurnMessages.length - 1].content += `
 
 ${cleanMsg}`;
         } else {
-          conversationContents.push({
+          multiTurnMessages.push({
             role: "user",
-            parts: [{ text: cleanMsg }]
+            content: cleanMsg
           });
         }
-        while (conversationContents.length > 0 && conversationContents[0].role !== "user") {
-          conversationContents.shift();
+        while (multiTurnMessages.length > 0 && multiTurnMessages[0].role !== "user") {
+          multiTurnMessages.shift();
         }
-        for (const modelName of candidateModels) {
-          try {
-            const response = await withTimeout(
-              ai.models.generateContent({
-                model: modelName,
-                contents: conversationContents,
-                config: {
-                  systemInstruction: aiRuntime.customSystemInstruction ? `${systemInstruction}
+        const effectiveSystemPrompt = aiRuntime.customSystemInstruction ? `${systemInstruction}
 
 SPECIAL ADMINISTRATIVE DIRECTIVE:
-${aiRuntime.customSystemInstruction}` : systemInstruction,
-                  temperature: aiRuntime.temperature,
-                  maxOutputTokens: Math.min(aiRuntime.maxOutputTokens, 2048)
-                }
-              }),
-              7e3
-            );
-            if (response.text) {
-              botReply = response.text.trim();
+${aiRuntime.customSystemInstruction}` : systemInstruction;
+        for (const modelName of candidateModels) {
+          try {
+            const aiResult = await executeAiCompletion({
+              provider: aiRuntime.provider,
+              apiKey: aiRuntime.apiKey,
+              baseUrl: aiRuntime.baseUrl,
+              model: modelName,
+              systemInstruction: effectiveSystemPrompt,
+              messages: multiTurnMessages,
+              temperature: aiRuntime.temperature,
+              maxTokens: Math.min(aiRuntime.maxOutputTokens, 2048),
+              timeoutMs: 16e3
+            });
+            if (aiResult.text && !/^(?:1\.\s+)?\*\*(?:Analyze User Input|Analyze Input)/i.test(aiResult.text)) {
+              botReply = aiResult.text.trim();
               replySource = "AI";
               break;
             }
           } catch (aiErr) {
             const errMsg = String(aiErr?.message || "");
+            console.warn(`[AI Engine] Provider "${aiRuntime.provider}" model "${modelName}" failed:`, errMsg);
             const isAuthOrQuotaError = errMsg.includes("401") || errMsg.includes("UNAUTHENTICATED") || errMsg.includes("API_KEY_INVALID") || errMsg.includes("ACCESS_TOKEN_TYPE_UNSUPPORTED") || errMsg.includes("API_KEY_SERVICE_BLOCKED");
             if (isAuthOrQuotaError) {
               break;
@@ -4459,6 +5011,40 @@ ${aiRuntime.customSystemInstruction}` : systemInstruction,
         });
         botReply = synth.reply;
         replySource = synth.source;
+      }
+      const hasGreeting = /^(?:Hello|Greetings|Welcome|Good (?:morning|afternoon|evening|day)|Dear|Hi|مرحباً|أهلاً|السلام عليكم|تحية طيبة|أسعد الله|আসসালামু আলাইকুম|নমস্কার|হ্যালো|স্বাগতম)/i.test(botReply.trim());
+      if (botReply && !hasGreeting) {
+        let greetingText = "";
+        const nameGreeting = cleanUserName && cleanUserName !== "Guest User" ? cleanUserName : "";
+        if (userLang === "ar") {
+          greetingText = nameGreeting ? `\u0645\u0631\u062D\u0628\u0627\u064B \u0628\u0643 \u064A\u0627 ${nameGreeting}! \u064A\u0633\u0639\u062F\u0646\u0627 \u062A\u0648\u0627\u0635\u0644\u0643 \u0645\u0639 \u062A\u0631\u064A\u0643 \u0644\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u0627\u062A.` : `\u0623\u0647\u0644\u0627\u064B \u0648\u0633\u0647\u0644\u0627\u064B \u0648\u0645\u0631\u062D\u0628\u0627\u064B \u0628\u0643\u0645 \u0641\u064A \u062A\u0631\u064A\u0643 \u0644\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u0627\u062A!`;
+        } else if (userLang === "bn") {
+          greetingText = nameGreeting ? `\u0986\u09B8\u09B8\u09BE\u09B2\u09BE\u09AE\u09C1 \u0986\u09B2\u09BE\u0987\u0995\u09C1\u09AE ${nameGreeting}! \u099F\u09CD\u09B0\u09C7\u0995 \u0995\u09A8\u09B8\u09BE\u09B2\u099F\u09C7\u09A8\u09CD\u09B8\u09BF\u09A4\u09C7 \u0986\u09AA\u09A8\u09BE\u0995\u09C7 \u09B8\u09CD\u09AC\u09BE\u0997\u09A4\u09AE\u0964` : `\u0986\u09B8\u09B8\u09BE\u09B2\u09BE\u09AE\u09C1 \u0986\u09B2\u09BE\u0987\u0995\u09C1\u09AE! \u099F\u09CD\u09B0\u09C7\u0995 \u0995\u09A8\u09B8\u09BE\u09B2\u099F\u09C7\u09A8\u09CD\u09B8\u09BF\u09A4\u09C7 \u0986\u09AA\u09A8\u09BE\u0995\u09C7 \u09B8\u09CD\u09AC\u09BE\u0997\u09A4\u09AE\u0964`;
+        } else {
+          greetingText = nameGreeting ? `Hello ${nameGreeting}! Welcome to Trek Consultancy Support.` : `Greetings! Welcome to Trek Consultancy Support.`;
+        }
+        botReply = `${greetingText}
+
+${botReply}`;
+      }
+      const hasClosingSignature = /(?:> |^|\n)\s*🏛️\s*\*\*(?:Senior Advisory & Legal Desk|সিনিয়র অ্যাডভাইজরি|مكتب الاستشارات)/m.test(botReply);
+      if (botReply && !hasClosingSignature) {
+        if (userLang === "ar") {
+          botReply += `
+
+> \u{1F3DB}\uFE0F **\u0645\u0643\u062A\u0628 \u0627\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u0627\u062A \u0627\u0644\u0639\u0644\u064A\u0627 \u0648\u0627\u0644\u0634\u0624\u0648\u0646 \u0627\u0644\u0642\u0627\u0646\u0648\u0646\u064A\u0629 (\u0627\u0644\u0631\u064A\u0627\u0636)**  
+> *\u062A\u0631\u064A\u0643 \u0644\u0644\u0627\u0633\u062A\u0634\u0627\u0631\u0627\u062A | \u062D\u0644\u0648\u0644 \u062A\u0623\u0633\u064A\u0633 \u0627\u0644\u0634\u0631\u0643\u0627\u062A \u0648\u062F\u062E\u0648\u0644 \u0627\u0644\u0633\u0648\u0642 \u0627\u0644\u0633\u0639\u0648\u062F\u064A 2030*`;
+        } else if (userLang === "bn") {
+          botReply += `
+
+> \u{1F3DB}\uFE0F **\u09B8\u09BF\u09A8\u09BF\u09AF\u09BC\u09B0 \u0985\u09CD\u09AF\u09BE\u09A1\u09AD\u09BE\u0987\u099C\u09B0\u09BF \u0993 \u09B2\u09BF\u0997\u09CD\u09AF\u09BE\u09B2 \u09A1\u09C7\u09B8\u09CD\u0995 (\u09B0\u09BF\u09AF\u09BC\u09BE\u09A6)**  
+> *\u099F\u09CD\u09B0\u09C7\u0995 \u0995\u09A8\u09B8\u09BE\u09B2\u099F\u09C7\u09A8\u09CD\u09B8\u09BF | \u09AD\u09BF\u09B6\u09A8 \u09E8\u09E6\u09E9\u09E6 \u0995\u09B0\u09CD\u09AA\u09CB\u09B0\u09C7\u099F \u09AE\u09BE\u09B0\u09CD\u0995\u09C7\u099F \u098F\u09A8\u09CD\u099F\u09CD\u09B0\u09BF \u0993 \u09AC\u09BF\u099C\u09A8\u09C7\u09B8 \u09B8\u09B2\u09BF\u0989\u09B6\u09A8*`;
+        } else {
+          botReply += `
+
+> \u{1F3DB}\uFE0F **Senior Advisory & Legal Desk (Riyadh)**  
+> *Trek Consultancy | Vision 2030 Corporate Market Entry & Enterprise Solutions*`;
+        }
       }
       const botMsgId = `msg-${Date.now()}-b`;
       await pool.query(`
@@ -5901,6 +6487,25 @@ ${textPayload.slice(0, 12e4)}`
       res.status(500).json({ error: err.message });
     }
   });
+  const formatServerTimeAgo = (dateInput) => {
+    if (!dateInput) return "Just now";
+    const date = new Date(dateInput);
+    if (isNaN(date.getTime())) return "Just now";
+    const diffSec = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1e3));
+    if (diffSec < 60) return "Just now";
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHour = Math.floor(diffMin / 60);
+    if (diffHour < 24) return `${diffHour}h ago`;
+    const diffDays = Math.floor(diffHour / 24);
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays < 7) return `${diffDays}d ago`;
+    const diffWeeks = Math.floor(diffDays / 7);
+    if (diffWeeks < 4) return `${diffWeeks}w ago`;
+    const diffMonths = Math.floor(diffDays / 30);
+    if (diffMonths < 12) return `${diffMonths}mo ago`;
+    return `${Math.floor(diffDays / 365)}y ago`;
+  };
   app.get("/api/activity-logs", async (_req, res) => {
     try {
       const result = await pool.query("SELECT * FROM activity_logs ORDER BY created_at DESC LIMIT 30");
@@ -5909,8 +6514,9 @@ ${textPayload.slice(0, 12e4)}`
         action: r.action,
         actor: r.actor,
         target: r.target,
-        timeAgo: r.time_ago,
-        type: r.type
+        timeAgo: formatServerTimeAgo(r.created_at) || r.time_ago || "Just now",
+        type: r.type,
+        createdAt: r.created_at ? new Date(r.created_at).toISOString() : (/* @__PURE__ */ new Date()).toISOString()
       })));
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -5919,16 +6525,29 @@ ${textPayload.slice(0, 12e4)}`
   app.get("/api/admin/settings/ai", async (_req, res) => {
     try {
       const dbConfig = await getAiConfigFromDb();
-      const rawDbKey = (dbConfig.apiKey || "").trim();
-      const envKey = (process.env.GEMINI_API_KEY || "").trim();
+      const rawProvider = (dbConfig.provider || "gemini").toLowerCase();
+      const currentProvider = rawProvider === "openai" ? "openai" : "gemini";
+      const baseUrl = dbConfig.baseUrl || DEFAULT_PROVIDER_BASE_URLS[currentProvider] || "";
+      const providerApiKeys = dbConfig.providerApiKeys || {};
+      const rawDbKey = (providerApiKeys[currentProvider] || (rawProvider === currentProvider ? dbConfig.apiKey : "") || "").trim();
+      let envKey = "";
+      if (currentProvider === "gemini") envKey = (process.env.GEMINI_API_KEY || "").trim();
+      else if (currentProvider === "openai") envKey = (process.env.OPENAI_API_KEY || "").trim();
       const activeKey = rawDbKey || envKey;
       const apiKeyMasked = activeKey ? `${activeKey.slice(0, 6)}...${activeKey.slice(-4)}` : "";
       res.json({
-        selectedModel: dbConfig.selectedModel || "gemini-2.5-flash",
-        fallbackModels: Array.isArray(dbConfig.fallbackModels) ? dbConfig.fallbackModels : ["gemini-2.0-flash", "gemini-1.5-flash"],
+        provider: currentProvider,
+        baseUrl,
+        providerApiKeys: Object.fromEntries(
+          Object.entries(providerApiKeys).filter(([p]) => p === "gemini" || p === "openai").map(([p, k]) => [
+            p,
+            typeof k === "string" && k.length > 8 ? `${k.slice(0, 4)}...${k.slice(-4)}` : k ? "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" : ""
+          ])
+        ),
+        selectedModel: dbConfig.selectedModel || (currentProvider === "gemini" ? "gemini-3.8-flash" : "gpt-4o-mini"),
+        fallbackModels: Array.isArray(dbConfig.fallbackModels) ? dbConfig.fallbackModels : ["gemini-3.7-flash", "gemini-3.5-flash"],
         temperature: typeof dbConfig.temperature === "number" ? dbConfig.temperature : 0.4,
         maxOutputTokens: typeof dbConfig.maxOutputTokens === "number" ? dbConfig.maxOutputTokens : 2048,
-        provider: dbConfig.provider || "Google Gemini",
         customSystemInstruction: dbConfig.customSystemInstruction || "",
         status: dbConfig.status || "active",
         isKeyConfigured: Boolean(activeKey),
@@ -5951,7 +6570,10 @@ ${textPayload.slice(0, 12e4)}`
     try {
       const currentConfig = await getAiConfigFromDb();
       const {
+        provider,
+        baseUrl,
         apiKey,
+        providerApiKeys: incomingProviderKeys,
         selectedModel,
         fallbackModels,
         temperature,
@@ -5959,19 +6581,41 @@ ${textPayload.slice(0, 12e4)}`
         customSystemInstruction,
         status
       } = req.body;
-      let resolvedApiKey = currentConfig.apiKey || "";
+      const newProvider = (provider || currentConfig.provider || "gemini").toLowerCase() === "openai" ? "openai" : "gemini";
+      const mergedProviderKeys = {
+        ...currentConfig.providerApiKeys || {}
+      };
+      if (incomingProviderKeys && typeof incomingProviderKeys === "object") {
+        for (const [p, k] of Object.entries(incomingProviderKeys)) {
+          if (typeof k === "string") {
+            const trimmed = k.trim();
+            if (trimmed === "") {
+              delete mergedProviderKeys[p];
+            } else if (!trimmed.includes("...") && !trimmed.includes("\u2022\u2022\u2022\u2022")) {
+              mergedProviderKeys[p] = trimmed;
+            }
+          }
+        }
+      }
       if (typeof apiKey === "string") {
         const trimmed = apiKey.trim();
         if (trimmed === "") {
-          resolvedApiKey = "";
-        } else if (!trimmed.includes("...")) {
-          resolvedApiKey = trimmed;
+          delete mergedProviderKeys[newProvider];
+        } else if (!trimmed.includes("...") && !trimmed.includes("\u2022\u2022\u2022\u2022")) {
+          mergedProviderKeys[newProvider] = trimmed;
         }
       }
+      const sanitizedProviderKeys = {};
+      if (mergedProviderKeys["gemini"]) sanitizedProviderKeys["gemini"] = mergedProviderKeys["gemini"];
+      if (mergedProviderKeys["openai"]) sanitizedProviderKeys["openai"] = mergedProviderKeys["openai"];
+      const activeKeyForProvider = sanitizedProviderKeys[newProvider] || "";
       const newConfig = {
         ...currentConfig,
-        apiKey: resolvedApiKey,
-        selectedModel: selectedModel || currentConfig.selectedModel || "gemini-2.5-flash",
+        provider: newProvider,
+        baseUrl: typeof baseUrl === "string" && baseUrl.trim() ? baseUrl.trim() : DEFAULT_PROVIDER_BASE_URLS[newProvider] || (newProvider === "openai" ? "https://api.openai.com/v1" : "https://generativelanguage.googleapis.com"),
+        providerApiKeys: sanitizedProviderKeys,
+        apiKey: activeKeyForProvider,
+        selectedModel: selectedModel || (newProvider === "gemini" ? "gemini-3.8-flash" : "gpt-4o-mini"),
         fallbackModels: Array.isArray(fallbackModels) ? fallbackModels : currentConfig.fallbackModels,
         temperature: typeof temperature === "number" ? Math.max(0, Math.min(1, temperature)) : currentConfig.temperature,
         maxOutputTokens: typeof maxOutputTokens === "number" ? Math.max(256, Math.min(8192, maxOutputTokens)) : currentConfig.maxOutputTokens,
@@ -5989,11 +6633,14 @@ ${textPayload.slice(0, 12e4)}`
         const logId = `act-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
         await pool.query(
           "INSERT INTO activity_logs (id, action, actor, target, time_ago, type, created_at) VALUES ($1, $2, $3, $4, $5, $6, NOW())",
-          [logId, "UPDATED_AI_CONFIG", "Administrator", `AI Model: ${newConfig.selectedModel}`, "Just now", "system"]
+          [logId, "UPDATED_AI_CONFIG", "Administrator", `AI Provider: ${newConfig.provider} | Model: ${newConfig.selectedModel}`, "Just now", "system"]
         );
       } catch {
       }
-      const activeKey = resolvedApiKey || (process.env.GEMINI_API_KEY || "").trim();
+      let envKey = "";
+      if (newProvider === "gemini") envKey = (process.env.GEMINI_API_KEY || "").trim();
+      else if (newProvider === "openai") envKey = (process.env.OPENAI_API_KEY || "").trim();
+      const activeKey = activeKeyForProvider || envKey;
       const apiKeyMasked = activeKey ? `${activeKey.slice(0, 6)}...${activeKey.slice(-4)}` : "";
       res.json({
         success: true,
@@ -6003,8 +6650,8 @@ ${textPayload.slice(0, 12e4)}`
           apiKey: void 0,
           apiKeyMasked,
           isKeyConfigured: Boolean(activeKey),
-          hasCustomKey: Boolean(resolvedApiKey),
-          usingEnvKey: Boolean(!resolvedApiKey && process.env.GEMINI_API_KEY)
+          hasCustomKey: Boolean(activeKeyForProvider),
+          usingEnvKey: Boolean(!activeKeyForProvider && envKey)
         }
       });
     } catch (err) {
@@ -6017,35 +6664,49 @@ ${textPayload.slice(0, 12e4)}`
   app.post("/api/admin/settings/ai/test", async (req, res) => {
     try {
       const dbConfig = await getAiConfigFromDb();
-      const { apiKey: inputKey, model: inputModel } = req.body;
+      const { provider: inputProvider, apiKey: inputKey, baseUrl: inputBaseUrl, model: inputModel } = req.body;
+      const rawInputProvider = (inputProvider || dbConfig.provider || "gemini").toLowerCase();
+      const provider = rawInputProvider === "openai" ? "openai" : "gemini";
+      let baseUrl = (inputBaseUrl || "").trim();
+      if (!baseUrl) {
+        baseUrl = DEFAULT_PROVIDER_BASE_URLS[provider] || (provider === "openai" ? "https://api.openai.com/v1" : "https://generativelanguage.googleapis.com");
+      }
       let testKey = (inputKey || "").trim();
-      if (!testKey || testKey.includes("...")) {
-        testKey = (dbConfig.apiKey || process.env.GEMINI_API_KEY || "").trim();
+      if (!testKey || testKey.includes("...") || testKey.includes("\u2022\u2022\u2022\u2022")) {
+        testKey = (dbConfig.providerApiKeys?.[provider] || (dbConfig.provider === provider ? dbConfig.apiKey : "") || "").trim();
+        if (!testKey) {
+          if (provider === "gemini") testKey = (process.env.GEMINI_API_KEY || "").trim();
+          else if (provider === "openai") testKey = (process.env.OPENAI_API_KEY || "").trim();
+        }
       }
       if (!testKey) {
         return res.status(400).json({
           success: false,
-          message: "No Google Gemini API Key configured. Please enter an API key to test."
+          message: `No API key configured for provider "${provider}". Please enter an API key to test.`
         });
       }
-      const testModel = (inputModel || dbConfig.selectedModel || "gemini-2.5-flash").trim();
+      const defaultModelForProvider = provider === "gemini" ? "gemini-3.8-flash" : "gpt-4o-mini";
+      const testModel = (inputModel || (dbConfig.provider === provider ? dbConfig.selectedModel : defaultModelForProvider) || defaultModelForProvider).trim();
       const startTime = Date.now();
-      const ai = new import_genai.GoogleGenAI({ apiKey: testKey });
-      const testResponse = await withTimeout(
-        ai.models.generateContent({
-          model: testModel,
-          contents: 'Reply with the single word "READY" if you receive this diagnostic verification signal.'
-        }),
-        9e3
-      );
+      const result = await executeAiCompletion({
+        provider,
+        apiKey: testKey,
+        baseUrl,
+        model: testModel,
+        systemInstruction: "You are a diagnostic verification probe. Reply strictly with the word READY.",
+        messages: [{ role: "user", content: 'Reply with the single word "READY" if you receive this diagnostic verification signal.' }],
+        temperature: 0.1,
+        maxTokens: 50,
+        timeoutMs: 12e3
+      });
       const latencyMs = Date.now() - startTime;
-      const responseText = (testResponse.text || "").trim();
+      const responseText = result.text;
       try {
         const updatedConfig = {
           ...dbConfig,
           lastTestedAt: (/* @__PURE__ */ new Date()).toISOString(),
           lastTestStatus: "success",
-          lastTestMessage: `Model ${testModel} responded in ${latencyMs}ms: "${responseText.slice(0, 50)}"`,
+          lastTestMessage: `[${provider.toUpperCase()}] Model ${testModel} responded in ${latencyMs}ms: "${responseText.slice(0, 50)}"`,
           lastTestLatencyMs: latencyMs
         };
         await pool.query(
@@ -6058,9 +6719,10 @@ ${textPayload.slice(0, 12e4)}`
       return res.json({
         success: true,
         latencyMs,
+        provider,
         model: testModel,
         response: responseText,
-        message: `Successfully connected to ${testModel} in ${latencyMs}ms!`
+        message: `Successfully connected to ${provider} (${testModel}) in ${latencyMs}ms!`
       });
     } catch (err) {
       const errMsg = err?.message || String(err);
@@ -6071,7 +6733,7 @@ ${textPayload.slice(0, 12e4)}`
           ...dbConfig,
           lastTestedAt: (/* @__PURE__ */ new Date()).toISOString(),
           lastTestStatus: "failed",
-          lastTestMessage: errMsg.slice(0, 200),
+          lastTestMessage: errMsg.slice(0, 500),
           lastTestLatencyMs: 0
         };
         await pool.query(
@@ -6084,7 +6746,7 @@ ${textPayload.slice(0, 12e4)}`
       return res.status(400).json({
         success: false,
         error: errMsg,
-        message: `Connection failed: ${errMsg.slice(0, 150)}`
+        message: errMsg
       });
     }
   });
@@ -6126,7 +6788,11 @@ ${textPayload.slice(0, 12e4)}`
     try {
       const result = await pool.query("SELECT value FROM settings WHERE key = 'hero'");
       if (result.rows.length > 0 && result.rows[0].value?.slides?.length > 0) {
-        res.json(result.rows[0].value);
+        const val = result.rows[0].value;
+        if (Array.isArray(val.slides)) {
+          val.slides = val.slides.map((s) => ({ ...s, url: normalizeImageUrl(s.url) }));
+        }
+        res.json(val);
       } else {
         res.json(defaultHeroSettings);
       }
@@ -6137,6 +6803,9 @@ ${textPayload.slice(0, 12e4)}`
   app.post("/api/admin/hero", async (req, res) => {
     try {
       const heroSettings = req.body;
+      if (heroSettings && Array.isArray(heroSettings.slides)) {
+        heroSettings.slides = heroSettings.slides.map((s) => ({ ...s, url: normalizeImageUrl(s.url) }));
+      }
       await pool.query(`
         INSERT INTO settings (key, value) VALUES ('hero', $1)
         ON CONFLICT (key) DO UPDATE SET value = $1
@@ -6149,6 +6818,9 @@ ${textPayload.slice(0, 12e4)}`
   app.post("/api/hero", async (req, res) => {
     try {
       const heroSettings = req.body;
+      if (heroSettings && Array.isArray(heroSettings.slides)) {
+        heroSettings.slides = heroSettings.slides.map((s) => ({ ...s, url: normalizeImageUrl(s.url) }));
+      }
       await pool.query(`
         INSERT INTO settings (key, value) VALUES ('hero', $1)
         ON CONFLICT (key) DO UPDATE SET value = $1

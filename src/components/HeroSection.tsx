@@ -3,6 +3,7 @@ import { Search, X, ChevronLeft, ChevronRight, TrendingUp, Shield, Users, Sparkl
 import { HeroSettings } from '../types';
 import { defaultAdminHeroSettings } from './admin/AdminHeroTab';
 import { useLanguage } from '../context/LanguageContext';
+import { normalizeImageUrl, getAlternativeImageUrl, DEFAULT_HERO_FALLBACK } from '../utils/imageUrl';
 
 interface HeroSectionProps {
   searchQuery: string;
@@ -110,16 +111,22 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               }`}
             >
               <img
-                src={slide.url}
+                src={normalizeImageUrl(slide.url) || DEFAULT_HERO_FALLBACK}
                 alt={slide.title || 'Hero Background'}
+                referrerPolicy="no-referrer"
                 className={`w-full h-full object-cover object-center transform-gpu will-change-transform transition-transform duration-[7000ms] ease-out ${
                   isZoomEffect && isActive ? 'scale-[1.08]' : 'scale-100'
                 }`}
                 loading={index === 0 ? 'eager' : 'lazy'}
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
-                  if (target.src !== defaultAdminHeroSettings.slides[0].url) {
-                    target.src = defaultAdminHeroSettings.slides[0].url;
+                  const alt = getAlternativeImageUrl(slide.url);
+                  const triedAlt = target.getAttribute('data-tried-alt');
+                  if (alt && !triedAlt) {
+                    target.setAttribute('data-tried-alt', 'true');
+                    target.src = alt;
+                  } else if (target.src !== DEFAULT_HERO_FALLBACK) {
+                    target.src = DEFAULT_HERO_FALLBACK;
                   }
                 }}
               />

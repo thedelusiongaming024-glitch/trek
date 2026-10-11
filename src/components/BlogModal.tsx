@@ -4,6 +4,7 @@ import { X, Calendar, Tag, Heart, MessageSquare, Send, Loader2, ArrowLeft, Share
 import { BlogPost, BlogComment } from '../types';
 import { useLanguage } from '../context/LanguageContext';
 import { normalizeUrl } from '../utils/url';
+import { normalizeImageUrl, getAlternativeImageUrl, DEFAULT_BLOG_FALLBACK } from '../utils/imageUrl';
 
 interface BlogModalProps {
   post: BlogPost | null;
@@ -172,10 +173,21 @@ export const BlogModal: React.FC<BlogModalProps> = ({
         <div className="p-4 sm:p-6 overflow-y-auto space-y-5">
           <div className="aspect-[16/9] w-full rounded-2xl overflow-hidden bg-slate-100 border border-slate-200/80 shadow-xs">
             <img
-              src={post.imageUrl}
+              src={normalizeImageUrl(post.imageUrl) || DEFAULT_BLOG_FALLBACK}
               alt={post.title}
               referrerPolicy="no-referrer"
               className="w-full h-full object-cover"
+              onError={(e) => {
+                const target = e.currentTarget as HTMLImageElement;
+                const alt = getAlternativeImageUrl(post.imageUrl);
+                const triedAlt = target.getAttribute('data-tried-alt');
+                if (alt && !triedAlt) {
+                  target.setAttribute('data-tried-alt', 'true');
+                  target.src = alt;
+                } else if (target.src !== DEFAULT_BLOG_FALLBACK) {
+                  target.src = DEFAULT_BLOG_FALLBACK;
+                }
+              }}
             />
           </div>
 

@@ -94,7 +94,27 @@ export interface BlogPost {
 
 export type FilterCategory = 'all' | 'popular' | 'featured' | 'recent' | 'unloved' | 'loved';
 
-export type AdminTab = 'overview' | 'customers' | 'hero' | 'topics' | 'support' | 'blogs' | 'users' | 'ai' | 'seo' | 'settings';
+export type AdminTab = 'overview' | 'customers' | 'hero' | 'topics' | 'support' | 'blogs' | 'users' | 'ai' | 'seo' | 'settings' | 'newsletter';
+
+export interface NewsletterSubscriber {
+  id: string;
+  email: string;
+  subscribed_at?: string;
+  status?: 'active' | 'unsubscribed';
+}
+
+export interface NewsletterCampaign {
+  id: string;
+  subject: string;
+  issueNumber?: number;
+  previewText?: string;
+  content: string;
+  sentAt: string;
+  recipientCount: number;
+  status: 'sent' | 'draft' | 'scheduled';
+  author?: string;
+  tags?: string[];
+}
 
 export interface SEOSettings {
   metaTitle: string;
@@ -161,7 +181,8 @@ export interface ActivityLog {
   actor: string;
   target: string;
   timeAgo: string;
-  type: 'topic' | 'reply' | 'user' | 'system' | 'blog' | 'setting' | 'support';
+  type: 'topic' | 'reply' | 'user' | 'system' | 'blog' | 'setting' | 'support' | 'newsletter';
+  createdAt?: string;
 }
 
 export interface SupportTicket {

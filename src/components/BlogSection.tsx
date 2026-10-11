@@ -3,6 +3,7 @@ import { Calendar, Tag, ArrowUpRight, Heart, MessageSquare, Lock, ExternalLink }
 import { BlogPost } from '../types';
 import { useLanguage } from '../context/LanguageContext';
 import { normalizeUrl } from '../utils/url';
+import { normalizeImageUrl, getAlternativeImageUrl, DEFAULT_BLOG_FALLBACK } from '../utils/imageUrl';
 
 interface BlogSectionProps {
   posts: BlogPost[];
@@ -81,10 +82,21 @@ export const BlogSection: React.FC<BlogSectionProps> = ({
               {/* Image Container with high quality photography */}
               <div className="relative aspect-[16/10] overflow-hidden bg-slate-100">
                 <img
-                  src={post.imageUrl}
+                  src={normalizeImageUrl(post.imageUrl) || DEFAULT_BLOG_FALLBACK}
                   alt={post.title}
                   referrerPolicy="no-referrer"
                   className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300"
+                  onError={(e) => {
+                    const target = e.currentTarget as HTMLImageElement;
+                    const alt = getAlternativeImageUrl(post.imageUrl);
+                    const triedAlt = target.getAttribute('data-tried-alt');
+                    if (alt && !triedAlt) {
+                      target.setAttribute('data-tried-alt', 'true');
+                      target.src = alt;
+                    } else if (target.src !== DEFAULT_BLOG_FALLBACK) {
+                      target.src = DEFAULT_BLOG_FALLBACK;
+                    }
+                  }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-white/60 via-transparent to-transparent opacity-70" />
                 

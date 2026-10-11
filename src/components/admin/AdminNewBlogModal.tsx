@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { BlogPost } from '../../types';
 import { normalizeUrl } from '../../utils/url';
+import { normalizeImageUrl, DEFAULT_BLOG_FALLBACK } from '../../utils/imageUrl';
 
 interface AdminNewBlogModalProps {
   isOpen: boolean;
@@ -75,7 +76,7 @@ export const AdminNewBlogModal: React.FC<AdminNewBlogModalProps> = ({
       title: title.trim(),
       category: category,
       date: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
-      imageUrl: imageUrl.trim() || 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=700&auto=format&fit=crop&q=80',
+      imageUrl: normalizeImageUrl(imageUrl.trim()) || DEFAULT_BLOG_FALLBACK,
       excerpt: excerpt.trim(),
       content: content.trim(),
       author: 'Forum Admin',
@@ -135,37 +136,38 @@ export const AdminNewBlogModal: React.FC<AdminNewBlogModalProps> = ({
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1.5">
-                Category
-              </label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-lg bg-white border border-slate-300 text-slate-900 focus:outline-none focus:ring-1 focus:ring-teal-600 focus:border-teal-600 transition-colors shadow-2xs"
-              >
-                <option value="Architecture">Architecture</option>
-                <option value="Design">Design & UI</option>
-                <option value="DevOps">DevOps & Scale</option>
-                <option value="Performance">Performance</option>
-                <option value="Security">Security</option>
-                <option value="Tutorial">Tutorial & Guides</option>
-              </select>
-            </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1.5">
+              Category
+            </label>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full px-3 py-2 text-xs rounded-lg bg-white border border-slate-300 text-slate-900 focus:outline-none focus:ring-1 focus:ring-teal-600 focus:border-teal-600 transition-colors shadow-2xs"
+            >
+              <option value="Architecture">Architecture</option>
+              <option value="Design">Design & UI</option>
+              <option value="DevOps">DevOps & Scale</option>
+              <option value="Performance">Performance</option>
+              <option value="Security">Security</option>
+              <option value="Tutorial">Tutorial & Guides</option>
+            </select>
+          </div>
 
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1.5">
-                Cover Image URL
-              </label>
-              <input
-                type="url"
-                value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-                placeholder="https://images.unsplash.com/..."
-                className="w-full px-3 py-2 text-xs rounded-lg bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-teal-600 focus:border-teal-600 transition-colors shadow-2xs"
-              />
-            </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1.5">
+              Cover Image URL (Optional)
+            </label>
+            <input
+              type="url"
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              placeholder="https://images.unsplash.com/... or Google Drive link"
+              className="w-full px-3 py-2 text-xs rounded-lg bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-teal-600 focus:border-teal-600 transition-colors shadow-2xs"
+            />
+            <p className="text-[10px] text-slate-500 mt-1">
+              Supports standard image URLs and Google Drive sharing links.
+            </p>
           </div>
 
           <div>

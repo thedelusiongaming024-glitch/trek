@@ -12,7 +12,8 @@ import {
   Image as ImageIcon,
   Globe,
   UserCheck,
-  Cpu
+  Cpu,
+  Mail
 } from 'lucide-react';
 import { AdminNavbar } from './AdminNavbar';
 import { AdminOverviewTab } from './AdminOverviewTab';
@@ -21,6 +22,7 @@ import { AdminHeroTab } from './AdminHeroTab';
 import { AdminTopicsTab } from './AdminTopicsTab';
 import { AdminBlogsTab } from './AdminBlogsTab';
 import { AdminUsersTab } from './AdminUsersTab';
+import { AdminNewsletterTab } from './AdminNewsletterTab';
 import { AdminAiTab } from './AdminAiTab';
 import { AdminSettingsTab } from './AdminSettingsTab';
 import { AdminSupportTab } from './AdminSupportTab';
@@ -126,6 +128,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         case 'topics': return 'আলোচনাসমূহ';
         case 'support': return 'সাপোর্ট ও মেসেঞ্জার';
         case 'blogs': return 'ইনসাইটস';
+        case 'newsletter': return 'নিউজলেটার';
         case 'users': return 'কর্মী ও ভূমিকা';
         case 'ai': return 'মডেল সেটিংস';
         case 'seo': return 'এসইও ও মেটাডাটা';
@@ -140,6 +143,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         case 'topics': return 'المناقشات';
         case 'support': return 'الدعم والمراسلة';
         case 'blogs': return 'الرؤى والتحليلات';
+        case 'newsletter': return 'النشرة البريدية';
         case 'users': return 'فريق العمل والصلاحيات';
         case 'ai': return 'إعدادات النموذج';
         case 'seo': return 'تحسين محركات البحث';
@@ -153,6 +157,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       case 'topics': return 'Discussions';
       case 'support': return 'Support & Messenger';
       case 'blogs': return 'Insights';
+      case 'newsletter': return 'Newsletter';
       case 'users': return 'Staff & Roles';
       case 'ai': return 'Model Settings';
       case 'seo': return 'SEO & Metadata';
@@ -167,6 +172,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     { id: 'topics' as AdminTab, label: getNavLabel('topics'), icon: MessageSquare, badge: topics.length },
     { id: 'support' as AdminTab, label: getNavLabel('support'), icon: Headphones, badgeColor: 'bg-teal-500 text-white' },
     { id: 'blogs' as AdminTab, label: getNavLabel('blogs'), icon: BookOpen, badge: blogs.length },
+    { id: 'newsletter' as AdminTab, label: getNavLabel('newsletter'), icon: Mail },
     { id: 'users' as AdminTab, label: getNavLabel('users'), icon: Users, badge: users.length },
     { id: 'ai' as AdminTab, label: getNavLabel('ai'), icon: Cpu },
     { id: 'seo' as AdminTab, label: getNavLabel('seo'), icon: Globe },
@@ -313,6 +319,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               onViewBlog={onViewBlog}
               onUpdateBlog={onUpdateBlog}
             />
+          )}
+
+          {activeTab === 'newsletter' && (
+            <AdminNewsletterTab />
           )}
 
           {activeTab === 'users' && (

@@ -7,9 +7,11 @@ import {
   Clock, 
   ArrowUpRight, 
   Plus,
-  UserCheck
+  UserCheck,
+  Mail
 } from 'lucide-react';
 import { ForumTopic, BlogPost, AdminUser, ActivityLog } from '../../types';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface AdminOverviewTabProps {
   topics: ForumTopic[];
@@ -28,6 +30,14 @@ export const AdminOverviewTab: React.FC<AdminOverviewTabProps> = ({
   onNavigateTab,
   onOpenNewTopicModal
 }) => {
+  const { formatTimeAgo } = useLanguage();
+  const [, setTick] = React.useState(0);
+
+  // Live periodic refresh so relative timestamps update smoothly
+  React.useEffect(() => {
+    const timer = setInterval(() => setTick((v) => v + 1), 30000);
+    return () => clearInterval(timer);
+  }, []);
   const totalViews = topics.reduce((acc, t) => acc + (t.views || 0), 0);
   const totalReplies = topics.reduce((acc, t) => acc + (t.replies || 0), 0);
   const totalLikes = topics.reduce((acc, t) => acc + (t.likes || 0), 0);
@@ -88,7 +98,7 @@ export const AdminOverviewTab: React.FC<AdminOverviewTabProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={onOpenNewTopicModal}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-medium shadow-xs transition-colors cursor-pointer"
@@ -101,7 +111,14 @@ export const AdminOverviewTab: React.FC<AdminOverviewTabProps> = ({
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium shadow-2xs transition-colors cursor-pointer"
           >
             <UserCheck className="w-3.5 h-3.5 text-teal-600" />
-            <span>Customers & Chats</span>
+            <span>Customers</span>
+          </button>
+          <button
+            onClick={() => onNavigateTab('newsletter')}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium shadow-2xs transition-colors cursor-pointer"
+          >
+            <Mail className="w-3.5 h-3.5 text-purple-600" />
+            <span>Newsletter</span>
           </button>
           <button
             onClick={() => onNavigateTab('topics')}
@@ -237,25 +254,33 @@ export const AdminOverviewTab: React.FC<AdminOverviewTabProps> = ({
               </div>
             ) : (
               <div className="space-y-4">
-                {activityLogs.slice(0, 6).map((log) => (
-                  <div key={log.id} className="flex items-start gap-3 text-xs">
-                    <div className="w-2 h-2 rounded-full bg-slate-400 mt-1.5 shrink-0" />
-                    <div className="flex-1 min-w-0 space-y-0.5">
-                      <p className="text-slate-700 leading-normal">
-                        <span className="font-semibold text-slate-900">{log.actor}</span>
-                        {' '}
-                        <span>{log.action.toLowerCase()}</span>
-                        {' '}
-                        <span className="font-medium text-slate-800 truncate inline-block max-w-[120px] align-bottom">
-                          {log.target}
+                {activityLogs.slice(0, 6).map((log) => {
+                  const displayTime = formatTimeAgo(log.createdAt || log.timeAgo);
+                  const cleanAction = (log.action || '').replace(/_/g, ' ').toLowerCase();
+
+                  return (
+                    <div key={log.id} className="flex items-start gap-3 text-xs">
+                      <div className="w-2 h-2 rounded-full bg-slate-400 mt-1.5 shrink-0" />
+                      <div className="flex-1 min-w-0 space-y-0.5">
+                        <p className="text-slate-700 leading-normal">
+                          <span className="font-semibold text-slate-900">{log.actor}</span>
+                          {' '}
+                          <span>{cleanAction}</span>
+                          {' '}
+                          <span 
+                            className="font-medium text-slate-800 truncate inline-block max-w-[150px] sm:max-w-[210px] align-bottom"
+                            title={log.target}
+                          >
+                            {log.target}
+                          </span>
+                        </p>
+                        <span className="text-[10px] text-slate-400 font-mono block">
+                          {displayTime}
                         </span>
-                      </p>
-                      <span className="text-[10px] text-slate-400 font-mono block">
-                        {log.timeAgo}
-                      </span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

@@ -11,6 +11,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { AdminUser } from '../../types';
+import { normalizeImageUrl } from '../../utils/imageUrl';
 
 interface AdminUsersTabProps {
   users: AdminUser[];
@@ -32,6 +33,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newRole, setNewRole] = useState<AdminUser['role']>('Moderator');
+  const [newAvatar, setNewAvatar] = useState('');
 
   const filteredUsers = users.filter(u => 
     u.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -49,7 +51,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
       email: newEmail.trim(),
       role: newRole,
       status: 'active',
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80',
+      avatar: normalizeImageUrl(newAvatar.trim()) || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80',
       joinedDate: 'Just now',
       threadsCount: 0
     };
@@ -57,6 +59,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
     onAddUser(newUser);
     setNewName('');
     setNewEmail('');
+    setNewAvatar('');
     setIsAddModalOpen(false);
   };
 
@@ -116,8 +119,9 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                   <td className="py-3.5 px-5">
                     <div className="flex items-center gap-2.5">
                       <img
-                        src={user.avatar}
+                        src={normalizeImageUrl(user.avatar)}
                         alt={user.name}
+                        referrerPolicy="no-referrer"
                         className="w-8 h-8 rounded-lg ring-1 ring-slate-200 object-cover shrink-0"
                       />
                       <div className="min-w-0">
@@ -247,6 +251,17 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                   <option value="Community Lead">Community Lead (Events, Blogs)</option>
                   <option value="Super Admin">Super Admin (Full Root Permissions)</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-medium mb-1">Avatar Image URL (Optional)</label>
+                <input
+                  type="url"
+                  value={newAvatar}
+                  onChange={(e) => setNewAvatar(e.target.value)}
+                  placeholder="https://images.unsplash.com/... or Google Drive link"
+                  className="w-full px-3 py-1.5 rounded-lg border border-slate-200 focus:border-teal-600 focus:ring-1 focus:ring-teal-600/30 focus:outline-none bg-white"
+                />
               </div>
 
               <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">

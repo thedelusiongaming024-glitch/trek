@@ -13,6 +13,7 @@ import {
   Info
 } from 'lucide-react';
 import { HeroSettings, HeroSlideImage } from '../../types';
+import { normalizeImageUrl, DEFAULT_HERO_FALLBACK } from '../../utils/imageUrl';
 
 interface AdminHeroTabProps {
   heroSettings?: HeroSettings;
@@ -78,7 +79,7 @@ export const AdminHeroTab: React.FC<AdminHeroTabProps> = ({
   const activeSlides = settings.slides.filter(s => s.isActive !== false);
 
   const handleAddSlide = () => {
-    const targetUrl = newImageUrl.trim();
+    const targetUrl = normalizeImageUrl(newImageUrl.trim());
     if (!targetUrl) return;
 
     const newSlide: HeroSlideImage = {
@@ -202,16 +203,15 @@ export const AdminHeroTab: React.FC<AdminHeroTabProps> = ({
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="md:col-span-2 space-y-1">
-            <label className="text-[11px] font-medium text-slate-700">Image URL (HTTPS) *</label>
+            <label className="text-[11px] font-medium text-slate-700">Image URL (HTTPS or Google Drive link) *</label>
             <input
               type="url"
               value={newImageUrl}
               onChange={(e) => setNewImageUrl(e.target.value)}
-              placeholder="https://images.unsplash.com/photo-..."
+              placeholder="https://images.unsplash.com/... or Google Drive link"
               className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-teal-600/30 focus:border-teal-600 bg-white"
             />
           </div>
-
           <div className="space-y-1">
             <label className="text-[11px] font-medium text-slate-700">Caption / Category (Optional)</label>
             <input
@@ -224,17 +224,17 @@ export const AdminHeroTab: React.FC<AdminHeroTabProps> = ({
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-slate-100">
           <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
             <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-            <span>Recommended: landscape images (1920×1080) with good contrast.</span>
+            <span>Recommended ratio: 16:9 landscape. Google Drive sharing links automatically convert and render.</span>
           </div>
 
           <button
             type="button"
             onClick={handleAddSlide}
             disabled={!newImageUrl.trim()}
-            className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-medium shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+            className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-medium shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Add Slide</span>
@@ -277,11 +277,12 @@ export const AdminHeroTab: React.FC<AdminHeroTabProps> = ({
                 <div className="flex items-center gap-3 min-w-0 flex-1 w-full sm:w-auto">
                   <div className="relative w-16 h-11 rounded-md overflow-hidden shrink-0 bg-slate-100 border border-slate-200">
                     <img
-                      src={slide.url}
+                      src={normalizeImageUrl(slide.url)}
                       alt={slide.title || 'Hero slide'}
+                      referrerPolicy="no-referrer"
                       className="w-full h-full object-cover"
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=300&q=80';
+                        (e.target as HTMLImageElement).src = DEFAULT_HERO_FALLBACK;
                       }}
                     />
                     <div className="absolute top-1 left-1 px-1 py-0.2 rounded bg-slate-900/80 text-[9px] font-mono font-medium text-white">
@@ -301,7 +302,7 @@ export const AdminHeroTab: React.FC<AdminHeroTabProps> = ({
                       )}
                     </div>
                     <a
-                      href={slide.url}
+                      href={normalizeImageUrl(slide.url)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 text-[11px] text-teal-600 hover:text-teal-700 truncate max-w-xs sm:max-w-md mt-0.5"

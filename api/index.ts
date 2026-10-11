@@ -2873,6 +2873,10 @@ export async function createApp() {
       // Attempt real email dispatch via Resend if RESEND_API_KEY is configured
       let emailSent = false;
       let emailDeliveryError: string | null = null;
+      try {
+        const dotenv = await import('dotenv');
+        dotenv.default.config({ override: true });
+      } catch {}
       const resendApiKey = process.env.RESEND_API_KEY?.trim();
 
       if (resendApiKey && resendApiKey !== 're_123456789') {
@@ -3212,6 +3216,135 @@ export async function createApp() {
       `, [`act-${Date.now()}`, cleanEmail]);
 
       res.status(201).json({ success: true, message: 'Successfully subscribed to the newsletter!' });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Admin Newsletter Endpoints
+  const defaultNewsletterCampaignsApi = [
+    {
+      id: 'camp-44',
+      issueNumber: 44,
+      subject: 'Weekly Blueprint Digest #44: Scalable Cloud Architecture & Multi-Tenant Partitioning',
+      previewText: 'Best practices for zero-downtime database migrations, microservice resilience, and Saudi cloud compliance.',
+      author: 'Trek Consultancy Advisory Team',
+      sentAt: '2026-10-06T09:00:00.000Z',
+      recipientCount: 1420,
+      status: 'sent',
+      tags: ['Cloud Architecture', 'Database', 'Microservices'],
+      content: `## Welcome to Weekly Blueprint Digest #44\n\nIn this edition, our senior engineering team breaks down mission-critical database scaling patterns:\n\n### 1. Zero-Downtime Multi-Tenant Schema Migrations\nHow enterprise SaaS platforms partition tenant databases while maintaining 99.999% uptime guarantees.\n\n### 2. Redis Cache Lease Locking\nPreventing thundering herds with atomic token leases and distributed leases.\n\n### 3. Saudi Vision 2030 Cloud Compliance\nKey regulatory mandates for hosting customer records within Saudi Arabian data centers (CITC & NCA compliance).\n\n---\n*Need private advisory on your architectural roadmap? Reply directly to this digest or visit our forum portal.*`
+    },
+    {
+      id: 'camp-43',
+      issueNumber: 43,
+      subject: 'Weekly Blueprint Digest #43: High-Throughput Redis Cache Tuning & Latency Reductions',
+      previewText: 'Deep dive into memory fragmentation, pipelining, and sub-millisecond response guarantees.',
+      author: 'Liam Foster, Cloud Lead',
+      sentAt: '2026-09-29T09:00:00.000Z',
+      recipientCount: 1385,
+      status: 'sent',
+      tags: ['Performance', 'Caching', 'Redis'],
+      content: `## Weekly Blueprint Digest #43: Latency Optimization\n\nHigh-traffic systems live or die by their cache invalidation architecture. In this issue:\n\n- **Memory Fragmentation**: Detecting and compacting Jemalloc memory overhead in Redis clusters.\n- **Pipelining**: Bundling 500+ read operations in a single round-trip to reduce latency from 45ms to 1.8ms.\n- **Connection Pooling**: Managing pool starvation under high concurrent HTTP thread spikes.`
+    },
+    {
+      id: 'camp-42',
+      issueNumber: 42,
+      subject: 'Weekly Blueprint Digest #42: Enterprise Security, API Gateways, & Mutual TLS',
+      previewText: 'Implementing zero-trust perimeter defenses, mTLS certificates, and rate limiting across microservices.',
+      author: 'Trek Consultancy Advisory Team',
+      sentAt: '2026-09-22T09:00:00.000Z',
+      recipientCount: 1310,
+      status: 'sent',
+      tags: ['Security', 'API Gateway', 'DevOps'],
+      content: `## Weekly Blueprint Digest #42: Zero-Trust Security\n\nSecuring internal microservice communications across hybrid multi-cloud topologies:\n\n- **Mutual TLS (mTLS)**: Automatic certificate rotation with SPIFFE/SPIRE.\n- **Rate Limiting**: Sliding window rate limits at the API Gateway.\n- **Audit Compliance**: Tamper-proof logging with cryptographic hashing.`
+    }
+  ];
+
+  app.delete(['/api/admin/newsletter/:id', '/api/newsletter/:id'], async (req, res) => {
+    try {
+      const { id } = req.params;
+      await pool.query('DELETE FROM newsletter_subscribers WHERE id = $1 OR email = $1', [id]);
+      res.json({ success: true, message: 'Subscriber removed successfully' });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/admin/newsletter', async (req, res) => {
+    try {
+      const { email } = req.body;
+      const cleanEmail = (email || '').trim().toLowerCase();
+      if (!cleanEmail || !cleanEmail.includes('@')) {
+        return res.status(400).json({ error: 'A valid email address is required.' });
+      }
+      const id = `sub-${Date.now()}`;
+      await pool.query(`
+        INSERT INTO newsletter_subscribers (id, email)
+        VALUES ($1, $2)
+        ON CONFLICT (email) DO NOTHING
+      `, [id, cleanEmail]);
+      res.status(201).json({ success: true, subscriber: { id, email: cleanEmail, subscribed_at: new Date().toISOString(), status: 'active' } });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/admin/newsletter/campaigns', async (_req, res) => {
+    try {
+      const result = await pool.query("SELECT value FROM settings WHERE key = 'newsletter_campaigns'");
+      if (result.rows.length > 0 && result.rows[0].value) {
+        const val = typeof result.rows[0].value === 'string' ? JSON.parse(result.rows[0].value) : result.rows[0].value;
+        if (Array.isArray(val) && val.length > 0) {
+          return res.json(val);
+        }
+      }
+      res.json(defaultNewsletterCampaignsApi);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/admin/newsletter/broadcast', async (req, res) => {
+    try {
+      const { subject, previewText, content, author, tags } = req.body;
+      if (!subject?.trim() || !content?.trim()) {
+        return res.status(400).json({ error: 'Subject and content are required.' });
+      }
+
+      const cur = await pool.query("SELECT value FROM settings WHERE key = 'newsletter_campaigns'");
+      let campaigns = defaultNewsletterCampaignsApi;
+      if (cur.rows.length > 0 && cur.rows[0].value) {
+        try {
+          const parsed = typeof cur.rows[0].value === 'string' ? JSON.parse(cur.rows[0].value) : cur.rows[0].value;
+          if (Array.isArray(parsed)) campaigns = parsed;
+        } catch {}
+      }
+
+      const subsRes = await pool.query('SELECT COUNT(*) as count FROM newsletter_subscribers');
+      const subCount = parseInt(subsRes.rows[0]?.count || '0', 10);
+      const nextIssue = (campaigns[0]?.issueNumber || 44) + 1;
+
+      const newCampaign = {
+        id: `camp-${Date.now()}`,
+        issueNumber: nextIssue,
+        subject: subject.trim(),
+        previewText: (previewText || '').trim(),
+        content: content.trim(),
+        author: author?.trim() || 'Trek Consultancy Editorial Team',
+        sentAt: new Date().toISOString(),
+        recipientCount: subCount || 1,
+        status: 'sent',
+        tags: Array.isArray(tags) ? tags : ['Weekly Digest', 'Architecture']
+      };
+
+      const updated = [newCampaign, ...campaigns];
+      await pool.query(`
+        INSERT INTO settings (key, value) VALUES ('newsletter_campaigns', $1)
+        ON CONFLICT (key) DO UPDATE SET value = $1
+      `, [JSON.stringify(updated)]);
+
+      res.status(201).json({ success: true, campaign: newCampaign, sentCount: subCount });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -5963,6 +6096,27 @@ CRITICAL DIRECTIVES FOR MAXIMUM INFORMATION RETENTION:
     }
   });
 
+  // Helper to dynamically calculate human-friendly relative time from created_at
+  const formatServerTimeAgo = (dateInput: any): string => {
+    if (!dateInput) return 'Just now';
+    const date = new Date(dateInput);
+    if (isNaN(date.getTime())) return 'Just now';
+    const diffSec = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+    if (diffSec < 60) return 'Just now';
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHour = Math.floor(diffMin / 60);
+    if (diffHour < 24) return `${diffHour}h ago`;
+    const diffDays = Math.floor(diffHour / 24);
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays}d ago`;
+    const diffWeeks = Math.floor(diffDays / 7);
+    if (diffWeeks < 4) return `${diffWeeks}w ago`;
+    const diffMonths = Math.floor(diffDays / 30);
+    if (diffMonths < 12) return `${diffMonths}mo ago`;
+    return `${Math.floor(diffDays / 365)}y ago`;
+  };
+
   // Activity logs
   app.get('/api/activity-logs', async (_req, res) => {
     try {
@@ -5972,8 +6126,9 @@ CRITICAL DIRECTIVES FOR MAXIMUM INFORMATION RETENTION:
         action: r.action,
         actor: r.actor,
         target: r.target,
-        timeAgo: r.time_ago,
-        type: r.type
+        timeAgo: formatServerTimeAgo(r.created_at) || r.time_ago || 'Just now',
+        type: r.type,
+        createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString()
       })));
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -6288,12 +6443,39 @@ CRITICAL DIRECTIVES FOR MAXIMUM INFORMATION RETENTION:
     }
   });
 
-  // Hero Section Settings
+  // Hero Section Settings & Image Resolver
+  function normalizeHeroImageUrl(url?: string | null): string {
+    if (!url || typeof url !== 'string') return '';
+    const trimmed = url.trim();
+    if (!trimmed || trimmed.startsWith('data:image') || trimmed.startsWith('blob:') || trimmed.startsWith('/')) {
+      return trimmed;
+    }
+    const gdriveMatch = trimmed.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:export=view&)?id=|thumbnail\?id=)([a-zA-Z0-9_-]+)/i);
+    if (gdriveMatch && gdriveMatch[1]) {
+      return `https://lh3.googleusercontent.com/d/${gdriveMatch[1]}`;
+    }
+    const dropboxMatch = trimmed.match(/dropbox\.com\/s\/(.+)/i);
+    if (dropboxMatch) {
+      if (trimmed.includes('?dl=0')) return trimmed.replace('?dl=0', '?raw=1');
+      if (trimmed.includes('?dl=1')) return trimmed.replace('?dl=1', '?raw=1');
+      return trimmed.includes('?') ? `${trimmed}&raw=1` : `${trimmed}?raw=1`;
+    }
+    const ghMatch = trimmed.match(/github\.com\/([^/]+)\/([^/]+)\/blob\/([^/]+)\/(.+\.(?:png|jpe?g|webp|gif|svg|avif))/i);
+    if (ghMatch) {
+      return `https://raw.githubusercontent.com/${ghMatch[1]}/${ghMatch[2]}/${ghMatch[3]}/${ghMatch[4]}`;
+    }
+    return trimmed;
+  }
+
   app.get('/api/hero', async (_req, res) => {
     try {
       const result = await pool.query("SELECT value FROM settings WHERE key = 'hero'");
       if (result.rows.length > 0 && result.rows[0].value) {
-        res.json(result.rows[0].value);
+        const val = result.rows[0].value;
+        if (Array.isArray(val.slides)) {
+          val.slides = val.slides.map((s: any) => ({ ...s, url: normalizeHeroImageUrl(s.url) }));
+        }
+        res.json(val);
       } else {
         res.json(defaultHeroSettings);
       }
@@ -6305,6 +6487,9 @@ CRITICAL DIRECTIVES FOR MAXIMUM INFORMATION RETENTION:
   app.post('/api/admin/hero', async (req, res) => {
     try {
       const heroSettings = req.body;
+      if (heroSettings && Array.isArray(heroSettings.slides)) {
+        heroSettings.slides = heroSettings.slides.map((s: any) => ({ ...s, url: normalizeHeroImageUrl(s.url) }));
+      }
       await pool.query(`
         INSERT INTO settings (key, value) VALUES ('hero', $1)
         ON CONFLICT (key) DO UPDATE SET value = $1
@@ -6319,6 +6504,9 @@ CRITICAL DIRECTIVES FOR MAXIMUM INFORMATION RETENTION:
   app.post('/api/hero', async (req, res) => {
     try {
       const heroSettings = req.body;
+      if (heroSettings && Array.isArray(heroSettings.slides)) {
+        heroSettings.slides = heroSettings.slides.map((s: any) => ({ ...s, url: normalizeHeroImageUrl(s.url) }));
+      }
       await pool.query(`
         INSERT INTO settings (key, value) VALUES ('hero', $1)
         ON CONFLICT (key) DO UPDATE SET value = $1

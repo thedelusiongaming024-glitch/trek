@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { BlogPost } from '../../types';
 import { normalizeUrl } from '../../utils/url';
+import { normalizeImageUrl, DEFAULT_BLOG_FALLBACK } from '../../utils/imageUrl';
 
 interface AdminEditBlogModalProps {
   blog: BlogPost | null;
@@ -104,7 +105,7 @@ export const AdminEditBlogModal: React.FC<AdminEditBlogModalProps> = ({
         excerpt: excerpt.trim(),
         content: content.trim(),
         author: author.trim() || blog.author || 'Editorial Staff',
-        imageUrl: imageUrl.trim() || blog.imageUrl || 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=700&auto=format&fit=crop&q=80',
+        imageUrl: normalizeImageUrl(imageUrl.trim()) || normalizeImageUrl(blog.imageUrl) || DEFAULT_BLOG_FALLBACK,
         redirectUrl: cleanRedirect
       };
 
@@ -207,27 +208,18 @@ export const AdminEditBlogModal: React.FC<AdminEditBlogModalProps> = ({
 
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1.5">
-              Cover Image URL
+              Cover Image URL (Optional)
             </label>
             <input
               type="url"
               value={imageUrl}
               onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="https://images.unsplash.com/..."
+              placeholder="https://images.unsplash.com/... or Google Drive link"
               className="w-full px-3 py-2 text-xs rounded-lg bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-teal-600 focus:border-teal-600 transition-colors shadow-2xs"
             />
-            {imageUrl && (
-              <div className="mt-2 relative w-full h-24 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
-                <img
-                  src={imageUrl}
-                  alt="Preview"
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    (e.currentTarget as HTMLElement).style.display = 'none';
-                  }}
-                />
-              </div>
-            )}
+            <p className="text-[10px] text-slate-500 mt-1">
+              Supports standard image URLs and Google Drive sharing links.
+            </p>
           </div>
 
           <div>
