@@ -283,7 +283,9 @@ export const defaultAiSettings = {
   maxOutputTokens: 2048,
   customSystemInstruction: '',
   status: 'active',
-  lastTestStatus: 'untested'
+  lastTestStatus: 'untested',
+  enableWebSearch: true,
+  enableUrlBrowsing: true
 };
 
 // Real Pool instance and Neon stateless HTTP client

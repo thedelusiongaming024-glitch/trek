@@ -309,7 +309,9 @@ var defaultAiSettings = {
   maxOutputTokens: 2048,
   customSystemInstruction: "",
   status: "active",
-  lastTestStatus: "untested"
+  lastTestStatus: "untested",
+  enableWebSearch: true,
+  enableUrlBrowsing: true
 };
 var realPool = null;
 var neonSql = null;
@@ -1851,6 +1853,102 @@ I am the AI Support Consultant for **${memory.identity.brand}**. I draw directly
   };
 }
 
+// src/server/webBrowser.ts
+function extractUrlsFromText(text) {
+  if (!text || typeof text !== "string") return [];
+  const urlRegex = /https?:\/\/[^\s<>"'{}|\\^`\[\]]+/gi;
+  const matches = text.match(urlRegex) || [];
+  const cleaned = matches.map((u) => u.replace(/[.,;:!?)\]]+$/, "")).filter(Boolean);
+  return Array.from(new Set(cleaned));
+}
+function cleanHtmlToText(html, maxChars = 4e3) {
+  if (!html) return { title: "", text: "" };
+  let title = "";
+  const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  if (titleMatch && titleMatch[1]) {
+    title = titleMatch[1].replace(/<[^>]+>/g, "").trim();
+  }
+  let processed = html.replace(/<!--[\s\S]*?-->/g, "").replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<noscript[\s\S]*?<\/noscript>/gi, "").replace(/<svg[\s\S]*?<\/svg>/gi, "").replace(/<nav[\s\S]*?<\/nav>/gi, "").replace(/<footer[\s\S]*?<\/footer>/gi, "").replace(/<iframe[\s\S]*?<\/iframe>/gi, "");
+  processed = processed.replace(/<h[1-2][^>]*>([\s\S]*?)<\/h[1-2]>/gi, "\n\n## $1\n\n").replace(/<h[3-6][^>]*>([\s\S]*?)<\/h[3-6]>/gi, "\n\n### $1\n\n").replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, "\n- $1").replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, "\n\n$1\n\n").replace(/<br\s*[\/]?>/gi, "\n").replace(/<div[^>]*>/gi, "\n").replace(/<\/div>/gi, "\n");
+  processed = processed.replace(/<[^>]+>/g, " ");
+  processed = processed.replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").replace(/&quot;/gi, '"').replace(/&#39;/gi, "'").replace(/&#x27;/gi, "'").replace(/&mdash;/gi, "\u2014").replace(/&ndash;/gi, "\u2013");
+  processed = processed.replace(/[ \t]+/g, " ").replace(/\n\s*\n\s*\n+/g, "\n\n").trim();
+  if (processed.length > maxChars) {
+    processed = processed.slice(0, maxChars) + "\n\n...[Content truncated for length]";
+  }
+  return { title, text: processed };
+}
+async function fetchAndExtractPageContent(targetUrl, timeoutMs = 6e3) {
+  const fetchedAt = (/* @__PURE__ */ new Date()).toISOString();
+  try {
+    const parsed = new URL(targetUrl);
+    const hostname = parsed.hostname.toLowerCase();
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0" || hostname.startsWith("192.168.") || hostname.startsWith("10.") || hostname.startsWith("172.16.") || hostname.endsWith(".internal") || hostname.endsWith(".local")) {
+      return {
+        url: targetUrl,
+        title: "Forbidden",
+        content: "",
+        success: false,
+        error: "Security: Access to local/private network addresses is blocked.",
+        fetchedAt
+      };
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const response = await fetch(targetUrl, {
+      method: "GET",
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 (TrekConsultancyBot/1.0)",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.7",
+        "Accept-Language": "en-US,en;q=0.9,ar;q=0.8,bn;q=0.7"
+      },
+      signal: controller.signal,
+      redirect: "follow"
+    });
+    clearTimeout(timer);
+    if (!response.ok) {
+      return {
+        url: targetUrl,
+        title: `HTTP ${response.status}`,
+        content: "",
+        success: false,
+        error: `HTTP error: ${response.status} ${response.statusText}`,
+        fetchedAt
+      };
+    }
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.includes("text/html") && !contentType.includes("text/plain") && !contentType.includes("application/json")) {
+      return {
+        url: targetUrl,
+        title: "Unsupported Media",
+        content: `[Non-text content-type: ${contentType}]`,
+        success: false,
+        error: `Target content-type is ${contentType}, only web pages or text can be parsed.`,
+        fetchedAt
+      };
+    }
+    const rawBody = await response.text();
+    const { title, text } = cleanHtmlToText(rawBody);
+    return {
+      url: targetUrl,
+      title: title || parsed.hostname,
+      content: text,
+      success: true,
+      fetchedAt
+    };
+  } catch (err) {
+    const isTimeout = err?.name === "AbortError" || String(err?.message || "").includes("timeout") || String(err?.message || "").includes("abort");
+    return {
+      url: targetUrl,
+      title: "Fetch Failed",
+      content: "",
+      success: false,
+      error: isTimeout ? `Request timed out after ${timeoutMs / 1e3} seconds.` : err?.message || "Network connection failed",
+      fetchedAt
+    };
+  }
+}
+
 // src/server/app.ts
 var ragCache = null;
 var RAG_CACHE_TTL_MS = 15e3;
@@ -1966,6 +2064,8 @@ async function getEffectiveAiRuntime() {
     temperature: typeof dbConfig.temperature === "number" ? dbConfig.temperature : 0.4,
     maxOutputTokens: typeof dbConfig.maxOutputTokens === "number" ? dbConfig.maxOutputTokens : 2048,
     customSystemInstruction: (dbConfig.customSystemInstruction || "").trim(),
+    enableWebSearch: dbConfig.enableWebSearch !== false,
+    enableUrlBrowsing: dbConfig.enableUrlBrowsing !== false,
     status: dbConfig.status || "active",
     providerApiKeys: dbConfig.providerApiKeys && typeof dbConfig.providerApiKeys === "object" ? dbConfig.providerApiKeys : {},
     dbConfig
@@ -1980,7 +2080,8 @@ async function executeAiCompletion({
   messages,
   temperature = 0.4,
   maxTokens = 2048,
-  timeoutMs = 12e3
+  timeoutMs = 14e3,
+  enableWebSearch = true
 }) {
   const normProvider = (provider || "gemini").toLowerCase();
   if (normProvider === "gemini") {
@@ -1999,19 +2100,44 @@ ${msg.content}`;
     while (contents.length > 0 && contents[0].role !== "user") {
       contents.shift();
     }
-    const response = await withTimeout(
-      ai.models.generateContent({
-        model,
-        contents,
-        config: {
-          systemInstruction,
-          temperature,
-          maxOutputTokens: maxTokens
-        }
-      }),
-      timeoutMs
-    );
-    return { text: (response.text || "").trim(), model };
+    const tools = [];
+    if (enableWebSearch !== false) {
+      tools.push({ googleSearch: {} });
+    }
+    try {
+      const response = await withTimeout(
+        ai.models.generateContent({
+          model,
+          contents,
+          config: {
+            systemInstruction,
+            temperature,
+            maxOutputTokens: maxTokens,
+            ...tools.length > 0 ? { tools } : {}
+          }
+        }),
+        timeoutMs
+      );
+      return { text: (response.text || "").trim(), model };
+    } catch (geminiErr) {
+      if (tools.length > 0) {
+        console.warn(`[AI Engine] Gemini Google Search grounding call failed for ${model}, retrying without search tool:`, geminiErr?.message);
+        const retryResponse = await withTimeout(
+          ai.models.generateContent({
+            model,
+            contents,
+            config: {
+              systemInstruction,
+              temperature,
+              maxOutputTokens: maxTokens
+            }
+          }),
+          timeoutMs
+        );
+        return { text: (retryResponse.text || "").trim(), model };
+      }
+      throw geminiErr;
+    }
   }
   const effectiveBaseUrl = (baseUrl || DEFAULT_PROVIDER_BASE_URLS.openai || "https://api.openai.com/v1").replace(/\/+$/, "");
   const url = `${effectiveBaseUrl}/chat/completions`;
@@ -4893,6 +5019,41 @@ VERIFIED HUMAN SUPPORT TICKETS & SENIOR CONSULTANT RESOLUTIONS:
         const candidateModels = aiRuntime.candidateModels;
         const memoryPromptBlock = formatBusinessMemoryForPrompt(businessMemory);
         const clientDisplayName = cleanUserName && cleanUserName !== "Guest User" ? cleanUserName : "";
+        let browsedUrlContext = "";
+        if (aiRuntime.enableUrlBrowsing !== false) {
+          const detectedUrls = extractUrlsFromText(cleanMsg);
+          if (detectedUrls.length > 0) {
+            const targetUrls = detectedUrls.slice(0, 2);
+            try {
+              const fetchResults = await Promise.allSettled(
+                targetUrls.map((u) => fetchAndExtractPageContent(u, 5500))
+              );
+              const successfulPages = fetchResults.filter((r) => r.status === "fulfilled" && r.value.success).map((r) => r.value);
+              if (successfulPages.length > 0) {
+                browsedUrlContext = `
+============================================================
+\u{1F310} LIVE BROWSED EXTERNAL WEB CONTENT (Fetched in real-time from link in inquiry):
+============================================================
+`;
+                for (const page of successfulPages) {
+                  browsedUrlContext += `
+[URL: ${page.url}]
+[Page Title: ${page.title}]
+Extracted Content:
+${page.content}
+------------------------------------------------------------
+`;
+                }
+                browsedUrlContext += `DIRECTIVE: The user referenced the live web link(s) above. Analyze the extracted web content above with highest precision and address their questions, summarize, or verify details directly based on this live information.
+============================================================
+
+`;
+              }
+            } catch (browseErr) {
+              console.warn("[Web Browser] Non-fatal URL fetch warning:", browseErr);
+            }
+          }
+        }
         const systemInstruction = `You are Trek Support Assistant, the premier AI Executive Consultant and support assistant for Trek Consultancy Forum.
 
 CLIENT IDENTITY & CONTEXT:
@@ -4903,6 +5064,7 @@ CLIENT IDENTITY & CONTEXT:
 - SLA: ${slaHours} Hours
 
 ${memoryPromptBlock}
+${browsedUrlContext}
 
 ============================================================
 ADDITIONAL LIVE DATABASE CONTEXT & RECENT PLATFORM POSTS:
@@ -4984,7 +5146,8 @@ ${aiRuntime.customSystemInstruction}` : systemInstruction;
               messages: multiTurnMessages,
               temperature: aiRuntime.temperature,
               maxTokens: Math.min(aiRuntime.maxOutputTokens, 2048),
-              timeoutMs: 16e3
+              timeoutMs: 16e3,
+              enableWebSearch: aiRuntime.enableWebSearch !== false
             });
             if (aiResult.text && !/^(?:1\.\s+)?\*\*(?:Analyze User Input|Analyze Input)/i.test(aiResult.text)) {
               botReply = aiResult.text.trim();
@@ -6559,7 +6722,9 @@ ${textPayload.slice(0, 12e4)}`
         lastTestMessage: dbConfig.lastTestMessage || "",
         lastTestLatencyMs: dbConfig.lastTestLatencyMs || 0,
         updatedAt: dbConfig.updatedAt || null,
-        availableModels: TOP_AI_MODELS
+        availableModels: TOP_AI_MODELS,
+        enableWebSearch: dbConfig.enableWebSearch !== false,
+        enableUrlBrowsing: dbConfig.enableUrlBrowsing !== false
       });
     } catch (err) {
       console.error("[AI Settings] Failed to fetch settings:", err?.message || err);
@@ -6620,6 +6785,8 @@ ${textPayload.slice(0, 12e4)}`
         temperature: typeof temperature === "number" ? Math.max(0, Math.min(1, temperature)) : currentConfig.temperature,
         maxOutputTokens: typeof maxOutputTokens === "number" ? Math.max(256, Math.min(8192, maxOutputTokens)) : currentConfig.maxOutputTokens,
         customSystemInstruction: typeof customSystemInstruction === "string" ? customSystemInstruction.trim() : currentConfig.customSystemInstruction,
+        enableWebSearch: typeof req.body.enableWebSearch === "boolean" ? req.body.enableWebSearch : currentConfig.enableWebSearch !== false,
+        enableUrlBrowsing: typeof req.body.enableUrlBrowsing === "boolean" ? req.body.enableUrlBrowsing : currentConfig.enableUrlBrowsing !== false,
         status: status === "disabled" ? "disabled" : "active",
         updatedAt: (/* @__PURE__ */ new Date()).toISOString()
       };
@@ -6748,6 +6915,18 @@ ${textPayload.slice(0, 12e4)}`
         error: errMsg,
         message: errMsg
       });
+    }
+  });
+  app.post("/api/ai/browse-url", async (req, res) => {
+    try {
+      const { url } = req.body;
+      if (!url || typeof url !== "string" || !url.startsWith("http")) {
+        return res.status(400).json({ error: "Valid HTTP/HTTPS URL is required." });
+      }
+      const result = await fetchAndExtractPageContent(url.trim(), 8e3);
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ error: err?.message || "Failed to inspect URL" });
     }
   });
   app.get("/api/settings", async (_req, res) => {

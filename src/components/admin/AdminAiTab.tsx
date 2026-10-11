@@ -19,7 +19,10 @@ import {
   Sparkles,
   Zap,
   Terminal,
-  Bot
+  Bot,
+  Search,
+  Link2,
+  Compass
 } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { AiProvider, AiSettingsConfig, AiModelOption } from '../../types';
@@ -117,6 +120,19 @@ export const AdminAiTab: React.FC<AdminAiTabProps> = ({ onNotify }) => {
   const [lastTestedAt, setLastTestedAt] = useState<string | null>(null);
   const [lastTestStatus, setLastTestStatus] = useState<string>('untested');
 
+  // Agentic Browsing & Search Grounding States (Levels 1 & 2)
+  const [enableWebSearch, setEnableWebSearch] = useState<boolean>(true);
+  const [enableUrlBrowsing, setEnableUrlBrowsing] = useState<boolean>(true);
+  const [testUrlInput, setTestUrlInput] = useState<string>('');
+  const [urlTesting, setUrlTesting] = useState<boolean>(false);
+  const [urlTestResult, setUrlTestResult] = useState<{
+    url: string;
+    title: string;
+    content: string;
+    success: boolean;
+    error?: string;
+  } | null>(null);
+
   // Fetch current AI settings from PostgreSQL database
   const fetchSettings = async () => {
     setLoading(true);
@@ -139,6 +155,8 @@ export const AdminAiTab: React.FC<AdminAiTabProps> = ({ onNotify }) => {
         setMaxOutputTokens(typeof data.maxOutputTokens === 'number' ? data.maxOutputTokens : 2048);
         setFallbackModels(Array.isArray(data.fallbackModels) ? data.fallbackModels : ['gemini-3.7-flash', 'gemini-3.5-flash']);
         setCustomSystemInstruction(data.customSystemInstruction || '');
+        setEnableWebSearch(data.enableWebSearch !== false);
+        setEnableUrlBrowsing(data.enableUrlBrowsing !== false);
         setStatus(data.status || 'active');
         setAvailableModels(data.availableModels || []);
         setLastTestedAt(data.lastTestedAt || null);
@@ -212,6 +230,8 @@ export const AdminAiTab: React.FC<AdminAiTabProps> = ({ onNotify }) => {
         maxOutputTokens,
         fallbackModels,
         customSystemInstruction,
+        enableWebSearch,
+        enableUrlBrowsing,
         status
       };
 
@@ -302,6 +322,31 @@ export const AdminAiTab: React.FC<AdminAiTabProps> = ({ onNotify }) => {
       setLastTestStatus('failed');
     } finally {
       setTesting(false);
+    }
+  };
+
+  const handleTestUrlBrowse = async () => {
+    if (!testUrlInput.trim()) return;
+    setUrlTesting(true);
+    setUrlTestResult(null);
+    try {
+      const res = await fetch('/api/ai/browse-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: testUrlInput.trim() })
+      });
+      const data = await res.json();
+      setUrlTestResult(data);
+    } catch (err: any) {
+      setUrlTestResult({
+        url: testUrlInput.trim(),
+        title: 'Error',
+        content: '',
+        success: false,
+        error: err?.message || 'Network request failed'
+      });
+    } finally {
+      setUrlTesting(false);
     }
   };
 
@@ -1102,6 +1147,191 @@ export const AdminAiTab: React.FC<AdminAiTabProps> = ({ onNotify }) => {
                 ? 'এই নির্দেশনাটি সাধারণ নির্দেশনার সাথে যুক্ত হয়ে স্বয়ংক্রিয়ভাবে কাজ করবে।'
                 : 'Appended to the general system instructions for support queries.'}
             </p>
+          </div>
+        </div>
+
+        {/* SECTION 5: AGENTIC BROWSING & LIVE WEB RESEARCH (LEVELS 1 & 2) */}
+        <div className="rounded-xl p-5 bg-white border border-slate-200/90 shadow-2xs space-y-5">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 rounded-md bg-teal-50 text-teal-700">
+                <Globe className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-semibold text-slate-900">
+                    {isAr ? 'التصفح الإدراكي والبحث الحي (المستويان 1 و 2)' : isBn ? 'এজেন্টিক ব্রাউজিং ও লাইভ ওয়েব রিসার্চ (লেভেল ১ ও ২)' : 'Agentic Browsing & Live Web Research'}
+                  </h2>
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">
+                    {isAr ? 'نشط وآمن' : isBn ? 'সক্রিয় ও সুরক্ষিত' : 'Active & Guarded'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  {isAr 
+                    ? 'تمكين الذكاء الاصطناعي من البحث في الويب وقراءة الروابط الخارجية مباشرة في الوقت الفعلي مع حماية كاملة' 
+                    : isBn 
+                    ? 'ইউজারের মেসেজ অনুযায়ী গুগল সার্চ গ্রাউন্ডিং এবং বাইরের ওয়েব লিংক সরাসরি ভিজিট ও পড়ার সুবিধা' 
+                    : 'Real-time Google search grounding and live URL reader with strict timeout bounds & SSRF isolation'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Level 1: Live Web Search Grounding */}
+            <div className={`p-4 rounded-xl border transition-all ${enableWebSearch ? 'bg-slate-50/70 border-teal-600/40 ring-1 ring-teal-600/10' : 'bg-slate-50/30 border-slate-200 opacity-80'}`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1 rounded bg-teal-100 text-teal-700">
+                      <Search className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="text-xs font-bold text-slate-900">
+                      {isAr ? 'المستوى 1: البحث الحي عبر جوجل' : isBn ? 'লেভেল ১: গুগল সার্চ গ্রাউন্ডিং' : 'Level 1: Live Google Search'}
+                    </span>
+                  </div>
+                  <span className="inline-block text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    Gemini GoogleSearch Grounding
+                  </span>
+                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                    {isAr
+                      ? 'يبحث النموذج في جوجل عن أحدث القوانين، لوائح رؤية 2030، والقرارات الحكومية الجديدة ويدمجها في إجابته بدقة.'
+                      : isBn
+                      ? 'মডেল সরাসরি গুগলে সার্চ করে রিয়েল-টাইম সৌদি আইন, ভিশন ২০৩০ আপডেট ও সাম্প্রতিক তথ্য সংগ্রহ করে উত্তর প্রদান করে।'
+                      : 'Equips Gemini with real-time Google Search grounding. Queries the live web for current regulations, Vision 2030 updates, and market news.'}
+                  </p>
+                  <div className="pt-1 flex items-center gap-1.5 text-[10px] text-slate-500">
+                    <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                    <span>{isAr ? 'حماية تلقائية: إعادة المحاولة بدون أداة في حال نفاد الحصة' : isBn ? 'ফেল-সেফ: কোটা সমস্যা হলে স্বয়ংক্রিয় সাধারণ উত্তর' : 'Fail-safe: Auto-retries seamlessly if quota is exhausted'}</span>
+                  </div>
+                </div>
+
+                {/* Switch */}
+                <button
+                  type="button"
+                  onClick={() => setEnableWebSearch(!enableWebSearch)}
+                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    enableWebSearch ? 'bg-teal-600' : 'bg-slate-300'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      enableWebSearch ? 'translate-x-4 rtl:-translate-x-4' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+
+            {/* Level 2: Agentic URL Fetcher & Reader */}
+            <div className={`p-4 rounded-xl border transition-all ${enableUrlBrowsing ? 'bg-slate-50/70 border-teal-600/40 ring-1 ring-teal-600/10' : 'bg-slate-50/30 border-slate-200 opacity-80'}`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1 rounded bg-teal-100 text-teal-700">
+                      <Link2 className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="text-xs font-bold text-slate-900">
+                      {isAr ? 'المستوى 2: قارئ الروابط الذكي' : isBn ? 'লেভেল ২: এজেন্টিক ইউআরএল রিডার' : 'Level 2: Live URL Fetcher'}
+                    </span>
+                  </div>
+                  <span className="inline-block text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200">
+                    Agentic HTML / Web Inspector
+                  </span>
+                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                    {isAr
+                      ? 'عندما يرسل العميل رابطاً لموقع أو منصة حكومية في المحادثة، يقوم المساعد بفتحه وقراءة محتواه وتحليله فوراً.'
+                      : isBn
+                      ? 'চ্যাটে ইউজার কোনো সরকারি পোর্টাল, আর্টিকেল বা ওয়েবসাইটের লিংক দিলে এআই সরাসরি পেজটি ভিজিট করে পড়ে বিশ্লেষণ করে।'
+                      : 'When visitors paste web links into chat, the AI fetches the live webpage, cleans boilerplate, and synthesizes answers from it.'}
+                  </p>
+                  <div className="pt-1 flex items-center gap-1.5 text-[10px] text-slate-500">
+                    <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                    <span>{isAr ? 'محمي بمهلة 5.5 ثوانٍ وحظر العناوين الخاصة (SSRF)' : isBn ? '৫.৫ সেকেন্ড টাইমআউট ও সম্পূর্ণ SSRF প্রটেকশন' : 'Bounded 5.5s timeout & private network (SSRF) isolation'}</span>
+                  </div>
+                </div>
+
+                {/* Switch */}
+                <button
+                  type="button"
+                  onClick={() => setEnableUrlBrowsing(!enableUrlBrowsing)}
+                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    enableUrlBrowsing ? 'bg-teal-600' : 'bg-slate-300'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      enableUrlBrowsing ? 'translate-x-4 rtl:-translate-x-4' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Interactive URL Inspector Tester */}
+          <div className="pt-3 border-t border-slate-100 space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                <Compass className="w-3.5 h-3.5 text-teal-600" />
+                <span>{isAr ? 'فاحص الروابط المباشر (أداة تجربة واختبار):' : isBn ? 'লাইভ ইউআরএল টেস্টার (অ্যাডমিন টেস্ট টুল):' : 'Live URL Inspector (Diagnostic Probe):'}</span>
+              </label>
+              <span className="text-[10px] text-slate-400">
+                {isAr ? 'جرب أي رابط وتأكد من قراءته فوراً' : isBn ? 'যেকোনো লিংক দিয়ে পরীক্ষা করুন' : 'Test any link to verify live extraction'}
+              </span>
+            </div>
+
+            <div className="flex gap-2">
+              <input
+                type="url"
+                value={testUrlInput}
+                onChange={(e) => setTestUrlInput(e.target.value)}
+                placeholder="https://example.com or any news/regulatory page..."
+                className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-800 focus:outline-none focus:ring-1 focus:ring-teal-600/30 focus:border-teal-600 bg-white"
+              />
+              <button
+                type="button"
+                onClick={handleTestUrlBrowse}
+                disabled={urlTesting || !testUrlInput.trim()}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 disabled:opacity-40 text-white text-xs font-medium cursor-pointer transition-colors shadow-2xs"
+              >
+                {urlTesting ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Globe className="w-3.5 h-3.5" />
+                )}
+                <span>{isAr ? 'فحص الرابط' : isBn ? 'টেস্ট করুন' : 'Inspect Link'}</span>
+              </button>
+            </div>
+
+            {urlTestResult && (
+              <div className={`p-3 rounded-lg border text-xs space-y-1.5 ${
+                urlTestResult.success ? 'bg-emerald-50/60 border-emerald-200 text-emerald-900' : 'bg-red-50/60 border-red-200 text-red-900'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 font-bold">
+                    {urlTestResult.success ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                    )}
+                    <span>{urlTestResult.title || (urlTestResult.success ? 'Page Retrieved' : 'Fetch Failed')}</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-slate-500">
+                    {urlTestResult.content ? `${urlTestResult.content.length} characters parsed` : ''}
+                  </span>
+                </div>
+                {urlTestResult.error && (
+                  <p className="text-[11px] text-red-700">{urlTestResult.error}</p>
+                )}
+                {urlTestResult.content && (
+                  <div className="p-2 rounded bg-white/80 border border-emerald-100 font-mono text-[11px] text-slate-700 max-h-36 overflow-y-auto whitespace-pre-line">
+                    {urlTestResult.content.slice(0, 500)}
+                    {urlTestResult.content.length > 500 ? '\n\n...[content continues]' : ''}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

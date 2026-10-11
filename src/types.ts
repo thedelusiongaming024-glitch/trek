@@ -317,6 +317,8 @@ export interface AiSettingsConfig {
   lastTestLatencyMs?: number;
   updatedAt?: string;
   availableModels?: AiModelOption[];
+  enableWebSearch?: boolean;
+  enableUrlBrowsing?: boolean;
 }
 
 export const isAdministrativeRole = (role?: string | null): boolean => {

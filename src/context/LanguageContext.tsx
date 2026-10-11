@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
 export type Language = 'en' | 'bn' | 'ar';
 
@@ -525,7 +525,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     }
   }, [language]);
 
-  const t = (key: string, bnText?: string, arText?: string): string => {
+  const t = useCallback((key: string, bnText?: string, arText?: string): string => {
     if (language === 'en') {
       return key;
     }
@@ -543,10 +543,10 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     }
 
     return key;
-  };
+  }, [language]);
 
   // Number translation into Bengali and Arabic numerals
-  const formatNumber = (num: number | string): string => {
+  const formatNumber = useCallback((num: number | string): string => {
     if (language === 'bn') {
       return String(num).replace(/[0-9]/g, (d) => bengaliDigits[parseInt(d, 10)]);
     }
@@ -554,10 +554,10 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       return String(num).replace(/[0-9]/g, (d) => arabicDigits[parseInt(d, 10)]);
     }
     return String(num);
-  };
+  }, [language]);
 
   // Date and month name formatting for English, Bengali, and Arabic
-  const formatDate = (dateStr: string | undefined | null): string => {
+  const formatDate = useCallback((dateStr: string | undefined | null): string => {
     if (!dateStr) return '';
     if (language === 'en') return String(dateStr);
 
@@ -581,10 +581,10 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     }
 
     return converted;
-  };
+  }, [language]);
 
   // Accurate relative time calculation supporting Date, ISO timestamp, and relative strings
-  const formatTimeAgo = (timeOrDate: string | Date | number | undefined | null): string => {
+  const formatTimeAgo = useCallback((timeOrDate: string | Date | number | undefined | null): string => {
     if (!timeOrDate) {
       if (language === 'bn') return 'এইমাত্র';
       if (language === 'ar') return 'الآن';
@@ -781,20 +781,20 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     }
 
     return rawStr;
-  };
+  }, [language, formatDate, formatNumber]);
 
   // Category name translation
-  const translateCategory = (cat: string): string => {
+  const translateCategory = useCallback((cat: string): string => {
     if (language === 'en' || !cat) return cat;
     const match = categoryMap[cat];
     if (match) {
       return language === 'bn' ? match.bn : match.ar;
     }
     return cat;
-  };
+  }, [language]);
 
   // User role translation
-  const translateRole = (role: string): string => {
+  const translateRole = useCallback((role: string): string => {
     if (language === 'en' || !role) return role;
     if (dictionary[role]) {
       return language === 'bn' ? dictionary[role].bn : dictionary[role].ar;
@@ -815,7 +815,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       if (lower.includes('author')) return 'লেখক';
     }
     return role;
-  };
+  }, [language]);
 
   return (
     <LanguageContext.Provider value={{

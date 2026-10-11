@@ -101,6 +101,9 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
   const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const lastScrolledMsgIdRef = useRef<string | null>(null);
+  const hasInitialScrolledRef = useRef<boolean>(false);
+  const skipHistoryFetchRef = useRef<boolean>(false);
 
   // Check guest conversation limit (3 free messages for new visitors without account)
   const isGuest = !currentUser?.email;
@@ -233,6 +236,11 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
     if (!isOpen) return;
     let isMounted = true;
 
+    if (skipHistoryFetchRef.current) {
+      skipHistoryFetchRef.current = false;
+      return;
+    }
+
     const fetchHistory = async () => {
       try {
         const params = new URLSearchParams();
@@ -255,6 +263,15 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
                 time: m.createdAt ? new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recorded'
               }))
             );
+            if (!hasInitialScrolledRef.current) {
+              hasInitialScrolledRef.current = true;
+              requestAnimationFrame(() => {
+                const container = messagesContainerRef.current;
+                if (container) {
+                  container.scrollTop = container.scrollHeight;
+                }
+              });
+            }
           } else {
             // Fresh greeting for clean session or new user without prior history
             setMessages([
@@ -276,7 +293,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [isOpen, sessionId, (currentUser as any)?.id, currentUser?.email, language, t]);
+  }, [isOpen, sessionId, (currentUser as any)?.id, currentUser?.email]);
 
   // Fetch FAQs
   useEffect(() => {
@@ -304,22 +321,32 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
     return () => clearTimeout(timer);
   }, [isOpen, selectedCategory, faqSearch, language]);
 
-  // Scroll chat smartly:
-  // After AI answers, smoothly position the screen so the user reads from the beginning of the question and answer.
-  // When the user sends a message, scroll to the bottom so they see their question & the loading spinner.
-  const scrollToQuestion = (questionIndex: number) => {
+  // Internal container-only scroll to bottom (NEVER uses scrollIntoView to prevent outer page jumping)
+  const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    container.scrollTo({
+      top: container.scrollHeight,
+      behavior
+    });
+  };
+
+  // Scroll to a specific message item strictly within container
+  const scrollToMessage = (elementId: string, behavior: ScrollBehavior = 'smooth') => {
     const container = messagesContainerRef.current;
     if (!container) return;
 
-    const targetEl = document.getElementById(`chat-msg-${questionIndex}`);
+    const targetEl = document.getElementById(elementId);
     if (targetEl) {
       const containerRect = container.getBoundingClientRect();
       const elementRect = targetEl.getBoundingClientRect();
-      const relativeTop = elementRect.top - containerRect.top + container.scrollTop - 12;
+      const targetTop = elementRect.top - containerRect.top + container.scrollTop - 10;
       container.scrollTo({
-        top: Math.max(0, relativeTop),
-        behavior: 'smooth'
+        top: Math.max(0, targetTop),
+        behavior
       });
+    } else {
+      scrollToBottom(behavior);
     }
   };
 
@@ -327,9 +354,19 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
     if (activeTab !== 'chat' || messages.length === 0) return;
 
     const lastMsg = messages[messages.length - 1];
+    const lastMsgId = lastMsg?.id || `msg-${messages.length - 1}-${(lastMsg?.text || '').slice(0, 16)}`;
 
-    if (lastMsg?.sender === 'bot') {
-      // Find the user question that prompted this bot response
+    // Guard: only scroll when a new message has genuinely been added
+    if (lastScrolledMsgIdRef.current === lastMsgId) return;
+    lastScrolledMsgIdRef.current = lastMsgId;
+
+    if (lastMsg?.sender === 'user') {
+      // User sent a message: scroll to bottom so their message and the typing indicator are visible
+      requestAnimationFrame(() => {
+        scrollToBottom('smooth');
+      });
+    } else if (lastMsg?.sender === 'bot') {
+      // Bot reply arrived: smoothly align to the previous question and start of answer ONCE
       let questionIndex = -1;
       for (let i = messages.length - 2; i >= 0; i--) {
         if (messages[i].sender === 'user') {
@@ -338,24 +375,26 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
         }
       }
 
-      if (questionIndex >= 0) {
-        // Smoothly scroll down so the user's question is at the top of the screen
-        // allowing them to read the answer from the very beginning
-        const timer1 = setTimeout(() => scrollToQuestion(questionIndex), 60);
-        const timer2 = setTimeout(() => scrollToQuestion(questionIndex), 180);
-        return () => {
-          clearTimeout(timer1);
-          clearTimeout(timer2);
-        };
-      } else {
-        // Fallback for initial welcome greeting
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }
-    } else {
-      // When user sends a message, scroll to bottom to show their question and the loading indicator
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      const raf = requestAnimationFrame(() => {
+        if (questionIndex >= 0) {
+          scrollToMessage(`chat-msg-${questionIndex}`, 'smooth');
+        } else {
+          scrollToBottom('smooth');
+        }
+      });
+
+      return () => cancelAnimationFrame(raf);
     }
   }, [messages, activeTab]);
+
+  // When loading state starts, ensure container is smoothly scrolled to show the loader
+  useEffect(() => {
+    if (isSending) {
+      requestAnimationFrame(() => {
+        scrollToBottom('smooth');
+      });
+    }
+  }, [isSending]);
 
   if (!isOpen) return null;
 
@@ -399,6 +438,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
       if (res.ok) {
         const data = await res.json();
         if (data.conversation?.sessionId && data.conversation.sessionId !== sessionId) {
+          skipHistoryFetchRef.current = true;
           setSessionId(data.conversation.sessionId);
         }
         setMessages((prev) => [
@@ -537,7 +577,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
       {activeTab === 'chat' && (
         <div className="flex-1 flex flex-col min-h-0 bg-slate-50/40">
           {/* Messages list */}
-          <div ref={messagesContainerRef} className="flex-1 p-4 overflow-y-auto space-y-3.5 relative">
+          <div ref={messagesContainerRef} className="flex-1 p-4 overflow-y-auto overscroll-contain space-y-3.5 relative">
             {messages.map((m, i) => {
               const msgKey = m.id || `msg-${i}`;
               const isCopied = copiedMsgId === msgKey;
@@ -836,7 +876,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
 
       {/* TAB 2: FAQS & KNOWLEDGE */}
       {activeTab === 'faqs' && (
-        <div className="flex-1 flex flex-col min-h-0 bg-slate-50/40 p-4 overflow-y-auto">
+        <div className="flex-1 flex flex-col min-h-0 bg-slate-50/40 p-4 overflow-y-auto overscroll-contain">
           {/* Search box */}
           <div className="relative mb-3">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 rtl:left-auto rtl:right-3" />

@@ -323,7 +323,9 @@ export const defaultAiSettings = {
   maxOutputTokens: 2048,
   customSystemInstruction: '',
   status: 'active',
-  lastTestStatus: 'untested'
+  lastTestStatus: 'untested',
+  enableWebSearch: true,
+  enableUrlBrowsing: true
 };
 
 // Real Pool instance and Neon stateless HTTP client
@@ -881,6 +883,7 @@ export async function initDb() {
 import express from 'express';
 import { GoogleGenAI } from '@google/genai';
 import { Resend } from 'resend';
+import { extractUrlsFromText, fetchAndExtractPageContent } from './webBrowser';
 
 // ---------------------------------------------------------------------------
 // Unified Business Memory & Knowledge Core (Inlined for Vercel Serverless)
@@ -1807,6 +1810,8 @@ export async function getEffectiveAiRuntime() {
     temperature: typeof dbConfig.temperature === 'number' ? dbConfig.temperature : 0.4,
     maxOutputTokens: typeof dbConfig.maxOutputTokens === 'number' ? dbConfig.maxOutputTokens : 2048,
     customSystemInstruction: (dbConfig.customSystemInstruction || '').trim(),
+    enableWebSearch: dbConfig.enableWebSearch !== false,
+    enableUrlBrowsing: dbConfig.enableUrlBrowsing !== false,
     status: dbConfig.status || 'active',
     providerApiKeys: (dbConfig.providerApiKeys && typeof dbConfig.providerApiKeys === 'object') ? dbConfig.providerApiKeys : {},
     dbConfig
@@ -1822,7 +1827,8 @@ export async function executeAiCompletion({
   messages,
   temperature = 0.4,
   maxTokens = 2048,
-  timeoutMs = 12000
+  timeoutMs = 14000,
+  enableWebSearch = true
 }: {
   provider: string;
   apiKey: string;
@@ -1833,10 +1839,11 @@ export async function executeAiCompletion({
   temperature?: number;
   maxTokens?: number;
   timeoutMs?: number;
+  enableWebSearch?: boolean;
 }): Promise<{ text: string; model: string }> {
   const normProvider = (provider || 'gemini').toLowerCase();
 
-  // 1. Google Gemini Provider via official SDK
+  // 1. Google Gemini Provider via official SDK (with Level 1 Google Search Grounding)
   if (normProvider === 'gemini') {
     const ai = new GoogleGenAI({ apiKey });
     const contents: any[] = [];
@@ -1852,20 +1859,48 @@ export async function executeAiCompletion({
       contents.shift();
     }
 
-    const response = await withTimeout(
-      ai.models.generateContent({
-        model,
-        contents,
-        config: {
-          systemInstruction,
-          temperature,
-          maxOutputTokens: maxTokens
-        }
-      }),
-      timeoutMs
-    );
+    // Google Search Grounding tool (Level 1)
+    const tools: any[] = [];
+    if (enableWebSearch !== false) {
+      tools.push({ googleSearch: {} });
+    }
 
-    return { text: (response.text || '').trim(), model };
+    try {
+      const response = await withTimeout(
+        ai.models.generateContent({
+          model,
+          contents,
+          config: {
+            systemInstruction,
+            temperature,
+            maxOutputTokens: maxTokens,
+            ...(tools.length > 0 ? { tools } : {})
+          }
+        }),
+        timeoutMs
+      );
+
+      return { text: (response.text || '').trim(), model };
+    } catch (geminiErr: any) {
+      // Fail-safe resilience: if Google Search grounding fails for this model/tier, retry without tools
+      if (tools.length > 0) {
+        console.warn(`[AI Engine] Gemini Google Search grounding call failed for ${model}, retrying without search tool:`, geminiErr?.message);
+        const retryResponse = await withTimeout(
+          ai.models.generateContent({
+            model,
+            contents,
+            config: {
+              systemInstruction,
+              temperature,
+              maxOutputTokens: maxTokens
+            }
+          }),
+          timeoutMs
+        );
+        return { text: (retryResponse.text || '').trim(), model };
+      }
+      throw geminiErr;
+    }
   }
 
   // 2. OpenAI Provider via standard Chat Completions
@@ -4637,6 +4672,33 @@ export async function createApp() {
         const candidateModels = aiRuntime.candidateModels;
         const memoryPromptBlock = formatBusinessMemoryForPrompt(businessMemory);
         const clientDisplayName = cleanUserName && cleanUserName !== 'Guest User' ? cleanUserName : '';
+        // Level 2: Agentic URL Fetcher & Inspector
+        let browsedUrlContext = '';
+        if (aiRuntime.enableUrlBrowsing !== false) {
+          const detectedUrls = extractUrlsFromText(cleanMsg);
+          if (detectedUrls.length > 0) {
+            const targetUrls = detectedUrls.slice(0, 2);
+            try {
+              const fetchResults = await Promise.allSettled(
+                targetUrls.map(u => fetchAndExtractPageContent(u, 5500))
+              );
+              const successfulPages = fetchResults
+                .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled' && r.value.success)
+                .map(r => r.value);
+
+              if (successfulPages.length > 0) {
+                browsedUrlContext = `\n============================================================\n🌐 LIVE BROWSED EXTERNAL WEB CONTENT (Fetched in real-time from link in inquiry):\n============================================================\n`;
+                for (const page of successfulPages) {
+                  browsedUrlContext += `\n[URL: ${page.url}]\n[Page Title: ${page.title}]\nExtracted Content:\n${page.content}\n------------------------------------------------------------\n`;
+                }
+                browsedUrlContext += `DIRECTIVE: The user referenced the live web link(s) above. Analyze the extracted web content above with highest precision and address their questions, summarize, or verify details directly based on this live information.\n============================================================\n\n`;
+              }
+            } catch (browseErr) {
+              console.warn('[Web Browser] Non-fatal URL fetch warning:', browseErr);
+            }
+          }
+        }
+
         const systemInstruction = `You are Trek Support Assistant, the premier AI Executive Consultant and support assistant for Trek Consultancy Forum.
 
 CLIENT IDENTITY & CONTEXT:
@@ -4647,6 +4709,7 @@ CLIENT IDENTITY & CONTEXT:
 - SLA: ${slaHours} Hours
 
 ${memoryPromptBlock}
+${browsedUrlContext}
 
 ============================================================
 ADDITIONAL LIVE DATABASE CONTEXT & RECENT PLATFORM POSTS:
@@ -4731,7 +4794,8 @@ Guidelines:
               messages: multiTurnMessages,
               temperature: aiRuntime.temperature,
               maxTokens: Math.min(aiRuntime.maxOutputTokens, 2048),
-              timeoutMs: 16000
+              timeoutMs: 16000,
+              enableWebSearch: aiRuntime.enableWebSearch !== false
             });
 
             if (aiResult.text && !/^(?:1\.\s+)?\*\*(?:Analyze User Input|Analyze Input)/i.test(aiResult.text)) {
@@ -6183,7 +6247,9 @@ CRITICAL DIRECTIVES FOR MAXIMUM INFORMATION RETENTION:
         lastTestMessage: dbConfig.lastTestMessage || '',
         lastTestLatencyMs: dbConfig.lastTestLatencyMs || 0,
         updatedAt: dbConfig.updatedAt || null,
-        availableModels: TOP_AI_MODELS
+        availableModels: TOP_AI_MODELS,
+        enableWebSearch: dbConfig.enableWebSearch !== false,
+        enableUrlBrowsing: dbConfig.enableUrlBrowsing !== false
       });
     } catch (err: any) {
       console.error('[AI Settings] Failed to fetch settings:', err?.message || err);
@@ -6254,6 +6320,8 @@ CRITICAL DIRECTIVES FOR MAXIMUM INFORMATION RETENTION:
         temperature: typeof temperature === 'number' ? Math.max(0, Math.min(1, temperature)) : currentConfig.temperature,
         maxOutputTokens: typeof maxOutputTokens === 'number' ? Math.max(256, Math.min(8192, maxOutputTokens)) : currentConfig.maxOutputTokens,
         customSystemInstruction: typeof customSystemInstruction === 'string' ? customSystemInstruction.trim() : currentConfig.customSystemInstruction,
+        enableWebSearch: typeof req.body.enableWebSearch === 'boolean' ? req.body.enableWebSearch : (currentConfig.enableWebSearch !== false),
+        enableUrlBrowsing: typeof req.body.enableUrlBrowsing === 'boolean' ? req.body.enableUrlBrowsing : (currentConfig.enableUrlBrowsing !== false),
         status: status === 'disabled' ? 'disabled' : 'active',
         updatedAt: new Date().toISOString()
       };
@@ -6402,6 +6470,20 @@ CRITICAL DIRECTIVES FOR MAXIMUM INFORMATION RETENTION:
         error: errMsg,
         message: errMsg
       });
+    }
+  });
+
+  // Agentic Browsing URL Reader & Inspector (Level 2 Standalone Endpoint)
+  app.post('/api/ai/browse-url', async (req, res) => {
+    try {
+      const { url } = req.body;
+      if (!url || typeof url !== 'string' || !url.startsWith('http')) {
+        return res.status(400).json({ error: 'Valid HTTP/HTTPS URL is required.' });
+      }
+      const result = await fetchAndExtractPageContent(url.trim(), 8000);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || 'Failed to inspect URL' });
     }
   });
 
