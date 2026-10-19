@@ -1,7 +1,0 @@
-{
-  "name": "Trek Consultancy Forum",
-  "description": "The official community forum and support portal for Trek Consultancy, featuring discussion threads, consultancy inquiries, and an AI assistant.",
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
-}
