@@ -291,6 +291,12 @@ const dictionary: Record<string, { en: string; bn: string; ar: string }> = {
   "Leave a Reply": { en: "Leave a Reply", bn: "উত্তর লিখুন", ar: "أضف رداً" },
   "Submit Reply": { en: "Submit Reply", bn: "উত্তর জমা দিন", ar: "إرسال الرد" },
   "Replying as": { en: "Replying as", bn: "উত্তর দিচ্ছেন:", ar: "الرد بصفتك:" },
+  "Replying to": { en: "Replying to", bn: "উত্তর দিচ্ছেন:", ar: "الرد على:" },
+  "Reply to this comment": { en: "Reply to this comment", bn: "এই মন্তব্যের উত্তর দিন", ar: "الرد على هذا التعليق" },
+  "Load More": { en: "Load More", bn: "আরও দেখুন", ar: "تحميل المزيد" },
+  "Show Less": { en: "Show Less", bn: "কম দেখান", ar: "عرض أقل" },
+  "Load more child replies": { en: "Load more child replies", bn: "আরও উত্তর দেখুন", ar: "تحميل المزيد من الردود" },
+  "Show less": { en: "Show less", bn: "কম দেখান", ar: "عرض أقل" },
   "Replies & Discussion": { en: "Replies & Discussion", bn: "উত্তর ও আলোচনা", ar: "الردود والمناقشة" },
   "No replies yet. Be the first to share an answer or solution!": {
     en: "No replies yet. Be the first to share an answer or solution!",
@@ -328,7 +334,8 @@ const dictionary: Record<string, { en: string; bn: string; ar: string }> = {
 
   // Support Assistant Header & Tabs
   "AI Support Hub": { en: "AI Support Hub", bn: "এআই সাপোর্ট হাব", ar: "مركز الدعم الذكي" },
-  "Trek Support Assistant": { en: "Trek Support Assistant", bn: "ট্রেক সাপোর্ট সহকারী", ar: "مساعد تريك للدعم" },
+  "Trek Support Agent": { en: "Trek Support Agent", bn: "ট্রেক সাপোর্ট এজেন্ট", ar: "وكيل دعم تريك" },
+  "Trek Support Assistant": { en: "Trek Support Agent", bn: "ট্রেক সাপোর্ট এজেন্ট", ar: "وكيل دعم تريك" },
   "24/7 AI & Help Center": { en: "24/7 AI & Help Center", bn: "২৪/৭ এআই ও হেল্প সেন্টার", ar: "الدعم الذكي ومركز المساعدة ٢٤/٧" },
   "AI Chat": { en: "AI Chat", bn: "এআই চ্যাট", ar: "المحادثة الذكية" },
   "FAQs & Knowledge": { en: "FAQs & Knowledge", bn: "প্রশ্নোত্তর ও নলেজ", ar: "الأسئلة الشائعة والمعرفة" },

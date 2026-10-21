@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Plus, 
   Flame, 
@@ -6,7 +6,9 @@ import {
   Clock, 
   HeartCrack, 
   Heart,
-  AlertCircle
+  AlertCircle,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { ForumTopic, RecentTopic, RecentReply, FilterCategory, PlatformSettings } from '../types';
 import { ForumCard } from './ForumCard';
@@ -54,6 +56,24 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
   settings
 }) => {
   const { language, t, formatNumber } = useLanguage();
+  const [visibleCount, setVisibleCount] = useState<number>(5);
+
+  // Reset to default 5 posts whenever filter or search query changes
+  useEffect(() => {
+    setVisibleCount(5);
+  }, [activeFilter, searchQuery]);
+
+  const displayedTopics = filteredTopics.slice(0, visibleCount);
+  const hasMore = visibleCount < filteredTopics.length;
+
+  const handleLoadMore = () => {
+    setVisibleCount((prev) => prev + 2);
+  };
+
+  const handleShowLess = () => {
+    setVisibleCount(5);
+  };
+
   const tabs: { id: FilterCategory; label: string; icon: React.ReactNode }[] = [
     { id: 'popular', label: 'Popular', icon: <Flame className="w-3.5 h-3.5" /> },
     { id: 'recent', label: 'Recent', icon: <Clock className="w-3.5 h-3.5" /> },
@@ -167,19 +187,49 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
               </button>
             </div>
           ) : (
-            filteredTopics.map((topic) => (
-              <ForumCard
-                key={topic.id}
-                topic={topic}
-                onSelect={onSelectTopic}
-                onToggleLike={onToggleLike}
-                onEdit={onEditTopic ? (_e, t) => onEditTopic(t) : undefined}
-                onDelete={onDeleteTopic ? (_e, t) => onDeleteTopic(t) : undefined}
-                canEdit={canEditTopic ? canEditTopic(topic) : false}
-                canDelete={canDeleteTopic ? canDeleteTopic(topic) : false}
-                isAuthor={isTopicAuthor ? isTopicAuthor(topic) : false}
-              />
-            ))
+            <>
+              {displayedTopics.map((topic) => (
+                <ForumCard
+                  key={topic.id}
+                  topic={topic}
+                  onSelect={onSelectTopic}
+                  onToggleLike={onToggleLike}
+                  onEdit={onEditTopic ? (_e, t) => onEditTopic(t) : undefined}
+                  onDelete={onDeleteTopic ? (_e, t) => onDeleteTopic(t) : undefined}
+                  canEdit={canEditTopic ? canEditTopic(topic) : false}
+                  canDelete={canDeleteTopic ? canDeleteTopic(topic) : false}
+                  isAuthor={isTopicAuthor ? isTopicAuthor(topic) : false}
+                />
+              ))}
+
+              {(hasMore || visibleCount > 5) && (
+                <div className="pt-3 flex flex-wrap items-center justify-center gap-3">
+                  {hasMore && (
+                    <button
+                      type="button"
+                      onClick={handleLoadMore}
+                      className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-full bg-white/85 hover:bg-white text-slate-700 hover:text-teal-700 font-semibold text-xs sm:text-sm border border-slate-200/90 shadow-xs hover:shadow-md transition-all cursor-pointer active:scale-95 backdrop-blur-md group"
+                      title={t('Load More', 'আরও দেখুন', 'تحميل المزيد')}
+                    >
+                      <ChevronDown className="w-4 h-4 text-teal-600 group-hover:translate-y-0.5 transition-transform" />
+                      <span>{t('Load More', 'আরও দেখুন', 'تحميل المزيد')}</span>
+                    </button>
+                  )}
+
+                  {visibleCount > 5 && (
+                    <button
+                      type="button"
+                      onClick={handleShowLess}
+                      className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-full bg-white/85 hover:bg-white text-slate-600 hover:text-slate-900 font-semibold text-xs sm:text-sm border border-slate-200/90 shadow-xs hover:shadow-md transition-all cursor-pointer active:scale-95 backdrop-blur-md group"
+                      title={t('Show Less', 'কম দেখান', 'عرض أقل')}
+                    >
+                      <ChevronUp className="w-4 h-4 text-slate-500 group-hover:-translate-y-0.5 transition-transform" />
+                      <span>{t('Show Less', 'কম দেখান', 'عرض أقل')}</span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -215,8 +265,8 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
             onClick={onOpenChat}
             id="floating-support-chat-btn"
             className="relative w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-gradient-to-tr from-[#006AFF] via-[#0084FF] to-[#00C6FF] hover:from-[#005cd6] hover:to-[#00b4f0] text-white shadow-[0_10px_30px_-5px_rgba(0,132,255,0.5)] hover:shadow-[0_15px_35px_-5px_rgba(0,132,255,0.65)] border-2 border-white/50 backdrop-blur-md flex items-center justify-center cursor-pointer transition-all hover:scale-105 active:scale-95 group focus:outline-none ring-4 ring-blue-500/20 hover:ring-blue-500/35"
-            title={t('Trek Support Assistant')}
-            aria-label={t('Trek Support Assistant')}
+            title={t('Trek Support Agent')}
+            aria-label={t('Trek Support Agent')}
           >
             {/* Messenger Chat Icon */}
             <div className="relative flex items-center justify-center">

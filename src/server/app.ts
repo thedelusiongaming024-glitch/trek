@@ -489,6 +489,52 @@ export async function createApp() {
     });
   });
 
+  // Helper to build first-tier nested replies tree
+  function buildNestedReplies(replyRows: any[]): { repliesList: any[]; totalCount: number } {
+    const replyMap = new Map<string, any>();
+    const topLevelReplies: any[] = [];
+
+    // First pass: create structured reply objects
+    for (const row of replyRows) {
+      const replyObj = {
+        id: row.id,
+        topicId: row.topic_id,
+        parentReplyId: row.parent_reply_id || null,
+        author: row.author,
+        authorRole: row.author_role,
+        authorAvatar: row.author_avatar,
+        timeAgo: row.time_ago,
+        createdAt: row.created_at,
+        content: row.content,
+        likes: row.likes || 0,
+        nestedReplies: []
+      };
+      replyMap.set(row.id, replyObj);
+    }
+
+    // Second pass: attach first-tier nested replies to their parent
+    for (const row of replyRows) {
+      const current = replyMap.get(row.id);
+      if (!current) continue;
+
+      if (current.parentReplyId && replyMap.has(current.parentReplyId)) {
+        // Climb up to the top-level parent to guarantee strict first-tier nesting
+        let topParent = replyMap.get(current.parentReplyId);
+        while (topParent.parentReplyId && replyMap.has(topParent.parentReplyId)) {
+          topParent = replyMap.get(topParent.parentReplyId);
+        }
+        topParent.nestedReplies.push(current);
+      } else {
+        topLevelReplies.push(current);
+      }
+    }
+
+    return {
+      repliesList: topLevelReplies,
+      totalCount: replyRows.length
+    };
+  }
+
   // Topics
   app.get('/api/topics', async (req, res) => {
     try {
@@ -510,42 +556,37 @@ export async function createApp() {
         if (!repliesByTopic[reply.topic_id]) {
           repliesByTopic[reply.topic_id] = [];
         }
-        repliesByTopic[reply.topic_id].push({
-          id: reply.id,
-          author: reply.author,
-          authorRole: reply.author_role,
-          authorAvatar: reply.author_avatar,
-          timeAgo: reply.time_ago,
-          createdAt: reply.created_at,
-          content: reply.content,
-          likes: reply.likes || 0
-        });
+        repliesByTopic[reply.topic_id].push(reply);
       }
 
-      const topics = topicsRes.rows.map((t: any) => ({
-        id: t.id,
-        title: t.title,
-        author: t.author,
-        authorEmail: t.author_email,
-        authorId: t.author_id,
-        authorRole: t.author_role,
-        authorAvatar: t.author_avatar,
-        timeAgo: t.time_ago,
-        createdAt: t.created_at,
-        category: t.category,
-        categorySlug: t.category_slug,
-        views: t.views || 0,
-        likes: t.likes || 0,
-        replies: repliesByTopic[t.id]?.length ?? (t.replies || 0),
-        isFeatured: Boolean(t.is_featured),
-        isPopular: Boolean(t.is_popular),
-        status: t.status || 'approved',
-        editCount: Number(t.edit_count || 0),
-        lastApprovedTitle: t.last_approved_title || null,
-        lastApprovedContent: t.last_approved_content || null,
-        content: t.content,
-        repliesList: repliesByTopic[t.id] || []
-      }));
+      const topics = topicsRes.rows.map((t: any) => {
+        const topicRows = repliesByTopic[t.id] || [];
+        const { repliesList, totalCount } = buildNestedReplies(topicRows);
+        return {
+          id: t.id,
+          title: t.title,
+          author: t.author,
+          authorEmail: t.author_email,
+          authorId: t.author_id,
+          authorRole: t.author_role,
+          authorAvatar: t.author_avatar,
+          timeAgo: t.time_ago,
+          createdAt: t.created_at,
+          category: t.category,
+          categorySlug: t.category_slug,
+          views: t.views || 0,
+          likes: t.likes || 0,
+          replies: totalCount > 0 ? totalCount : (t.replies || 0),
+          isFeatured: Boolean(t.is_featured),
+          isPopular: Boolean(t.is_popular),
+          status: t.status || 'approved',
+          editCount: Number(t.edit_count || 0),
+          lastApprovedTitle: t.last_approved_title || null,
+          lastApprovedContent: t.last_approved_content || null,
+          content: t.content,
+          repliesList
+        };
+      });
 
       res.json(topics);
     } catch (err: any) {
@@ -983,16 +1024,7 @@ export async function createApp() {
 
       // Fetch replies to construct response matching GET /api/topics format
       const repliesRes = await pool.query('SELECT * FROM replies WHERE topic_id = $1 ORDER BY created_at ASC', [id]);
-      const repliesList = repliesRes.rows.map((reply: any) => ({
-        id: reply.id,
-        author: reply.author,
-        authorRole: reply.author_role,
-        authorAvatar: reply.author_avatar,
-        timeAgo: reply.time_ago,
-        createdAt: reply.created_at,
-        content: reply.content,
-        likes: reply.likes || 0
-      }));
+      const { repliesList, totalCount } = buildNestedReplies(repliesRes.rows);
 
       res.json({
         id: updated.id,
@@ -1008,7 +1040,7 @@ export async function createApp() {
         categorySlug: updated.category_slug,
         views: updated.views || 0,
         likes: updated.likes || 0,
-        replies: repliesList.length,
+        replies: totalCount > 0 ? totalCount : (updated.replies || 0),
         isFeatured: Boolean(updated.is_featured),
         isPopular: Boolean(updated.is_popular),
         status: updated.status,
@@ -1162,16 +1194,7 @@ export async function createApp() {
 
         // Fetch replies to construct complete topic object
         const repliesRes = await pool.query('SELECT * FROM replies WHERE topic_id = $1 ORDER BY created_at ASC', [id]);
-        const repliesList = repliesRes.rows.map((reply: any) => ({
-          id: reply.id,
-          author: reply.author,
-          authorRole: reply.author_role,
-          authorAvatar: reply.author_avatar,
-          timeAgo: reply.time_ago,
-          createdAt: reply.created_at,
-          content: reply.content,
-          likes: reply.likes || 0
-        }));
+        const { repliesList, totalCount } = buildNestedReplies(repliesRes.rows);
 
         return res.json({
           success: true,
@@ -1190,7 +1213,7 @@ export async function createApp() {
             categorySlug: restored.category_slug,
             views: restored.views || 0,
             likes: restored.likes || 0,
-            replies: repliesList.length,
+            replies: totalCount > 0 ? totalCount : (restored.replies || 0),
             isFeatured: Boolean(restored.is_featured),
             isPopular: Boolean(restored.is_popular),
             status: 'approved',
@@ -1338,37 +1361,67 @@ export async function createApp() {
   app.post('/api/topics/:id/replies', async (req, res) => {
     try {
       const { id: topicId } = req.params;
-      const { author, content, authorAvatar, authorRole } = req.body;
+      const { author, content, authorAvatar, authorRole, parentReplyId } = req.body;
       const replyId = `rep-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
       const avatar = authorAvatar || getRandomAvatar(author);
 
+      let validParentId: string | null = null;
+      if (parentReplyId && typeof parentReplyId === 'string' && parentReplyId.trim()) {
+        const checkParent = await pool.query('SELECT id FROM replies WHERE id = $1 AND topic_id = $2', [parentReplyId.trim(), topicId]);
+        if (checkParent.rowCount && checkParent.rowCount > 0) {
+          validParentId = parentReplyId.trim();
+        }
+      }
+
       const replyRes = await pool.query(`
-        INSERT INTO replies (id, topic_id, author, author_role, author_avatar, time_ago, content, likes)
-        VALUES ($1, $2, $3, $4, $5, 'Just now', $6, 0)
+        INSERT INTO replies (id, topic_id, parent_reply_id, author, author_role, author_avatar, time_ago, content, likes)
+        VALUES ($1, $2, $3, $4, $5, $6, 'Just now', $7, 0)
         RETURNING *
-      `, [replyId, topicId, author || 'Community Member', authorRole || 'Member', avatar, content]);
+      `, [replyId, topicId, validParentId, author || 'Community Member', authorRole || 'Member', avatar, content]);
 
       // Update topic replies count directly from replies table
       await pool.query('UPDATE topics SET replies = (SELECT COUNT(*) FROM replies WHERE topic_id = $1) WHERE id = $1', [topicId]);
 
       const reply = {
         id: replyRes.rows[0].id,
+        topicId: replyRes.rows[0].topic_id,
+        parentReplyId: replyRes.rows[0].parent_reply_id || null,
         author: replyRes.rows[0].author,
         authorRole: replyRes.rows[0].author_role,
         authorAvatar: replyRes.rows[0].author_avatar,
         timeAgo: replyRes.rows[0].time_ago,
         createdAt: replyRes.rows[0].created_at || new Date().toISOString(),
         content: replyRes.rows[0].content,
-        likes: 0
+        likes: 0,
+        nestedReplies: []
       };
 
       // Also log activity
       await pool.query(`
         INSERT INTO activity_logs (id, action, actor, target, time_ago, type)
-        VALUES ($1, 'Added Reply', $2, 'Discussion Thread', 'Just now', 'reply')
-      `, [`act-${Date.now()}`, author || 'Community Member']);
+        VALUES ($1, $2, $3, 'Discussion Thread', 'Just now', 'reply')
+      `, [`act-${Date.now()}`, validParentId ? 'Added Nested Reply' : 'Added Reply', author || 'Community Member']);
 
       res.status(201).json(reply);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.delete('/api/replies/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const findRes = await pool.query('SELECT topic_id FROM replies WHERE id = $1', [id]);
+      if (findRes.rowCount === 0) {
+        return res.status(404).json({ error: 'Reply not found' });
+      }
+      const topicId = findRes.rows[0].topic_id;
+
+      // PostgreSQL cascade delete will automatically remove all replies having parent_reply_id = id
+      await pool.query('DELETE FROM replies WHERE id = $1', [id]);
+      await pool.query('UPDATE topics SET replies = (SELECT COUNT(*) FROM replies WHERE topic_id = $1) WHERE id = $1', [topicId]);
+
+      res.json({ success: true, deletedId: id, topicId });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -2674,12 +2727,12 @@ export async function createApp() {
     if (isGreeting) {
       if (userLang === 'bn') {
         return {
-          reply: `নমস্কার / আসসালামু আলাইকুম! **${forumName}** এআই অ্যাসিস্ট্যান্টে আপনাকে স্বাগতম।\n\nআমি আপনাকে ট্রেকের সম্পূর্ণ প্রাতিষ্ঠানিক নলেজ বেস ও ডাটাবেজের তথ্যের ভিত্তিতে সহায়তা করতে পারি:\n\n1. **সৌদি বিজনেস সেটআপ**: ১০০% ফরেন ওনারশিপ, MISA ইনভেস্টমেন্ট লাইসেন্স, কমার্শিয়াল রেজিস্ট্রেশন (CR) এবং ব্যাংক অ্যাকাউন্ট\n2. **সফটওয়্যার ও ডিজিটাল সলিউশনস**: কাস্টম ইআরপি, ওয়েব ও মোবাইল অ্যাপ্লিকেশন ডেভেলপমেন্ট এবং ক্লাউড আর্কিটেকচার\n3. **ভিসা ও সরকারি PRO সেবা**: ইনভেস্টর ভিসা, ওয়ার্ক পারমিট, ইকামা প্রসেসিং এবং Qiwa/Muqeem পোর্টাল ম্যানেজমেন্ট\n4. **রিয়েল এস্টেট ইনভেস্টমেন্ট**: বাণিজ্যিক, আবাসিক ও শিল্প সম্পত্তি ক্রয় এবং লিজ পরামর্শ\n5. **করপোরেট সাপোর্ট**: অ্যাকাউন্টস, অডিট, ZATCA ভ্যাট ও ট্যাক্স কমপ্লায়েন্স এবং এইচআর/পেরোল\n6. **ফোরাম কমিউনিটি**: প্রশ্ন পোস্ট করা, উত্তর দেওয়া এবং প্রযুক্তিগত আলোচনা\n\nআপনার যেকোনো প্রশ্ন বা ব্যবসার প্রয়োজনীয়তা সরাসরি লিখুন, আমি বিস্তারিত বুঝিয়ে বলছি!`,
+          reply: `নমস্কার / আসসালামু আলাইকুম! **${forumName}** এআই এজেন্টে আপনাকে স্বাগতম।\n\nআমি আপনাকে ট্রেকের সম্পূর্ণ প্রাতিষ্ঠানিক নলেজ বেস ও ডাটাবেজের তথ্যের ভিত্তিতে সহায়তা করতে পারি:\n\n1. **সৌদি বিজনেস সেটআপ**: ১০০% ফরেন ওনারশিপ, MISA ইনভেস্টমেন্ট লাইসেন্স, কমার্শিয়াল রেজিস্ট্রেশন (CR) এবং ব্যাংক অ্যাকাউন্ট\n2. **সফটওয়্যার ও ডিজিটাল সলিউশনস**: কাস্টম ইআরপি, ওয়েব ও মোবাইল অ্যাপ্লিকেশন ডেভেলপমেন্ট এবং ক্লাউড আর্কিটেকচার\n3. **ভিসা ও সরকারি PRO সেবা**: ইনভেস্টর ভিসা, ওয়ার্ক পারমিট, ইকামা প্রসেসিং এবং Qiwa/Muqeem পোর্টাল ম্যানেজমেন্ট\n4. **রিয়েল এস্টেট ইনভেস্টমেন্ট**: বাণিজ্যিক, আবাসিক ও শিল্প সম্পত্তি ক্রয় এবং লিজ পরামর্শ\n5. **করপোরেট সাপোর্ট**: অ্যাকাউন্টস, অডিট, ZATCA ভ্যাট ও ট্যাক্স কমপ্লায়েন্স এবং এইচআর/পেরোল\n6. **ফোরাম কমিউনিটি**: প্রশ্ন পোস্ট করা, উত্তর দেওয়া এবং প্রযুক্তিগত আলোচনা\n\nআপনার যেকোনো প্রশ্ন বা ব্যবসার প্রয়োজনীয়তা সরাসরি লিখুন, আমি বিস্তারিত বুঝিয়ে বলছি!`,
           source: 'AI'
         };
       }
       return {
-        reply: `Hello and welcome to **${forumName}**! I am your 24/7 AI Consultant & Support Assistant.\n\nI am fully equipped with our verified knowledge base to answer questions across our core service pillars:\n\n1. **Saudi Business Setup**: 100% foreign ownership, MISA licensing, Commercial Registration (CR), and corporate banking\n2. **Software & Digital Solutions**: Custom software, enterprise ERPs, cloud architecture, and fullstack apps\n3. **Visa & PRO Government Liaison**: Investor visas, work permits, Iqama issuance, and Qiwa/Muqeem compliance\n4. **Real Estate Investment**: Commercial, residential, and industrial property buying & leasing advisory\n5. **Corporate & Financial Support**: Bookkeeping, statutory audits, ZATCA Phase 2 e-invoicing, VAT & tax filings\n6. **Community Forum**: Posting questions, exploring engineering topics, and collaborating\n\nFeel free to ask any specific question, and I'll be glad to help you right away!`,
+        reply: `Hello and welcome to **${forumName}**! I am your 24/7 AI Consultant & Support Agent.\n\nI am fully equipped with our verified knowledge base to answer questions across our core service pillars:\n\n1. **Saudi Business Setup**: 100% foreign ownership, MISA licensing, Commercial Registration (CR), and corporate banking\n2. **Software & Digital Solutions**: Custom software, enterprise ERPs, cloud architecture, and fullstack apps\n3. **Visa & PRO Government Liaison**: Investor visas, work permits, Iqama issuance, and Qiwa/Muqeem compliance\n4. **Real Estate Investment**: Commercial, residential, and industrial property buying & leasing advisory\n5. **Corporate & Financial Support**: Bookkeeping, statutory audits, ZATCA Phase 2 e-invoicing, VAT & tax filings\n6. **Community Forum**: Posting questions, exploring engineering topics, and collaborating\n\nFeel free to ask any specific question, and I'll be glad to help you right away!`,
         source: 'AI'
       };
     }
@@ -3128,13 +3181,13 @@ export async function createApp() {
     // Universal Helpful AI Fallback (NEVER Deflect to "Submit Ticket")
     if (userLang === 'bn') {
       return {
-        reply: `আমি Trek Consultancy-র এআই সাপোর্ট অ্যাসিস্ট্যান্ট। আপনার প্রশ্নের উত্তর দিতে আমি আনন্দের সাথে প্রস্তুত!\n\nআমাদের প্ল্যাটফর্মের মাধ্যমে আপনি নিম্নলিখিত বিষয়গুলো সম্পর্কে যেকোনো তথ্য ও সমাধান পেতে পারেন:\n\n- **সৌদি কোম্পানি গঠন ও MISA লাইসেন্স**: বিদেশি উদ্যোক্তাদের জন্য ১০০% কোম্পানি মালিকানা ও লাইসেন্সিং প্রক্রিয়া\n- **সফটওয়্যার ও ডিজিটাল সলিউশন**: কাস্টম ইআরপি, ওয়েব/মোবাইল অ্যাপস এবং ক্লাউড আর্কিটেকচার\n- **ভিসা ও সরকারি PRO সেবা**: ইনভেস্টর ভিসা, ওয়ার্ক পারমিট ও ইকামা প্রসেসিং\n- **বাণিজ্যিক রিয়েল এস্টেট**: অফিস স্পেস, জমি ও ইন্ডাস্ট্রিয়াল লিজ পরামর্শ\n- **ট্যাক্স ও অডিট**: ZATCA ই-ইনভয়েসিং, ভ্যাট ফাইলিং এবং বার্ষিক হিসাবরক্ষণ\n- **ফোরাম কমিউনিটি**: প্রযুক্তিগত যেকোনো প্রশ্ন পোস্ট করা ও বিশেষজ্ঞদের পরামর্শ নেওয়া\n\nআপনার কি এই ক্ষেত্রগুলোর কোনোটিতে নির্দিষ্ট পরামর্শ বা সহায়তার প্রয়োজন? আপনার প্রশ্নটি একটু বিস্তারিত লিখুন, আমি এখনই প্রয়োজনীয় তথ্য উপস্থাপন করব!`,
+        reply: `আমি Trek Consultancy-র এআই সাপোর্ট এজেন্ট। আপনার প্রশ্নের উত্তর দিতে আমি আনন্দের সাথে প্রস্তুত!\n\nআমাদের প্ল্যাটফর্মের মাধ্যমে আপনি নিম্নলিখিত বিষয়গুলো সম্পর্কে যেকোনো তথ্য ও সমাধান পেতে পারেন:\n\n- **সৌদি কোম্পানি গঠন ও MISA লাইসেন্স**: বিদেশি উদ্যোক্তাদের জন্য ১০০% কোম্পানি মালিকানা ও লাইসেন্সিং প্রক্রিয়া\n- **সফটওয়্যার ও ডিজিটাল সলিউশন**: কাস্টম ইআরপি, ওয়েব/মোবাইল অ্যাপস এবং ক্লাউড আর্কিটেকচার\n- **ভিসা ও সরকারি PRO সেবা**: ইনভেস্টর ভিসা, ওয়ার্ক পারমিট ও ইকামা প্রসেসিং\n- **বাণিজ্যিক রিয়েল এস্টেট**: অফিস স্পেস, জমি ও ইন্ডাস্ট্রিয়াল লিজ পরামর্শ\n- **ট্যাক্স ও অডিট**: ZATCA ই-ইনভয়েসিং, ভ্যাট ফাইলিং এবং বার্ষিক হিসাবরক্ষণ\n- **ফোরাম কমিউনিটি**: প্রযুক্তিগত যেকোনো প্রশ্ন পোস্ট করা ও বিশেষজ্ঞদের পরামর্শ নেওয়া\n\nআপনার কি এই ক্ষেত্রগুলোর কোনোটিতে নির্দিষ্ট পরামর্শ বা সহায়তার প্রয়োজন? আপনার প্রশ্নটি একটু বিস্তারিত লিখুন, আমি এখনই প্রয়োজনীয় তথ্য উপস্থাপন করব!`,
         source: 'AI'
       };
     }
 
     return {
-      reply: `I am your Trek Consultancy AI Support Assistant, and I am glad to assist you!\n\nI can provide direct guidance, regulatory steps, and technical explanations across all of our enterprise services:\n\n- **Saudi Business Setup & MISA**: 100% foreign ownership company formation, Commercial Registration (CR), and corporate banking\n- **Software & Digital Solutions**: Enterprise ERPs, custom web/mobile applications, and modern cloud architecture\n- **Visa & PRO Government Liaison**: Investor visas, work permits, Iqama issuance, and Qiwa/Muqeem portals\n- **Commercial Real Estate**: Office spaces, warehouses, and foreign asset investment advisory\n- **Corporate Support & Tax**: ZATCA Phase 2 e-invoicing, statutory accounting, and financial audits\n- **Community Forum**: How to post questions, explore solutions, and collaborate with our engineering team\n\nCould you share a bit more detail on what you are looking to achieve? I will provide you with the exact steps and information!`,
+      reply: `I am your Trek Consultancy AI Support Agent, and I am glad to assist you!\n\nI can provide direct guidance, regulatory steps, and technical explanations across all of our enterprise services:\n\n- **Saudi Business Setup & MISA**: 100% foreign ownership company formation, Commercial Registration (CR), and corporate banking\n- **Software & Digital Solutions**: Enterprise ERPs, custom web/mobile applications, and modern cloud architecture\n- **Visa & PRO Government Liaison**: Investor visas, work permits, Iqama issuance, and Qiwa/Muqeem portals\n- **Commercial Real Estate**: Office spaces, warehouses, and foreign asset investment advisory\n- **Corporate Support & Tax**: ZATCA Phase 2 e-invoicing, statutory accounting, and financial audits\n- **Community Forum**: How to post questions, explore solutions, and collaborate with our engineering team\n\nCould you share a bit more detail on what you are looking to achieve? I will provide you with the exact steps and information!`,
       source: 'AI'
     };
   }
@@ -3524,7 +3577,7 @@ export async function createApp() {
           }
         }
 
-        const systemInstruction = `You are Trek Support Assistant, the premier AI Executive Consultant and support assistant for Trek Consultancy Forum.
+        const systemInstruction = `You are Trek Support Agent, the premier AI Executive Consultant and support agent for Trek Consultancy Forum.
 
 CLIENT IDENTITY & CONTEXT:
 - Client Name: ${clientDisplayName || 'Esteemed Client / Guest'}

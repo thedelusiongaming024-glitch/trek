@@ -518,13 +518,13 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
           <div className="relative w-10 h-10 flex items-center justify-center shrink-0">
             <img
               src={aiAvatar}
-              alt="Trek Support Assistant"
+              alt="Trek Support Agent"
               className="w-full h-full object-contain filter drop-shadow-sm"
             />
           </div>
           <div>
             <h4 className="text-sm font-bold text-white tracking-tight">
-              {t('Trek Support Assistant')}
+              {t('Trek Support Agent')}
             </h4>
           </div>
         </div>

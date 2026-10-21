@@ -22,6 +22,7 @@ import { useLanguage } from './context/LanguageContext';
 import { normalizeUrl } from './utils/url';
 import { 
   ForumTopic, 
+  ForumReply,
   FilterCategory, 
   BlogPost, 
   AdminUser, 
@@ -315,20 +316,28 @@ export default function App() {
         const likedTopicsSet = new Set(rawLikedTopics);
         const likedRepliesSet = new Set(rawLikedReplies);
 
-        const mappedTopics: ForumTopic[] = topicsRes.value.map((t: any) => {
-          const repList = Array.isArray(t.repliesList)
-            ? t.repliesList.map((r: any) => ({
-                ...r,
-                isLiked: likedRepliesSet.has(r.id),
-                likes: Number(r.likes || 0)
+        const mapReply = (r: any): ForumReply => ({
+          ...r,
+          isLiked: likedRepliesSet.has(r.id),
+          likes: Number(r.likes || 0),
+          nestedReplies: Array.isArray(r.nestedReplies)
+            ? r.nestedReplies.map((nr: any) => ({
+                ...nr,
+                isLiked: likedRepliesSet.has(nr.id),
+                likes: Number(nr.likes || 0)
               }))
-            : [];
+            : []
+        });
+
+        const mappedTopics: ForumTopic[] = topicsRes.value.map((t: any) => {
+          const repList: ForumReply[] = Array.isArray(t.repliesList) ? t.repliesList.map(mapReply) : [];
+          const totalReplies = repList.reduce((acc: number, r: ForumReply) => acc + 1 + (r.nestedReplies?.length || 0), 0);
           return {
             ...t,
             isLiked: likedTopicsSet.has(t.id),
             likes: Number(t.likes || 0),
             views: Number(t.views || 0),
-            replies: repList.length,
+            replies: typeof t.replies === 'number' && t.replies >= totalReplies ? t.replies : totalReplies,
             repliesList: repList
           };
         });
@@ -1547,7 +1556,18 @@ export default function App() {
   // Reply Like Toggle synced with PostgreSQL and localStorage
   const handleToggleReplyLike = async (topicId: string, replyId: string) => {
     const currentTopic = topics.find((t) => t.id === topicId);
-    const currentReply = currentTopic?.repliesList?.find((r) => r.id === replyId);
+    let currentReply: ForumReply | undefined;
+    for (const r of currentTopic?.repliesList || []) {
+      if (r.id === replyId) {
+        currentReply = r;
+        break;
+      }
+      const foundInNested = r.nestedReplies?.find((c) => c.id === replyId);
+      if (foundInNested) {
+        currentReply = foundInNested;
+        break;
+      }
+    }
     const nextIsLiked = !currentReply?.isLiked;
     const delta = nextIsLiked ? 1 : -1;
 
@@ -1570,6 +1590,16 @@ export default function App() {
                 ...r,
                 isLiked: nextIsLiked,
                 likes: Math.max(0, (r.likes || 0) + delta)
+              };
+            }
+            if (r.nestedReplies && r.nestedReplies.some((c) => c.id === replyId)) {
+              return {
+                ...r,
+                nestedReplies: r.nestedReplies.map((c) =>
+                  c.id === replyId
+                    ? { ...c, isLiked: nextIsLiked, likes: Math.max(0, (c.likes || 0) + delta) }
+                    : c
+                )
               };
             }
             return r;
@@ -1596,9 +1626,20 @@ export default function App() {
           setTopics((prev) =>
             prev.map((t) => {
               if (t.id === topicId) {
-                const updatedReplies = (t.repliesList || []).map((r) =>
-                  r.id === replyId ? { ...r, likes: data.likes, isLiked: nextIsLiked } : r
-                );
+                const updatedReplies = (t.repliesList || []).map((r) => {
+                  if (r.id === replyId) {
+                    return { ...r, likes: data.likes, isLiked: nextIsLiked };
+                  }
+                  if (r.nestedReplies && r.nestedReplies.some((c) => c.id === replyId)) {
+                    return {
+                      ...r,
+                      nestedReplies: r.nestedReplies.map((c) =>
+                        c.id === replyId ? { ...c, likes: data.likes, isLiked: nextIsLiked } : c
+                      )
+                    };
+                  }
+                  return r;
+                });
                 const updated = { ...t, repliesList: updatedReplies };
                 if (selectedTopic?.id === topicId) {
                   setSelectedTopic(updated);
@@ -1646,8 +1687,13 @@ export default function App() {
     }
   };
 
-  // Add Reply directly saved to PostgreSQL
-  const handleAddReply = async (topicId: string, replyContent: string, authorName: string) => {
+  // Add Reply directly saved to PostgreSQL (with first-tier nested reply support)
+  const handleAddReply = async (
+    topicId: string, 
+    replyContent: string, 
+    authorName: string,
+    parentReplyId?: string | null
+  ) => {
     const actualAuthor = currentUser?.name || authorName || 'Community Contributor';
     const actualAvatar = currentUser?.avatar || getRandomAvatar(currentUser?.email || actualAuthor);
     const actualRole = currentUser?.role || 'User';
@@ -1660,7 +1706,8 @@ export default function App() {
           author: actualAuthor,
           content: replyContent,
           authorRole: actualRole,
-          authorAvatar: actualAvatar
+          authorAvatar: actualAvatar,
+          parentReplyId: parentReplyId || null
         })
       });
 
@@ -1669,15 +1716,31 @@ export default function App() {
         throw new Error(errData.error || 'Failed to submit reply');
       }
 
-      const savedReply = await res.json();
+      const savedReply: ForumReply = await res.json();
 
       setTopics((prev) =>
         prev.map((t) => {
           if (t.id === topicId) {
-            const updatedReplies = [...(t.repliesList || []), savedReply];
+            let updatedReplies: ForumReply[];
+            if (parentReplyId) {
+              // Add to the top-level parent's nestedReplies list
+              updatedReplies = (t.repliesList || []).map((r) => {
+                if (r.id === parentReplyId || r.nestedReplies?.some((child) => child.id === parentReplyId)) {
+                  return {
+                    ...r,
+                    nestedReplies: [...(r.nestedReplies || []), { ...savedReply, isLiked: false }]
+                  };
+                }
+                return r;
+              });
+            } else {
+              updatedReplies = [...(t.repliesList || []), { ...savedReply, nestedReplies: [], isLiked: false }];
+            }
+
+            const totalReplies = updatedReplies.reduce((acc, r) => acc + 1 + (r.nestedReplies?.length || 0), 0);
             const updated = {
               ...t,
-              replies: updatedReplies.length,
+              replies: totalReplies,
               repliesList: updatedReplies
             };
             if (selectedTopic?.id === topicId) {
@@ -1689,7 +1752,13 @@ export default function App() {
         })
       );
 
-      showToast(language === 'ar' ? 'تم نشر الرد وحفظه بنجاح!' : (language === 'bn' ? 'উত্তর সফলভাবে যোগ করা হয়েছে!' : 'Reply published and saved successfully!'));
+      showToast(
+        language === 'ar'
+          ? (parentReplyId ? 'تم نشر الرد المتداخل بنجاح!' : 'تم نشر الرد وحفظه بنجاح!')
+          : (language === 'bn'
+            ? (parentReplyId ? 'উত্তরে প্রতি-উত্তর সফলভাবে যোগ করা হয়েছে!' : 'উত্তর সফলভাবে যোগ করা হয়েছে!')
+            : (parentReplyId ? 'Nested reply published and saved successfully!' : 'Reply published and saved successfully!'))
+      );
     } catch (err: any) {
       console.error('Failed to save reply to database:', err);
       showToast(

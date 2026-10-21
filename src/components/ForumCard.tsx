@@ -28,6 +28,9 @@ export const ForumCard: React.FC<ForumCardProps> = ({
   const { t, formatNumber, formatTimeAgo, translateCategory, translateRole } = useLanguage();
   const showEdit = Boolean(canEdit && onEdit);
   const showDelete = Boolean(canDelete && onDelete);
+  const totalRepliesCount = typeof topic.replies === 'number' && topic.replies >= 0
+    ? topic.replies
+    : (topic.repliesList?.reduce((acc, r) => acc + 1 + (r.nestedReplies?.length || 0), 0) ?? 0);
 
   return (
     <article
@@ -163,9 +166,9 @@ export const ForumCard: React.FC<ForumCardProps> = ({
           <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
           <span>
             <strong className="font-bold text-slate-700">
-              {formatNumber(topic.repliesList?.length ?? topic.replies)}
+              {formatNumber(totalRepliesCount)}
             </strong>{' '}
-            {(topic.repliesList?.length ?? topic.replies) === 1 ? t('Reply') : t('Replies')}
+            {totalRepliesCount === 1 ? t('Reply') : t('Replies')}
           </span>
         </div>
       </div>

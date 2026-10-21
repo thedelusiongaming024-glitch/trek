@@ -5,10 +5,45 @@ import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 
+// Node 22+ undici / WebSocket ErrorEvent setter patch:
+try {
+  if (typeof WebSocket !== 'undefined') {
+    const probe = new WebSocket('ws://127.0.0.1:1');
+    probe.onerror = (e: any) => {
+      const proto = Object.getPrototypeOf(e);
+      if (proto && proto.constructor?.name === 'ErrorEvent') {
+        const desc = Object.getOwnPropertyDescriptor(proto, 'message');
+        if (desc && !desc.set) {
+          const originalGet = desc.get;
+          Object.defineProperty(proto, 'message', {
+            get() {
+              return this._custom_msg_override !== undefined ? this._custom_msg_override : originalGet?.call(this);
+            },
+            set(val) {
+              this._custom_msg_override = val;
+            },
+            configurable: true,
+            enumerable: true
+          });
+        }
+      }
+      try { probe.close(); } catch {}
+    };
+  }
+} catch {}
+
 dotenv.config();
 if (!process.env.DATABASE_URL && fs.existsSync('env.txt')) {
   dotenv.config({ path: 'env.txt' });
 }
+
+// Trap unexpected unhandled library exceptions (e.g. Neon WebSocket ErrorEvent setter bug)
+process.on('uncaughtException', (err: any) => {
+  console.warn('[Server] Uncaught exception trapped:', err?.message || err);
+});
+process.on('unhandledRejection', (reason: any) => {
+  console.warn('[Server] Unhandled rejection trapped:', reason?.message || reason);
+});
 
 import http from 'http';
 import { createApp } from './src/server/app';

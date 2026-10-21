@@ -3,6 +3,36 @@ import ws from 'ws';
 import dotenv from 'dotenv';
 import fs from 'fs';
 
+// Node 22+ undici / WebSocket ErrorEvent setter patch:
+// In Node 22, ErrorEvent.prototype.message is an immutable getter.
+// When Neon's client encounters a connection reset or timeout, assigning to err.message
+// causes an unhandled TypeError. This patch installs a setter so message overrides succeed.
+try {
+  if (typeof WebSocket !== 'undefined') {
+    const probe = new WebSocket('ws://127.0.0.1:1');
+    probe.onerror = (e: any) => {
+      const proto = Object.getPrototypeOf(e);
+      if (proto && proto.constructor?.name === 'ErrorEvent') {
+        const desc = Object.getOwnPropertyDescriptor(proto, 'message');
+        if (desc && !desc.set) {
+          const originalGet = desc.get;
+          Object.defineProperty(proto, 'message', {
+            get() {
+              return this._custom_msg_override !== undefined ? this._custom_msg_override : originalGet?.call(this);
+            },
+            set(val) {
+              this._custom_msg_override = val;
+            },
+            configurable: true,
+            enumerable: true
+          });
+        }
+      }
+      try { probe.close(); } catch {}
+    };
+  }
+} catch {}
+
 dotenv.config();
 if (!process.env.DATABASE_URL && fs.existsSync('env.txt')) {
   dotenv.config({ path: 'env.txt' });
@@ -403,7 +433,18 @@ export const pool = {
   },
   connect: async () => {
     if (realPool) {
-      return await realPool.connect();
+      let timer: NodeJS.Timeout;
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Neon pool connect timeout (12000ms)')), 12000);
+      });
+      try {
+        const client = await Promise.race([realPool.connect(), timeoutPromise]);
+        clearTimeout(timer!);
+        return client;
+      } catch (err) {
+        clearTimeout(timer!);
+        throw err;
+      }
     }
     throw new Error('DATABASE_URL is not configured — no database connection is available.');
   }
@@ -660,6 +701,7 @@ export async function initDb() {
         CREATE TABLE IF NOT EXISTS replies (
           id          VARCHAR(64) PRIMARY KEY,
           topic_id    VARCHAR(64) NOT NULL REFERENCES topics(id) ON DELETE CASCADE,
+          parent_reply_id VARCHAR(64) REFERENCES replies(id) ON DELETE CASCADE,
           author      VARCHAR(255) NOT NULL,
           author_role VARCHAR(100) DEFAULT 'Member',
           author_avatar TEXT,
@@ -668,6 +710,9 @@ export async function initDb() {
           likes       INT DEFAULT 0,
           created_at  TIMESTAMPTZ DEFAULT NOW()
         );
+
+        ALTER TABLE replies ADD COLUMN IF NOT EXISTS parent_reply_id VARCHAR(64) REFERENCES replies(id) ON DELETE CASCADE;
+        CREATE INDEX IF NOT EXISTS idx_replies_parent_reply_id ON replies (parent_reply_id);
 
         CREATE TABLE IF NOT EXISTS user_notifications (
           id          VARCHAR(64) PRIMARY KEY,

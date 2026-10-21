@@ -1,5 +1,7 @@
 export interface ForumReply {
   id: string;
+  topicId?: string;
+  parentReplyId?: string | null;
   author: string;
   authorRole?: string;
   authorAvatar: string;
@@ -8,6 +10,7 @@ export interface ForumReply {
   content: string;
   likes: number;
   isLiked?: boolean;
+  nestedReplies?: ForumReply[];
 }
 
 export interface DiscussionCategory {
