@@ -83,12 +83,11 @@ async function startServer() {
 
   const httpServer = http.createServer(app);
 
-  // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
-        hmr: process.env.DISABLE_HMR === 'true' ? false : { server: httpServer }
+        hmr: { server: httpServer }
       },
       appType: 'spa',
     });

@@ -94,43 +94,24 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
           );
           return;
         }
+        if (data.token) {
+          try {
+            localStorage.setItem('trek_auth_token', data.token);
+          } catch {}
+        }
         onLogin(data.user);
       } else {
-        // Fallback check against local adminUsers state
-        const matched = adminUsers.find(u => u.email.toLowerCase() === cleanEmail);
-        if (matched && cleanPass === 'admin123') {
-          onLogin({
-            id: matched.id,
-            name: matched.name,
-            email: matched.email,
-            role: matched.role,
-            avatar: matched.avatar
-          });
-        } else {
-          setError(
-            data.error ||
-              (language === 'bn'
-                ? 'ভুল প্রশাসনিক তথ্য। অনুগ্রহ করে আপনার ইমেইল ও পাসওয়ার্ড যাচাই করুন।'
-                : language === 'ar'
-                ? 'بيانات الاعتماد الإدارية غير صحيحة. يرجى التحقق من البريد الإلكتروني وكلمة المرور.'
-                : 'Invalid administrative credentials. Please verify your email and password.')
-          );
-        }
+        setError(
+          data.error ||
+            (language === 'bn'
+              ? 'ভুল প্রশাসনিক তথ্য। অনুগ্রহ করে আপনার ইমেইল ও পাসওয়ার্ড যাচাই করুন।'
+              : language === 'ar'
+              ? 'بيانات الاعتماد الإدارية غير صحيحة. يرجى التحقق من البريد الإلكتروني وكلمة المرور.'
+              : 'Invalid administrative credentials. Please verify your email and password.')
+        );
       }
     } catch (err: any) {
-      // Local fallback in case network hiccup
-      const matched = adminUsers.find(u => u.email.toLowerCase() === cleanEmail);
-      if (matched && cleanPass === 'admin123') {
-        onLogin({
-          id: matched.id,
-          name: matched.name,
-          email: matched.email,
-          role: matched.role,
-          avatar: matched.avatar
-        });
-      } else {
-        setError('Authentication request failed. Please check your database connection.');
-      }
+      setError('Authentication request failed. Please check your database connection.');
     } finally {
       setIsLoading(false);
     }

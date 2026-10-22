@@ -1,28 +1,26 @@
-// ---------------------------------------------------------------------------
-// This file is intentionally self-contained: db.ts and app.ts are inlined
-// directly here rather than imported from src/server/*. Vercel's Node
-// builder was failing to resolve those cross-directory relative TS imports
-// at deploy time (ERR_MODULE_NOT_FOUND for src/server/app.ts), crashing this
-// function before any route code ran. Inlining removes that failure mode
-// entirely — only npm package imports remain, which Vercel handles reliably.
-// The original src/server/db.ts and src/server/app.ts are still used by the
-// local dev server (server.ts) and remain the source of truth for editing;
-// re-run the merge if you change either of them.
-// ---------------------------------------------------------------------------
+// Vercel serverless function entrypoint (bundles db + Express app routes)
 
 import { neon, neonConfig, Pool } from '@neondatabase/serverless';
 import ws from 'ws';
 import dotenv from 'dotenv';
-import fs from 'fs';
 import zlib from 'node:zlib';
+import {
+  hashPassword,
+  generateRandomPassword,
+  verifyPassword,
+  signSessionToken,
+  setSessionCookie,
+  clearSessionCookie,
+  authenticateRequest,
+  resolveVerifiedUser,
+  createRequireAdminMiddleware,
+  isAdminRoleName,
+  securityHeadersMiddleware,
+  corsMiddleware,
+  createRateLimiter
+} from './security';
 
 dotenv.config();
-if (!process.env.DATABASE_URL && fs.existsSync('env.txt')) {
-  dotenv.config({ path: 'env.txt' });
-}
-if (!process.env.DATABASE_URL && fs.existsSync('.env.example')) {
-  dotenv.config({ path: '.env.example' });
-}
 
 // Ensure WebSocket constructor is configured for Node.js environments (Vercel serverless / Node < 22)
 if (!neonConfig.webSocketConstructor) {
@@ -467,16 +465,10 @@ export async function initDb() {
       console.log('[Database] Connecting to Neon PostgreSQL...');
       client = await pool.connect();
 
-      // ========================================================================
-      // CLEAN ARCHITECTURAL SCHEMA INITIALIZATION (PostgreSQL / Neon)
-      // ========================================================================
-
-      // Vector extension for semantic AI & embeddings
+      // Initialize PostgreSQL schema
       await client.query(`CREATE EXTENSION IF NOT EXISTS vector;`);
 
-      // ------------------------------------------------------------------------
-      // DOMAIN 1: IDENTITY, CUSTOMERS & AUTHENTICATION
-      // ------------------------------------------------------------------------
+      // Users & authentication
       await client.query(`
         CREATE TABLE IF NOT EXISTS users (
           id            VARCHAR(255) PRIMARY KEY,
@@ -506,11 +498,8 @@ export async function initDb() {
         );
       `);
 
-      // ------------------------------------------------------------------------
-      // DOMAIN 2: CUSTOMER CONVERSATIONS & MULTI-TURN AI CHAT
-      // ------------------------------------------------------------------------
+      // Customer conversations & support chat
       await client.query(`
-        -- Canonical conversations table (distinct sessions recognized by email/session/user)
         CREATE TABLE IF NOT EXISTS conversations (
           id            VARCHAR(255) PRIMARY KEY,
           session_id    VARCHAR(255) NOT NULL,
@@ -529,7 +518,6 @@ export async function initDb() {
         );
         ALTER TABLE conversations DROP CONSTRAINT IF EXISTS conversations_user_id_fkey;
 
-        -- Canonical messages table
         CREATE TABLE IF NOT EXISTS messages (
           id              VARCHAR(255) PRIMARY KEY,
           conversation_id VARCHAR(255) NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
@@ -546,7 +534,6 @@ export async function initDb() {
         );
         ALTER TABLE messages DROP CONSTRAINT IF EXISTS messages_user_id_fkey;
 
-        -- Compatibility table: support_conversations
         CREATE TABLE IF NOT EXISTS support_conversations (
           id            VARCHAR(255) PRIMARY KEY,
           user_id       VARCHAR(255) DEFAULT NULL,
@@ -562,7 +549,6 @@ export async function initDb() {
           updated_at    TIMESTAMPTZ DEFAULT NOW()
         );
 
-        -- Compatibility table: support_messages
         CREATE TABLE IF NOT EXISTS support_messages (
           id         VARCHAR(255) PRIMARY KEY,
           session_id VARCHAR(255) NOT NULL,
@@ -576,9 +562,7 @@ export async function initDb() {
         );
       `);
 
-      // ------------------------------------------------------------------------
-      // DOMAIN 3: SUPPORT TICKETS & ESCALATIONS
-      // ------------------------------------------------------------------------
+      // Support tickets
       await client.query(`
         CREATE TABLE IF NOT EXISTS support_tickets (
           id              VARCHAR(255) PRIMARY KEY,
@@ -600,9 +584,7 @@ export async function initDb() {
         ALTER TABLE support_tickets DROP CONSTRAINT IF EXISTS support_tickets_user_id_fkey;
       `);
 
-      // ------------------------------------------------------------------------
-      // DOMAIN 4: KNOWLEDGE BASE, FAQS & RAG EMBEDDINGS
-      // ------------------------------------------------------------------------
+      // Knowledge base, FAQs & RAG chunks
       await client.query(`
         CREATE TABLE IF NOT EXISTS faq_categories (
           id          VARCHAR(255) PRIMARY KEY,
@@ -648,9 +630,7 @@ export async function initDb() {
         );
       `);
 
-      // ------------------------------------------------------------------------
-      // DOMAIN 5: COMMUNITY DISCUSSIONS & FORUM
-      // ------------------------------------------------------------------------
+      // Community forum
       await client.query(`
         CREATE TABLE IF NOT EXISTS discussion_categories (
           id          VARCHAR(64) PRIMARY KEY,
@@ -701,9 +681,7 @@ export async function initDb() {
         );
       `);
 
-      // ------------------------------------------------------------------------
-      // DOMAIN 6: CONTENT & EDITORIAL
-      // ------------------------------------------------------------------------
+      // Blog & editorial
       await client.query(`
         CREATE TABLE IF NOT EXISTS blogs (
           id            VARCHAR(64) PRIMARY KEY,
@@ -732,9 +710,7 @@ export async function initDb() {
         );
       `);
 
-      // ------------------------------------------------------------------------
-      // DOMAIN 7: COMMERCIAL INQUIRIES & LEADS
-      // ------------------------------------------------------------------------
+      // Commercial inquiries & newsletter
       await client.query(`
         CREATE TABLE IF NOT EXISTS consultancy_inquiries (
           id          VARCHAR(64) PRIMARY KEY,
@@ -756,9 +732,7 @@ export async function initDb() {
         );
       `);
 
-      // ------------------------------------------------------------------------
-      // DOMAIN 8: SYSTEM CONFIGURATION & AUDIT LOGS
-      // ------------------------------------------------------------------------
+      // System settings & activity logs
       await client.query(`
         CREATE TABLE IF NOT EXISTS settings (
           key   VARCHAR(64) PRIMARY KEY,
@@ -776,9 +750,7 @@ export async function initDb() {
         );
       `);
 
-      // ------------------------------------------------------------------------
-      // INDEXES FOR QUERY OPTIMIZATION & CUSTOMER RECOGNITION
-      // ------------------------------------------------------------------------
+      // Database indexes
       await client.query(`
         CREATE INDEX IF NOT EXISTS idx_users_email_lower          ON users (LOWER(email));
         CREATE INDEX IF NOT EXISTS idx_users_created_at           ON users (created_at DESC);
@@ -819,9 +791,7 @@ export async function initDb() {
         END $$;
       `);
 
-      // ------------------------------------------------------------------------
-      // SEED BASELINE SETTINGS IF MISSING
-      // ------------------------------------------------------------------------
+      // Seed default settings if missing
       const settingsCheck = await client.query("SELECT value FROM settings WHERE key = 'platform'");
       if (settingsCheck.rows.length === 0) {
         await client.query("INSERT INTO settings (key, value) VALUES ('platform', $1)", [JSON.stringify(defaultSettings)]);
@@ -867,6 +837,18 @@ export async function initDb() {
         }
       }
 
+      // Automatically migrate any legacy plaintext user passwords to scrypt hashes
+      const legacyUsers = await client.query(
+        "SELECT id, password FROM users WHERE password IS NOT NULL AND password != ''"
+      );
+      for (const row of legacyUsers.rows) {
+        const hashed = row.password.startsWith('scrypt$') ? row.password : hashPassword(row.password);
+        await client.query(
+          'UPDATE users SET password_hash = $1, password = NULL WHERE id = $2',
+          [hashed, row.id]
+        );
+      }
+
       console.log('[Database] PostgreSQL schema initialized cleanly on Neon.');
     } catch (err: any) {
       initDbPromise = null;
@@ -885,9 +867,7 @@ import { GoogleGenAI } from '@google/genai';
 import { Resend } from 'resend';
 import { extractUrlsFromText, fetchAndExtractPageContent } from './webBrowser';
 
-// ---------------------------------------------------------------------------
-// Unified Business Memory & Knowledge Core (Inlined for Vercel Serverless)
-// ---------------------------------------------------------------------------
+// Business memory & knowledge core
 export interface BusinessIdentity {
   name: string;
   brand: string;
@@ -1657,9 +1637,7 @@ export function synthesizeBusinessMemoryAnswer({
   };
 }
 
-// ---------------------------------------------------------------------------
-// AI support chat performance helpers
-// ---------------------------------------------------------------------------
+// Support chat RAG cache & helpers
 let ragCache: { data: RagData; expiresAt: number } | null = null;
 const RAG_CACHE_TTL_MS = 15_000; // 15 seconds real-time dynamic sync
 
@@ -1730,9 +1708,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   ]);
 }
 
-// ---------------------------------------------------------------------------
-// Project-wide AI Configuration & Synchronization (Neon PostgreSQL)
-// ---------------------------------------------------------------------------
+// AI provider configuration cache
 let aiConfigCache: { config: any; expiresAt: number } | null = null;
 const AI_CONFIG_CACHE_TTL_MS = 30_000;
 
@@ -2000,17 +1976,46 @@ export async function executeAiCompletion({
 // (server.ts) and the Vercel serverless function (api/index.ts).
 export async function createApp() {
   const app = express();
+  app.disable('x-powered-by');
+
+  // 1. Security Headers (Helmet-equivalent) & Strict CORS Policy
+  app.use(securityHeadersMiddleware);
+  app.use(corsMiddleware);
+
+  // 2. Global API Rate Limiting + Strict Endpoint Rate Limiters
+  const globalApiLimiter = createRateLimiter({
+    windowMs: 60_000,
+    max: 300,
+    keyPrefix: 'global',
+    message: 'Too many API requests from this IP. Please slow down and try again shortly.'
+  });
+  const authRateLimiter = createRateLimiter({
+    windowMs: 15 * 60_000,
+    max: 30,
+    keyPrefix: 'auth',
+    message: 'Too many authentication or OTP verification attempts. Please wait a few minutes before retrying.'
+  });
+  const aiAndMailLimiter = createRateLimiter({
+    windowMs: 60_000,
+    max: 25,
+    keyPrefix: 'ai-mail',
+    message: 'Rate limit exceeded for AI/email operations. Please wait a moment before sending another request.'
+  });
+
+  app.use('/api', globalApiLimiter);
+  app.use(['/api/auth/login', '/api/auth/register', '/api/auth/send-verification'], authRateLimiter);
+  app.use(['/api/support/messages', '/api/ai/browse-url', '/api/admin/newsletter/broadcast', '/api/admin/newsletter/email-config/test'], aiAndMailLimiter);
 
   app.use(express.json({ limit: '25mb' }));
   app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
+  // Parse signed session tokens from Authorization header or HttpOnly cookie
+  app.use(authenticateRequest);
+
+  const requireAdmin = createRequireAdminMiddleware(pool);
+
   // Ensure the schema exists before any request is allowed to hit a data
-  // route. Previously this ran in the background (fire-and-forget), which
-  // meant early requests on a cold start could query tables that didn't
-  // exist yet. Combined with the old pool.query() error-swallowing, that
-  // produced empty-but-"successful" responses instead of a visible error.
-  // initDb() itself caches its promise, so this only pays the cost once per
-  // warm serverless instance.
+  // route.
   app.use(async (_req, res, next) => {
     try {
       await initDb();
@@ -2023,6 +2028,9 @@ export async function createApp() {
       });
     }
   });
+
+  // Protect all /api/admin/* endpoints with server-verified admin authentication
+  app.use('/api/admin', requireAdmin);
 
   // Root API route
   app.get(['/api', '/api/'], (_req, res) => {
@@ -2224,7 +2232,7 @@ export async function createApp() {
   });
 
   // Discussion Categories: Create
-  app.post('/api/discussion/categories', async (req, res) => {
+  app.post('/api/discussion/categories', requireAdmin, async (req, res) => {
     try {
       const { name, description } = req.body;
       const cleanName = (name || '').trim();
@@ -2256,7 +2264,7 @@ export async function createApp() {
   });
 
   // Discussion Categories: Delete
-  app.delete('/api/discussion/categories/:id', async (req, res) => {
+  app.delete('/api/discussion/categories/:id', requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       await pool.query(
@@ -2270,7 +2278,7 @@ export async function createApp() {
   });
 
   // Staff Roles / Badges: Create
-  app.post('/api/discussion/staff-roles', async (req, res) => {
+  app.post('/api/discussion/staff-roles', requireAdmin, async (req, res) => {
     try {
       const { name, badgeLabel, color } = req.body;
       const cleanName = (name || '').trim();
@@ -2296,7 +2304,7 @@ export async function createApp() {
   });
 
   // Staff Roles / Badges: Delete
-  app.delete('/api/discussion/staff-roles/:id', async (req, res) => {
+  app.delete('/api/discussion/staff-roles/:id', requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       await pool.query(
@@ -2324,6 +2332,13 @@ export async function createApp() {
         content
       } = req.body;
 
+      // Never trust client-supplied administrative roles unless verified by server
+      const verifiedUser = await resolveVerifiedUser(req, pool);
+      let safeAuthorRole = 'Member';
+      if (verifiedUser && isAdminRoleName(verifiedUser.role)) {
+        safeAuthorRole = authorRole || verifiedUser.role;
+      }
+
       const id = `topic-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
       const avatar = authorAvatar || getRandomAvatar(authorEmail || author);
 
@@ -2331,7 +2346,7 @@ export async function createApp() {
         INSERT INTO topics (id, title, author, author_email, author_id, author_role, author_avatar, time_ago, category, category_slug, views, likes, replies, is_featured, is_popular, content)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 1, 0, 0, false, false, $11)
         RETURNING *
-      `, [id, title, author || 'Community Member', authorEmail || null, authorId || null, authorRole || 'Member', avatar, timeAgo || 'Just now', category, categorySlug, content]);
+      `, [id, title, author || 'Community Member', authorEmail || null, authorId || null, safeAuthorRole, avatar, timeAgo || 'Just now', category, categorySlug, content]);
 
       const newTopic = {
         id: insertRes.rows[0].id,
@@ -2376,50 +2391,35 @@ export async function createApp() {
       }
       const topic = topicRes.rows[0];
 
-      // Extract requester identity from headers or body
+      // Resolve identity from verified token or DB-validated headers — never trust client-supplied userRole/isAdmin
+      const verifiedUser = await resolveVerifiedUser(req, pool);
       const userEmail = (
+        verifiedUser?.email ||
         (req.headers['x-user-email'] as string) ||
         req.body?.userEmail ||
         ''
       ).trim().toLowerCase();
-      const userRole = (
-        (req.headers['x-user-role'] as string) ||
-        req.body?.userRole ||
-        ''
-      ).trim();
       const userName = (
+        verifiedUser?.name ||
         (req.headers['x-user-name'] as string) ||
         req.body?.userName ||
         ''
       ).trim().toLowerCase();
       const userId = (
+        verifiedUser?.id ||
         (req.headers['x-user-id'] as string) ||
         req.body?.userId ||
         ''
       ).trim();
 
-      // Check if user is an administrator
       let isAllowed = false;
 
-      if (userRole === 'Super Admin' || userRole === 'Moderator') {
+      // 1. Check if verified user is an administrator in the database
+      if (verifiedUser && isAdminRoleName(verifiedUser.role)) {
         isAllowed = true;
       }
 
-      // If not established as admin yet, check in users DB if role is admin/moderator
-      if (!isAllowed && userEmail) {
-        const uRes = await pool.query(
-          'SELECT role, status FROM users WHERE LOWER(email) = $1',
-          [userEmail]
-        );
-        if (uRes.rows.length > 0 && uRes.rows[0].status === 'active') {
-          const r = uRes.rows[0].role;
-          if (r === 'Super Admin' || r === 'Moderator') {
-            isAllowed = true;
-          }
-        }
-      }
-
-      // Check if user is the person who posted
+      // 2. Check if user is the author who posted this discussion
       if (!isAllowed) {
         const topicAuthorEmail = (topic.author_email || '').trim().toLowerCase();
         const topicAuthorName = (topic.author || '').trim().toLowerCase();
@@ -2453,7 +2453,7 @@ export async function createApp() {
     }
   });
 
-  app.post('/api/topics/:id/feature', async (req, res) => {
+  app.post('/api/topics/:id/feature', requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       const result = await pool.query(`
@@ -2465,7 +2465,7 @@ export async function createApp() {
     }
   });
 
-  app.post('/api/topics/:id/popular', async (req, res) => {
+  app.post('/api/topics/:id/popular', requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       const result = await pool.query(`
@@ -2498,11 +2498,18 @@ export async function createApp() {
       const replyId = `rep-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
       const avatar = authorAvatar || getRandomAvatar(author);
 
+      // Verify staff/admin badge server-side before allowing administrative authorRole
+      const verifiedUser = await resolveVerifiedUser(req, pool);
+      let safeAuthorRole = 'Member';
+      if (verifiedUser && isAdminRoleName(verifiedUser.role)) {
+        safeAuthorRole = authorRole || verifiedUser.role;
+      }
+
       const replyRes = await pool.query(`
         INSERT INTO replies (id, topic_id, author, author_role, author_avatar, time_ago, content, likes)
         VALUES ($1, $2, $3, $4, $5, 'Just now', $6, 0)
         RETURNING *
-      `, [replyId, topicId, author || 'Community Member', authorRole || 'Member', avatar, content]);
+      `, [replyId, topicId, author || 'Community Member', safeAuthorRole, avatar, content]);
 
       // Update topic replies count directly from replies table
       await pool.query('UPDATE topics SET replies = (SELECT COUNT(*) FROM replies WHERE topic_id = $1) WHERE id = $1', [topicId]);
@@ -2652,7 +2659,7 @@ export async function createApp() {
     }
   });
 
-  app.post('/api/blogs', async (req, res) => {
+  app.post('/api/blogs', requireAdmin, async (req, res) => {
     try {
       const { title, category, imageUrl, excerpt, content, author, authorAvatar } = req.body;
       const id = `blog-${Date.now()}`;
@@ -2683,7 +2690,7 @@ export async function createApp() {
     }
   });
 
-  app.delete('/api/blogs/:id', async (req, res) => {
+  app.delete('/api/blogs/:id', requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       await pool.query('DELETE FROM blogs WHERE id = $1', [id]);
@@ -2694,7 +2701,7 @@ export async function createApp() {
   });
 
   // Consultancy Inquiries
-  app.get('/api/consultancy', async (_req, res) => {
+  app.get('/api/consultancy', requireAdmin, async (_req, res) => {
     try {
       const result = await pool.query('SELECT * FROM consultancy_inquiries ORDER BY created_at DESC');
       const inquiries = result.rows.map((r: any) => ({
@@ -2746,7 +2753,7 @@ export async function createApp() {
     }
   });
 
-  app.patch('/api/consultancy/:id', async (req, res) => {
+  app.patch('/api/consultancy/:id', requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       const { status, notes, priority, assignedTo } = req.body;
@@ -2781,7 +2788,7 @@ export async function createApp() {
     }
   });
 
-  app.delete('/api/consultancy/:id', async (req, res) => {
+  app.delete('/api/consultancy/:id', requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       await pool.query('DELETE FROM consultancy_inquiries WHERE id = $1', [id]);
@@ -2811,17 +2818,28 @@ export async function createApp() {
     }
   });
 
-  app.post('/api/users', async (req, res) => {
+  app.post('/api/users', requireAdmin, async (req, res) => {
     try {
       const { name, email, password, role, avatar } = req.body;
+      const cleanName = (name || '').trim();
+      const cleanEmail = (email || '').trim().toLowerCase();
+      if (!cleanName || !cleanEmail) {
+        return res.status(400).json({ error: 'Name and email are required.' });
+      }
+
       const id = `usr-${Date.now()}`;
       const joinedDate = 'Just now';
+      // Never default to 'admin123'; generate a high-entropy random password if omitted, and store scrypt hash
+      const rawPassword = typeof password === 'string' && password.trim().length > 0
+        ? password.trim()
+        : generateRandomPassword();
+      const passwordHash = hashPassword(rawPassword);
 
       const insertRes = await pool.query(`
-        INSERT INTO users (id, name, email, password, role, status, avatar, joined_date, threads_count)
-        VALUES ($1, $2, $3, $4, $5, 'active', $6, $7, 0)
+        INSERT INTO users (id, name, email, password, password_hash, role, status, avatar, joined_date, threads_count)
+        VALUES ($1, $2, $3, NULL, $4, $5, 'active', $6, $7, 0)
         RETURNING id, name, email, role, status, avatar, joined_date, threads_count
-      `, [id, name, email, password || 'admin123', role || 'User', avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80', joinedDate]);
+      `, [id, cleanName, cleanEmail, passwordHash, role || 'User', avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80', joinedDate]);
 
       res.status(201).json(insertRes.rows[0]);
     } catch (err: any) {
@@ -2829,7 +2847,7 @@ export async function createApp() {
     }
   });
 
-  app.patch('/api/users/:id', async (req, res) => {
+  app.patch('/api/users/:id', requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       const { role, status } = req.body;
@@ -2856,7 +2874,7 @@ export async function createApp() {
     }
   });
 
-  app.delete('/api/users/:id', async (req, res) => {
+  app.delete('/api/users/:id', requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       await pool.query('DELETE FROM users WHERE id = $1', [id]);
@@ -2865,6 +2883,39 @@ export async function createApp() {
       res.status(500).json({ error: err.message });
     }
   });
+
+  // Helper to resolve effective Resend API Key & Sender Email from DB (with .env fallback)
+  const getEffectiveEmailConfig = async (): Promise<{
+    resendApiKey: string;
+    emailFrom: string;
+    source: 'database' | 'env';
+    updatedAt: string | null;
+  }> => {
+    const envKey = (process.env.RESEND_API_KEY || '').trim();
+    const envFrom = (process.env.EMAIL_FROM || 'Trek Consultancy Forum <onboarding@resend.dev>').trim();
+    try {
+      const res = await pool.query("SELECT value FROM settings WHERE key = 'email_config'");
+      if (res.rows.length > 0 && res.rows[0].value) {
+        const parsed = typeof res.rows[0].value === 'string' ? JSON.parse(res.rows[0].value) : res.rows[0].value;
+        const dbKey = (parsed?.resendApiKey ?? '').trim();
+        const dbFrom = (parsed?.emailFrom ?? '').trim();
+        return {
+          resendApiKey: dbKey || envKey,
+          emailFrom: dbFrom || envFrom,
+          source: 'database',
+          updatedAt: parsed?.updatedAt || null
+        };
+      }
+    } catch (err) {
+      console.warn('[Email Config] Fallback to environment variables:', err);
+    }
+    return {
+      resendApiKey: envKey,
+      emailFrom: envFrom,
+      source: 'env',
+      updatedAt: null
+    };
+  };
 
   // Send Email Verification Code
   app.post('/api/auth/send-verification', async (req, res) => {
@@ -2908,16 +2959,14 @@ export async function createApp() {
       // Attempt real email dispatch via Resend if RESEND_API_KEY is configured
       let emailSent = false;
       let emailDeliveryError: string | null = null;
-      try {
-        const dotenv = await import('dotenv');
-        dotenv.default.config({ override: true });
-      } catch {}
-      const resendApiKey = process.env.RESEND_API_KEY?.trim();
+      const emailCfg = await getEffectiveEmailConfig();
+      const resendApiKey = emailCfg.resendApiKey;
 
       if (resendApiKey && resendApiKey !== 're_123456789') {
         try {
           const resend = new Resend(resendApiKey);
-          let fromAddress = process.env.EMAIL_FROM?.trim() || 'Trek Consultancy Forum <onboarding@resend.dev>';
+          const rawFromAddress = emailCfg.emailFrom || 'Trek Consultancy Forum <onboarding@resend.dev>';
+          let fromAddress = rawFromAddress;
           const isUnverifiedPublicDomain = /@(gmail|yahoo|hotmail|outlook|icloud|live|aol|msn)\.com/i.test(fromAddress);
           if (fromAddress.includes('yourdomain.com') || isUnverifiedPublicDomain) {
             if (isUnverifiedPublicDomain) {
@@ -2928,6 +2977,7 @@ export async function createApp() {
 
           const { data: resendData, error: resendError } = await resend.emails.send({
             from: fromAddress,
+            replyTo: rawFromAddress,
             to: cleanEmail,
             subject: `${code} is your Trek Consultancy Forum verification code`,
             text: `Your Trek Consultancy Forum verification code is: ${code}\n\nThis code will expire in 15 minutes.\nIf you did not request this code, you can safely ignore this email.`,
@@ -3077,12 +3127,13 @@ export async function createApp() {
       const id = `usr-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
       const avatar = getRandomAvatar(cleanEmail || cleanName);
       const joinedDate = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      const passwordHash = hashPassword(cleanPass);
 
       const insertRes = await pool.query(`
-        INSERT INTO users (id, name, email, password, role, status, avatar, joined_date, threads_count, email_verified)
-        VALUES ($1, $2, $3, $4, 'User', 'active', $5, $6, 0, true)
+        INSERT INTO users (id, name, email, password, password_hash, role, status, avatar, joined_date, threads_count, email_verified)
+        VALUES ($1, $2, $3, NULL, $4, 'User', 'active', $5, $6, 0, true)
         RETURNING id, name, email, role, status, avatar, joined_date, threads_count, email_verified
-      `, [id, cleanName, cleanEmail, cleanPass, avatar, joinedDate]);
+      `, [id, cleanName, cleanEmail, passwordHash, avatar, joinedDate]);
 
       // If user had a guest chat session prior to registration, link the conversation and messages to their new account
       if (cleanSession) {
@@ -3121,9 +3172,19 @@ export async function createApp() {
         VALUES ($1, 'Joined Community', $2, 'User Registration', 'Just now', 'user')
       `, [`act-${Date.now()}`, cleanName]);
 
+      const createdUser = insertRes.rows[0];
+      const sessionToken = signSessionToken({
+        id: createdUser.id,
+        email: createdUser.email,
+        role: createdUser.role,
+        name: createdUser.name
+      });
+      setSessionCookie(res, sessionToken);
+
       res.status(201).json({
         success: true,
-        user: insertRes.rows[0]
+        token: sessionToken,
+        user: createdUser
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -3149,29 +3210,33 @@ export async function createApp() {
       const userRes = await pool.query('SELECT * FROM users WHERE LOWER(email) = $1', [cleanEmail]);
 
       if (userRes.rows.length === 0) {
-        // Fallback check for initial admin bootstrap
-        if ((cleanEmail === 'admin@trekconsultancy.com' || cleanEmail === 'admin@amacommunity.io') && cleanPass === 'admin123') {
-          return res.json({
-            success: true,
-            user: {
-              id: 'usr-admin',
-              name: 'Administrator',
-              email: cleanEmail,
-              role: 'Super Admin',
-              avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80'
-            }
-          });
-        }
         return res.status(401).json({ error: 'Invalid email or password.' });
       }
 
       const user = userRes.rows[0];
-      if (user.password !== cleanPass) {
+      const storedPass = user.password_hash || user.password || '';
+      const { valid: isPasswordValid, needsRehash } = verifyPassword(cleanPass, storedPass);
+
+      if (!isPasswordValid) {
         return res.status(401).json({ error: 'Invalid password. Access denied.' });
       }
 
       if (user.status === 'suspended') {
         return res.status(403).json({ error: 'This account is suspended.' });
+      }
+
+      // Automatically upgrade legacy plaintext password to salted scrypt hash and update last_login_at
+      if (needsRehash) {
+        const upgradedHash = hashPassword(cleanPass);
+        await pool.query(
+          'UPDATE users SET password_hash = $1, password = NULL, last_login_at = NOW(), updated_at = NOW() WHERE id = $2',
+          [upgradedHash, user.id]
+        ).catch(() => {});
+      } else {
+        await pool.query(
+          'UPDATE users SET last_login_at = NOW() WHERE id = $1',
+          [user.id]
+        ).catch(() => {});
       }
 
       // If user had a guest chat session prior to login, link the conversation and messages to their account
@@ -3205,8 +3270,17 @@ export async function createApp() {
         }
       }
 
+      const sessionToken = signSessionToken({
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        name: user.name
+      });
+      setSessionCookie(res, sessionToken);
+
       res.json({
         success: true,
+        token: sessionToken,
         user: {
           id: user.id,
           name: user.name,
@@ -3220,8 +3294,13 @@ export async function createApp() {
     }
   });
 
+  app.post('/api/auth/logout', (_req, res) => {
+    clearSessionCookie(res);
+    res.json({ success: true });
+  });
+
   // Newsletter Subscription
-  app.get('/api/newsletter', async (_req, res) => {
+  app.get('/api/newsletter', requireAdmin, async (_req, res) => {
     try {
       const result = await pool.query('SELECT * FROM newsletter_subscribers ORDER BY subscribed_at DESC');
       res.json(result.rows);
@@ -3296,7 +3375,7 @@ export async function createApp() {
     }
   ];
 
-  app.delete(['/api/admin/newsletter/:id', '/api/newsletter/:id'], async (req, res) => {
+  app.delete(['/api/admin/newsletter/:id', '/api/newsletter/:id'], requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       await pool.query('DELETE FROM newsletter_subscribers WHERE id = $1 OR email = $1', [id]);
@@ -3382,6 +3461,146 @@ export async function createApp() {
       res.status(201).json({ success: true, campaign: newCampaign, sentCount: subCount });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.delete(['/api/admin/newsletter/campaigns/:id', '/api/newsletter/campaigns/:id'], requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const cur = await pool.query("SELECT value FROM settings WHERE key = 'newsletter_campaigns'");
+      let campaigns = defaultNewsletterCampaignsApi;
+      if (cur.rows.length > 0 && cur.rows[0].value) {
+        try {
+          const parsed = typeof cur.rows[0].value === 'string' ? JSON.parse(cur.rows[0].value) : cur.rows[0].value;
+          if (Array.isArray(parsed)) campaigns = parsed;
+        } catch {}
+      }
+
+      const updated = campaigns.filter((c: any) => String(c.id) !== String(id));
+      await pool.query(`
+        INSERT INTO settings (key, value) VALUES ('newsletter_campaigns', $1)
+        ON CONFLICT (key) DO UPDATE SET value = $1
+      `, [JSON.stringify(updated)]);
+
+      res.json({ success: true, message: 'Campaign removed successfully', campaigns: updated });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/admin/newsletter/email-config', async (_req, res) => {
+    try {
+      const cfg = await getEffectiveEmailConfig();
+      res.json({
+        resendApiKey: cfg.resendApiKey,
+        emailFrom: cfg.emailFrom,
+        isConfigured: Boolean(cfg.resendApiKey && cfg.resendApiKey !== 're_123456789'),
+        source: cfg.source,
+        updatedAt: cfg.updatedAt
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  const handleSaveEmailConfig = async (req: any, res: any) => {
+    try {
+      const { resendApiKey, emailFrom } = req.body || {};
+      const cleanKey = (resendApiKey ?? '').trim();
+      const cleanFrom = (emailFrom ?? '').trim();
+
+      if (!cleanFrom) {
+        return res.status(400).json({ error: 'Sender address (EMAIL_FROM) is required.' });
+      }
+
+      const payload = {
+        resendApiKey: cleanKey,
+        emailFrom: cleanFrom,
+        updatedAt: new Date().toISOString()
+      };
+
+      await pool.query(`
+        INSERT INTO settings (key, value) VALUES ('email_config', $1)
+        ON CONFLICT (key) DO UPDATE SET value = $1
+      `, [JSON.stringify(payload)]);
+
+      if (cleanKey) process.env.RESEND_API_KEY = cleanKey;
+      if (cleanFrom) process.env.EMAIL_FROM = cleanFrom;
+
+      await pool.query(`
+        INSERT INTO activity_logs (id, action, actor, target, time_ago, type)
+        VALUES ($1, 'Updated Email Sender Settings', 'Admin', $2, 'Just now', 'settings')
+      `, [`act-${Date.now()}`, cleanFrom]).catch(() => {});
+
+      res.json({
+        success: true,
+        config: {
+          resendApiKey: cleanKey,
+          emailFrom: cleanFrom,
+          isConfigured: Boolean(cleanKey && cleanKey !== 're_123456789'),
+          source: 'database',
+          updatedAt: payload.updatedAt
+        }
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  };
+
+  app.put('/api/admin/newsletter/email-config', handleSaveEmailConfig);
+  app.post('/api/admin/newsletter/email-config', handleSaveEmailConfig);
+
+  app.post('/api/admin/newsletter/email-config/test', async (req, res) => {
+    try {
+      const cfg = await getEffectiveEmailConfig();
+      const cleanKey = ((req.body?.resendApiKey ?? cfg.resendApiKey) || '').trim();
+
+      if (!cleanKey || !cleanKey.startsWith('re_') || cleanKey === 're_123456789') {
+        return res.status(400).json({
+          valid: false,
+          error: 'Please enter a valid Resend API key starting with "re_".'
+        });
+      }
+
+      const checkRes = await fetch('https://api.resend.com/domains', {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${cleanKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const bodyText = await checkRes.text();
+      let data: any = null;
+      try {
+        data = JSON.parse(bodyText);
+      } catch {}
+
+      if (checkRes.ok) {
+        const domainCount = Array.isArray(data?.data) ? data.data.length : 0;
+        return res.json({
+          valid: true,
+          message: `Resend API key verified! Connected to Resend (${domainCount} domain${domainCount === 1 ? '' : 's'} found).`
+        });
+      }
+
+      const msg = (data?.message || bodyText || '').toLowerCase();
+      if (data?.name === 'restricted_api_key' || msg.includes('restricted to only send emails')) {
+        return res.json({
+          valid: true,
+          message: 'Resend API key verified! (Sending-access API key is active and ready).'
+        });
+      }
+
+      return res.status(400).json({
+        valid: false,
+        error: data?.message || 'Resend rejected this API key. Please check the key and try again.'
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        valid: false,
+        error: err?.message || 'Unable to reach Resend API to verify key.'
+      });
     }
   });
 
@@ -5301,9 +5520,7 @@ Guidelines:
     }
   });
 
-  // ---------------------------------------------------------------------------
-  // Ephemeral In-Memory Document Parsers for Zero-Disk AI Analysis
-  // ---------------------------------------------------------------------------
+  // In-memory document parsers
   function decodePdfString(str: string): string {
     return str
       .replace(/\\\\/g, '\\')
@@ -5990,7 +6207,7 @@ CRITICAL DIRECTIVES FOR MAXIMUM INFORMATION RETENTION:
 
       if (extractedChunks.length === 0) {
         return res.status(400).json({
-          error: 'No readable text content could be recognized from this file or image. Please ensure the image contains clear, legible text, or supply a Gemini AI Studio API key.'
+          error: 'No readable text content could be recognized from this file or image. Please ensure the image contains clear, legible text, or supply a Gemini API key.'
         });
       }
 
@@ -6199,9 +6416,7 @@ CRITICAL DIRECTIVES FOR MAXIMUM INFORMATION RETENTION:
     }
   });
 
-  // =========================================================================
-  // AI ENGINE & MODEL CONFIGURATION (Neon PostgreSQL Sync)
-  // =========================================================================
+  // AI Engine & Model Configuration
   app.get('/api/admin/settings/ai', async (_req, res) => {
     try {
       const dbConfig = await getAiConfigFromDb();
@@ -6510,7 +6725,7 @@ CRITICAL DIRECTIVES FOR MAXIMUM INFORMATION RETENTION:
     }
   });
 
-  app.post('/api/settings', async (req, res) => {
+  app.post('/api/settings', requireAdmin, async (req, res) => {
     try {
       const newSettings = req.body;
       await pool.query(`
@@ -6583,7 +6798,7 @@ CRITICAL DIRECTIVES FOR MAXIMUM INFORMATION RETENTION:
     }
   });
 
-  app.post('/api/hero', async (req, res) => {
+  app.post('/api/hero', requireAdmin, async (req, res) => {
     try {
       const heroSettings = req.body;
       if (heroSettings && Array.isArray(heroSettings.slides)) {
@@ -6671,7 +6886,7 @@ CRITICAL DIRECTIVES FOR MAXIMUM INFORMATION RETENTION:
   };
 
   app.post('/api/admin/seo', handleSaveSeo);
-  app.post('/api/seo', handleSaveSeo);
+  app.post('/api/seo', requireAdmin, handleSaveSeo);
 
   // Dynamic robots.txt
   app.get('/robots.txt', async (_req, res) => {

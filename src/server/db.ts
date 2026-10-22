@@ -1,7 +1,7 @@
 import { neon, neonConfig, Pool } from '@neondatabase/serverless';
 import ws from 'ws';
 import dotenv from 'dotenv';
-import fs from 'fs';
+import { hashPassword } from './security';
 
 // Node 22+ undici / WebSocket ErrorEvent setter patch:
 // In Node 22, ErrorEvent.prototype.message is an immutable getter.
@@ -34,12 +34,6 @@ try {
 } catch {}
 
 dotenv.config();
-if (!process.env.DATABASE_URL && fs.existsSync('env.txt')) {
-  dotenv.config({ path: 'env.txt' });
-}
-if (!process.env.DATABASE_URL && fs.existsSync('.env.example')) {
-  dotenv.config({ path: '.env.example' });
-}
 
 // Ensure WebSocket constructor is configured for Node.js environments (Vercel serverless / Node < 22)
 if (!neonConfig.webSocketConstructor) {
@@ -468,16 +462,9 @@ export async function initDb() {
       console.log('[Database] Connecting to Neon PostgreSQL...');
       client = await pool.connect();
 
-      // ========================================================================
-      // CLEAN ARCHITECTURAL SCHEMA INITIALIZATION (PostgreSQL / Neon)
-      // ========================================================================
-
-      // Vector extension for semantic AI & embeddings
       await client.query(`CREATE EXTENSION IF NOT EXISTS vector;`);
 
-      // ------------------------------------------------------------------------
-      // DOMAIN 1: IDENTITY, CUSTOMERS & AUTHENTICATION
-      // ------------------------------------------------------------------------
+      // Users & email verifications
       await client.query(`
         CREATE TABLE IF NOT EXISTS users (
           id            VARCHAR(255) PRIMARY KEY,
@@ -507,11 +494,8 @@ export async function initDb() {
         );
       `);
 
-      // ------------------------------------------------------------------------
-      // DOMAIN 2: CUSTOMER CONVERSATIONS & MULTI-TURN AI CHAT
-      // ------------------------------------------------------------------------
+      // Chat conversations & messages
       await client.query(`
-        -- Canonical conversations table (distinct sessions recognized by email/session/user)
         CREATE TABLE IF NOT EXISTS conversations (
           id            VARCHAR(255) PRIMARY KEY,
           session_id    VARCHAR(255) NOT NULL,
@@ -530,7 +514,6 @@ export async function initDb() {
         );
         ALTER TABLE conversations DROP CONSTRAINT IF EXISTS conversations_user_id_fkey;
 
-        -- Canonical messages table
         CREATE TABLE IF NOT EXISTS messages (
           id              VARCHAR(255) PRIMARY KEY,
           conversation_id VARCHAR(255) NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
@@ -547,7 +530,6 @@ export async function initDb() {
         );
         ALTER TABLE messages DROP CONSTRAINT IF EXISTS messages_user_id_fkey;
 
-        -- Compatibility table: support_conversations
         CREATE TABLE IF NOT EXISTS support_conversations (
           id            VARCHAR(255) PRIMARY KEY,
           user_id       VARCHAR(255) DEFAULT NULL,
@@ -563,7 +545,6 @@ export async function initDb() {
           updated_at    TIMESTAMPTZ DEFAULT NOW()
         );
 
-        -- Compatibility table: support_messages
         CREATE TABLE IF NOT EXISTS support_messages (
           id         VARCHAR(255) PRIMARY KEY,
           session_id VARCHAR(255) NOT NULL,
@@ -577,9 +558,7 @@ export async function initDb() {
         );
       `);
 
-      // ------------------------------------------------------------------------
-      // DOMAIN 3: SUPPORT TICKETS & ESCALATIONS
-      // ------------------------------------------------------------------------
+      // Support tickets
       await client.query(`
         CREATE TABLE IF NOT EXISTS support_tickets (
           id              VARCHAR(255) PRIMARY KEY,
@@ -601,9 +580,7 @@ export async function initDb() {
         ALTER TABLE support_tickets DROP CONSTRAINT IF EXISTS support_tickets_user_id_fkey;
       `);
 
-      // ------------------------------------------------------------------------
-      // DOMAIN 4: KNOWLEDGE BASE, FAQS & RAG EMBEDDINGS
-      // ------------------------------------------------------------------------
+      // FAQs & knowledge base
       await client.query(`
         CREATE TABLE IF NOT EXISTS faq_categories (
           id          VARCHAR(255) PRIMARY KEY,
@@ -649,9 +626,7 @@ export async function initDb() {
         );
       `);
 
-      // ------------------------------------------------------------------------
-      // DOMAIN 5: COMMUNITY DISCUSSIONS & FORUM
-      // ------------------------------------------------------------------------
+      // Forum discussions & replies
       await client.query(`
         CREATE TABLE IF NOT EXISTS discussion_categories (
           id          VARCHAR(64) PRIMARY KEY,
@@ -729,9 +704,7 @@ export async function initDb() {
         );
       `);
 
-      // ------------------------------------------------------------------------
-      // DOMAIN 6: CONTENT & EDITORIAL
-      // ------------------------------------------------------------------------
+      // Blog posts & comments
       await client.query(`
         CREATE TABLE IF NOT EXISTS blogs (
           id            VARCHAR(64) PRIMARY KEY,
@@ -763,9 +736,7 @@ export async function initDb() {
         );
       `);
 
-      // ------------------------------------------------------------------------
-      // DOMAIN 7: COMMERCIAL INQUIRIES & LEADS (REMOVED)
-      // ------------------------------------------------------------------------
+      // Newsletter subscribers
       await client.query(`
         DROP TABLE IF EXISTS consultancy_inquiries CASCADE;
 
@@ -776,9 +747,7 @@ export async function initDb() {
         );
       `);
 
-      // ------------------------------------------------------------------------
-      // DOMAIN 8: SYSTEM CONFIGURATION & AUDIT LOGS
-      // ------------------------------------------------------------------------
+      // Settings & activity logs
       await client.query(`
         CREATE TABLE IF NOT EXISTS settings (
           key   VARCHAR(64) PRIMARY KEY,
@@ -796,9 +765,7 @@ export async function initDb() {
         );
       `);
 
-      // ------------------------------------------------------------------------
-      // INDEXES FOR QUERY OPTIMIZATION & CUSTOMER RECOGNITION
-      // ------------------------------------------------------------------------
+      // Indexes
       await client.query(`
         CREATE INDEX IF NOT EXISTS idx_users_email_lower          ON users (LOWER(email));
         CREATE INDEX IF NOT EXISTS idx_users_created_at           ON users (created_at DESC);
@@ -839,9 +806,7 @@ export async function initDb() {
         END $$;
       `);
 
-      // ------------------------------------------------------------------------
-      // SEED BASELINE SETTINGS IF MISSING
-      // ------------------------------------------------------------------------
+      // Seed default settings if missing
       const settingsCheck = await client.query("SELECT value FROM settings WHERE key = 'platform'");
       if (settingsCheck.rows.length === 0) {
         await client.query("INSERT INTO settings (key, value) VALUES ('platform', $1)", [JSON.stringify(defaultSettings)]);
@@ -885,6 +850,18 @@ export async function initDb() {
             [id, role.name, role.badgeLabel, role.color]
           );
         }
+      }
+
+      // Automatically migrate any legacy plaintext user passwords to scrypt hashes
+      const legacyUsers = await client.query(
+        "SELECT id, password FROM users WHERE password IS NOT NULL AND password != ''"
+      );
+      for (const row of legacyUsers.rows) {
+        const hashed = row.password.startsWith('scrypt$') ? row.password : hashPassword(row.password);
+        await client.query(
+          'UPDATE users SET password_hash = $1, password = NULL WHERE id = $2',
+          [hashed, row.id]
+        );
       }
 
       console.log('[Database] PostgreSQL schema initialized cleanly on Neon.');

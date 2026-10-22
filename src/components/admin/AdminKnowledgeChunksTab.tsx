@@ -980,9 +980,7 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
         </div>
       </div>
 
-      {/* ========================================================================= */}
-      {/* MODAL 1: AI KNOWLEDGE INGESTION (FILES & ELEMENTS) & FILTER WORKSPACE    */}
-      {/* ========================================================================= */}
+      {/* Knowledge Ingestion Modal */}
       {isFileModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in overflow-y-auto">
           <div className="w-full max-w-4xl rounded-2xl bg-white border border-slate-200 shadow-2xl overflow-hidden my-6 flex flex-col max-h-[92vh]">
@@ -1250,16 +1248,8 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
                   </div>
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between text-[10px] text-slate-500 gap-1 pt-0.5">
                     <span>
-                      Google AI Studio keys start with <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-slate-700 font-bold">AIzaSy</code>.
+                      Gemini API keys start with <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-slate-700 font-bold">AIzaSy</code>.
                     </span>
-                    <a
-                      href="https://aistudio.google.com/apikey"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-indigo-600 hover:text-indigo-700 underline font-semibold"
-                    >
-                      Get Free Gemini API Key (aistudio.google.com) &rarr;
-                    </a>
                   </div>
                   <p className="text-[10px] text-emerald-700 font-medium">
                     ⚡ Built-in offline OCR automatically recognizes text from images & screenshots even if no API key is provided!
@@ -1321,9 +1311,7 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
                 </div>
               </div>
             ) : (
-              /* ========================================================================= */
-              /* REVIEW & FILTER WORKSPACE: ADMIN REVIEWS & COMMITS CHUNKS                */
-              /* ========================================================================= */
+              /* Chunk Review & Filter Workspace */
               <div className="flex-1 flex flex-col overflow-hidden">
                 {/* Review Header Banner */}
                 <div className="p-4 bg-slate-50/90 border-b border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shrink-0">
@@ -1591,9 +1579,7 @@ export const AdminKnowledgeChunksTab: React.FC<AdminKnowledgeChunksTabProps> = (
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* MODAL 2: MANUAL CHUNK CREATE / EDIT */}
-      {/* ========================================================================= */}
+      {/* Manual Chunk Create / Edit Modal */}
       {isManualModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in">
           <div className="w-full max-w-lg rounded-xl bg-white border border-slate-200 shadow-xl overflow-hidden">

@@ -13,17 +13,25 @@ import {
   synthesizeBusinessMemoryAnswer 
 } from './businessMemory';
 import { extractUrlsFromText, fetchAndExtractPageContent } from './webBrowser';
+import {
+  hashPassword,
+  generateRandomPassword,
+  verifyPassword,
+  signSessionToken,
+  setSessionCookie,
+  clearSessionCookie,
+  authenticateRequest,
+  resolveVerifiedUser,
+  createRequireAdminMiddleware,
+  isAdminRoleName,
+  securityHeadersMiddleware,
+  corsMiddleware,
+  createRateLimiter
+} from './security';
 
-// ---------------------------------------------------------------------------
-// AI support chat performance helpers
-// ---------------------------------------------------------------------------
-// The RAG context (FAQs, knowledge docs, recent topics, settings) used to be
-// re-queried from the DB on every single chat message, adding 4 sequential
-// round-trips before the AI call even started. It changes rarely, so it's
-// cached in memory for a short TTL and shared across requests on this warm
-// instance. Any admin mutation that touches this data invalidates the cache.
+// In-memory RAG cache (15s TTL, invalidated on admin mutations)
 let ragCache: { data: RagData; expiresAt: number } | null = null;
-const RAG_CACHE_TTL_MS = 15_000; // 15 seconds real-time dynamic sync
+const RAG_CACHE_TTL_MS = 15_000;
 
 interface RagData {
   faqsData: { rows: any[] };
@@ -79,25 +87,21 @@ async function getRagData(): Promise<RagData> {
   return data;
 }
 
-// Races a promise against a timeout so a slow/hanging Gemini model can't
-// stall the whole reply — we bail out and try the next model (or the
-// heuristic fallback) instead of waiting indefinitely.
+// Timeout wrapper for model requests
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
     promise,
     new Promise<T>((_, reject) => {
       const t = setTimeout(() => reject(new Error(`AI request timed out after ${ms}ms`)), ms);
-      // @ts-ignore - unref so this timer never keeps the process alive
+      // @ts-ignore
       t.unref?.();
     })
   ]);
 }
 
-// ---------------------------------------------------------------------------
-// Project-wide AI Configuration & Synchronization (Neon PostgreSQL)
-// ---------------------------------------------------------------------------
+// AI configuration cache
 let aiConfigCache: { config: any; expiresAt: number } | null = null;
-const AI_CONFIG_CACHE_TTL_MS = 30_000; // 30s cache with immediate invalidation on admin update
+const AI_CONFIG_CACHE_TTL_MS = 30_000;
 
 export function invalidateAiConfigCache() {
   aiConfigCache = null;
@@ -364,8 +368,37 @@ export async function executeAiCompletion({
 export async function createApp() {
   const app = express();
 
+  app.disable('x-powered-by');
+  app.use(securityHeadersMiddleware);
+  app.use(corsMiddleware);
   app.use(express.json({ limit: '25mb' }));
   app.use(express.urlencoded({ extended: true, limit: '25mb' }));
+  app.use(authenticateRequest);
+
+  const globalApiLimiter = createRateLimiter({
+    windowMs: 15 * 60_000,
+    max: 400,
+    keyPrefix: 'api-global'
+  });
+  const authRateLimiter = createRateLimiter({
+    windowMs: 15 * 60_000,
+    max: 25,
+    keyPrefix: 'api-auth',
+    message: 'Too many authentication or verification attempts. Please wait a few minutes before trying again.'
+  });
+  const aiAndMailLimiter = createRateLimiter({
+    windowMs: 15 * 60_000,
+    max: 40,
+    keyPrefix: 'api-ai-mail',
+    message: 'Rate limit reached for AI or email requests. Please wait a moment before trying again.'
+  });
+
+  app.use('/api', globalApiLimiter);
+  app.use(['/api/auth/login', '/api/auth/register', '/api/auth/send-verification'], authRateLimiter);
+  app.use(['/api/support/messages', '/api/ai/browse-url', '/api/admin/newsletter/broadcast'], aiAndMailLimiter);
+
+  const requireAdmin = createRequireAdminMiddleware(pool);
+  app.use('/api/admin', requireAdmin);
 
   // Ensure the schema exists before any request is allowed to hit a data
   // route. Previously this ran in the background (fire-and-forget), which
@@ -638,7 +671,7 @@ export async function createApp() {
   });
 
   // Discussion Categories: Create
-  app.post('/api/discussion/categories', async (req, res) => {
+  app.post('/api/discussion/categories', requireAdmin, async (req, res) => {
     try {
       const { name, description } = req.body;
       const cleanName = (name || '').trim();
@@ -670,7 +703,7 @@ export async function createApp() {
   });
 
   // Discussion Categories: Delete
-  app.delete('/api/discussion/categories/:id', async (req, res) => {
+  app.delete('/api/discussion/categories/:id', requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       await pool.query(
@@ -684,7 +717,7 @@ export async function createApp() {
   });
 
   // Staff Roles / Badges: Create
-  app.post('/api/discussion/staff-roles', async (req, res) => {
+  app.post('/api/discussion/staff-roles', requireAdmin, async (req, res) => {
     try {
       const { name, badgeLabel, color } = req.body;
       const cleanName = (name || '').trim();
@@ -710,7 +743,7 @@ export async function createApp() {
   });
 
   // Staff Roles / Badges: Delete
-  app.delete('/api/discussion/staff-roles/:id', async (req, res) => {
+  app.delete('/api/discussion/staff-roles/:id', requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       await pool.query(
@@ -741,8 +774,9 @@ export async function createApp() {
       const id = `topic-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
       const avatar = authorAvatar || getRandomAvatar(authorEmail || author);
 
-      const roleClean = (authorRole || '').toLowerCase();
-      const isAdmin = roleClean.includes('admin') || roleClean.includes('super admin') || roleClean.includes('staff') || req.body.isAdmin === true;
+      const verifiedUser = await resolveVerifiedUser(req, pool);
+      const isAdmin = Boolean(verifiedUser && isAdminRoleName(verifiedUser.role));
+      const safeAuthorRole = isAdmin ? (authorRole || verifiedUser?.role || 'Super Admin') : 'Member';
       const status = isAdmin ? 'approved' : 'pending';
 
       const finalCategorySlug = (categorySlug || (category || '').toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'general').trim();
@@ -756,7 +790,7 @@ export async function createApp() {
         INSERT INTO topics (id, title, author, author_email, author_id, author_role, author_avatar, time_ago, category, category_slug, views, likes, replies, is_featured, is_popular, status, content, edit_count, last_approved_title, last_approved_category, last_approved_category_slug, last_approved_content)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 1, 0, 0, false, false, $11, $12, 0, $13, $14, $15, $16)
         RETURNING *
-      `, [id, title, author || 'Community Member', authorEmail || null, authorId || null, authorRole || 'Member', avatar, timeAgo || 'Just now', category, finalCategorySlug, status, content, approvedTitle, approvedCategory, approvedCategorySlug, approvedContent]);
+      `, [id, title, author || 'Community Member', authorEmail || null, authorId || null, safeAuthorRole, avatar, timeAgo || 'Just now', category, finalCategorySlug, status, content, approvedTitle, approvedCategory, approvedCategorySlug, approvedContent]);
 
       const newTopic = {
         id: insertRes.rows[0].id,
@@ -805,48 +839,29 @@ export async function createApp() {
       }
       const topic = topicRes.rows[0];
 
-      // Extract requester identity from headers or body
+      // Extract requester identity from verified session or headers/body
+      const verifiedUser = await resolveVerifiedUser(req, pool);
       const userEmail = (
+        verifiedUser?.email ||
         (req.headers['x-user-email'] as string) ||
         req.body?.userEmail ||
         ''
       ).trim().toLowerCase();
-      const userRole = (
-        (req.headers['x-user-role'] as string) ||
-        req.body?.userRole ||
-        ''
-      ).trim();
       const userName = (
+        verifiedUser?.name ||
         (req.headers['x-user-name'] as string) ||
         req.body?.userName ||
         ''
       ).trim().toLowerCase();
       const userId = (
+        verifiedUser?.id ||
         (req.headers['x-user-id'] as string) ||
         req.body?.userId ||
         ''
       ).trim();
 
-      // Check if user is an administrator
-      let isAllowed = false;
-
-      if (userRole === 'Super Admin' || userRole === 'Moderator') {
-        isAllowed = true;
-      }
-
-      // If not established as admin yet, check in users DB if role is admin/moderator
-      if (!isAllowed && userEmail) {
-        const uRes = await pool.query(
-          'SELECT role, status FROM users WHERE LOWER(email) = $1',
-          [userEmail]
-        );
-        if (uRes.rows.length > 0 && uRes.rows[0].status === 'active') {
-          const r = uRes.rows[0].role;
-          if (r === 'Super Admin' || r === 'Moderator') {
-            isAllowed = true;
-          }
-        }
-      }
+      // Check if user is a verified administrator
+      let isAllowed = Boolean(verifiedUser && isAdminRoleName(verifiedUser.role));
 
       // Check if user is the person who posted
       if (!isAllowed) {
@@ -893,51 +908,30 @@ export async function createApp() {
       }
       const topic = topicRes.rows[0];
 
-      // Extract requester identity from headers or body
+      // Extract requester identity from verified session or headers/body
+      const verifiedUser = await resolveVerifiedUser(req, pool);
       const userEmail = (
+        verifiedUser?.email ||
         (req.headers['x-user-email'] as string) ||
         req.body?.userEmail ||
         ''
       ).trim().toLowerCase();
-      const userRole = (
-        (req.headers['x-user-role'] as string) ||
-        req.body?.userRole ||
-        ''
-      ).trim();
       const userName = (
+        verifiedUser?.name ||
         (req.headers['x-user-name'] as string) ||
         req.body?.userName ||
         ''
       ).trim().toLowerCase();
       const userId = (
+        verifiedUser?.id ||
         (req.headers['x-user-id'] as string) ||
         req.body?.userId ||
         ''
       ).trim();
 
-      // Check if user is an administrator
-      let isAllowed = false;
-      let isAdmin = false;
-
-      if (userRole === 'Super Admin' || userRole === 'Moderator' || userRole === 'Admin') {
-        isAllowed = true;
-        isAdmin = true;
-      }
-
-      // If not established as admin yet, check in users DB if role is admin/moderator
-      if (!isAllowed && userEmail) {
-        const uRes = await pool.query(
-          'SELECT role, status FROM users WHERE LOWER(email) = $1',
-          [userEmail]
-        );
-        if (uRes.rows.length > 0 && uRes.rows[0].status === 'active') {
-          const r = uRes.rows[0].role;
-          if (r === 'Super Admin' || r === 'Moderator' || r === 'Admin') {
-            isAllowed = true;
-            isAdmin = true;
-          }
-        }
-      }
+      // Check if user is a verified administrator
+      let isAdmin = Boolean(verifiedUser && isAdminRoleName(verifiedUser.role));
+      let isAllowed = isAdmin;
 
       // Check if user is the author who posted
       if (!isAllowed) {
@@ -1058,7 +1052,7 @@ export async function createApp() {
   app.patch('/api/topics/:id', handleUpdateTopic);
   app.put('/api/topics/:id', handleUpdateTopic);
 
-  app.post('/api/topics/:id/feature', async (req, res) => {
+  app.post('/api/topics/:id/feature', requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       const result = await pool.query(`
@@ -1070,7 +1064,7 @@ export async function createApp() {
     }
   });
 
-  app.post('/api/topics/:id/popular', async (req, res) => {
+  app.post('/api/topics/:id/popular', requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       const result = await pool.query(`
@@ -1083,7 +1077,7 @@ export async function createApp() {
   });
 
   // Approve a discussion topic
-  app.post('/api/topics/:id/approve', async (req, res) => {
+  app.post('/api/topics/:id/approve', requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       const result = await pool.query(`
@@ -1135,7 +1129,7 @@ export async function createApp() {
   });
 
   // Reject a discussion topic (rejects edit and reverts to original approved topic, or deletes if new unapproved post)
-  app.post('/api/topics/:id/reject', async (req, res) => {
+  app.post('/api/topics/:id/reject', requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       const { reason } = req.body || {};
@@ -1373,11 +1367,15 @@ export async function createApp() {
         }
       }
 
+      const verifiedUser = await resolveVerifiedUser(req, pool);
+      const isAdmin = Boolean(verifiedUser && isAdminRoleName(verifiedUser.role));
+      const safeReplyRole = isAdmin ? (authorRole || verifiedUser?.role || 'Super Admin') : 'Member';
+
       const replyRes = await pool.query(`
         INSERT INTO replies (id, topic_id, parent_reply_id, author, author_role, author_avatar, time_ago, content, likes)
         VALUES ($1, $2, $3, $4, $5, $6, 'Just now', $7, 0)
         RETURNING *
-      `, [replyId, topicId, validParentId, author || 'Community Member', authorRole || 'Member', avatar, content]);
+      `, [replyId, topicId, validParentId, author || 'Community Member', safeReplyRole, avatar, content]);
 
       // Update topic replies count directly from replies table
       await pool.query('UPDATE topics SET replies = (SELECT COUNT(*) FROM replies WHERE topic_id = $1) WHERE id = $1', [topicId]);
@@ -1408,7 +1406,7 @@ export async function createApp() {
     }
   });
 
-  app.delete('/api/replies/:id', async (req, res) => {
+  app.delete('/api/replies/:id', requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       const findRes = await pool.query('SELECT topic_id FROM replies WHERE id = $1', [id]);
@@ -1550,7 +1548,7 @@ export async function createApp() {
     }
   });
 
-  app.post('/api/blogs', async (req, res) => {
+  app.post('/api/blogs', requireAdmin, async (req, res) => {
     try {
       const { title, category, imageUrl, excerpt, content, author, authorAvatar, redirectUrl } = req.body;
       const id = `blog-${Date.now()}`;
@@ -1583,7 +1581,7 @@ export async function createApp() {
     }
   });
 
-  app.delete('/api/blogs/:id', async (req, res) => {
+  app.delete('/api/blogs/:id', requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       await pool.query('DELETE FROM blog_comments WHERE blog_id = $1', [id]);
@@ -1642,8 +1640,8 @@ export async function createApp() {
     }
   };
 
-  app.patch('/api/blogs/:id', handleUpdateBlog);
-  app.put('/api/blogs/:id', handleUpdateBlog);
+  app.patch('/api/blogs/:id', requireAdmin, handleUpdateBlog);
+  app.put('/api/blogs/:id', requireAdmin, handleUpdateBlog);
 
   // Users & Staff
   app.get('/api/users', async (_req, res) => {
@@ -1668,14 +1666,30 @@ export async function createApp() {
   app.post('/api/users', async (req, res) => {
     try {
       const { name, email, password, role, avatar } = req.body;
+      const cleanEmail = (email || '').trim().toLowerCase();
+      const cleanName = (name || '').trim();
+      if (!cleanEmail || !cleanName) {
+        return res.status(400).json({ error: 'Name and email are required.' });
+      }
+
+      const verifiedCaller = await resolveVerifiedUser(req, pool);
+      const callerIsAdmin = Boolean(verifiedCaller && isAdminRoleName(verifiedCaller.role));
+      const requestedRole = (role || 'User').trim();
+      const safeRole = !callerIsAdmin && isAdminRoleName(requestedRole) ? 'User' : requestedRole;
+
+      const rawPassword = typeof password === 'string' && password.trim().length >= 6
+        ? password.trim()
+        : generateRandomPassword();
+      const passwordHash = hashPassword(rawPassword);
+
       const id = `usr-${Date.now()}`;
       const joinedDate = 'Just now';
 
       const insertRes = await pool.query(`
-        INSERT INTO users (id, name, email, password, role, status, avatar, joined_date, threads_count)
-        VALUES ($1, $2, $3, $4, $5, 'active', $6, $7, 0)
+        INSERT INTO users (id, name, email, password, password_hash, role, status, avatar, joined_date, threads_count)
+        VALUES ($1, $2, $3, NULL, $4, $5, 'active', $6, $7, 0)
         RETURNING id, name, email, role, status, avatar, joined_date, threads_count
-      `, [id, name, email, password || 'admin123', role || 'User', avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80', joinedDate]);
+      `, [id, cleanName, cleanEmail, passwordHash, safeRole, avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80', joinedDate]);
 
       res.status(201).json(insertRes.rows[0]);
     } catch (err: any) {
@@ -1683,7 +1697,7 @@ export async function createApp() {
     }
   });
 
-  app.patch('/api/users/:id', async (req, res) => {
+  app.patch('/api/users/:id', requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       const { role, status } = req.body;
@@ -1710,7 +1724,7 @@ export async function createApp() {
     }
   });
 
-  app.delete('/api/users/:id', async (req, res) => {
+  app.delete('/api/users/:id', requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       await pool.query('DELETE FROM users WHERE id = $1', [id]);
@@ -1719,6 +1733,39 @@ export async function createApp() {
       res.status(500).json({ error: err.message });
     }
   });
+
+  // Helper to resolve effective Resend API Key & Sender Email from DB (with .env fallback)
+  const getEffectiveEmailConfig = async (): Promise<{
+    resendApiKey: string;
+    emailFrom: string;
+    source: 'database' | 'env';
+    updatedAt: string | null;
+  }> => {
+    const envKey = (process.env.RESEND_API_KEY || '').trim();
+    const envFrom = (process.env.EMAIL_FROM || 'Trek Consultancy Forum <onboarding@resend.dev>').trim();
+    try {
+      const res = await pool.query("SELECT value FROM settings WHERE key = 'email_config'");
+      if (res.rows.length > 0 && res.rows[0].value) {
+        const parsed = typeof res.rows[0].value === 'string' ? JSON.parse(res.rows[0].value) : res.rows[0].value;
+        const dbKey = (parsed?.resendApiKey ?? '').trim();
+        const dbFrom = (parsed?.emailFrom ?? '').trim();
+        return {
+          resendApiKey: dbKey || envKey,
+          emailFrom: dbFrom || envFrom,
+          source: 'database',
+          updatedAt: parsed?.updatedAt || null
+        };
+      }
+    } catch (err) {
+      console.warn('[Email Config] Fallback to environment variables:', err);
+    }
+    return {
+      resendApiKey: envKey,
+      emailFrom: envFrom,
+      source: 'env',
+      updatedAt: null
+    };
+  };
 
   // Send Email Verification Code
   app.post('/api/auth/send-verification', async (req, res) => {
@@ -1762,16 +1809,14 @@ export async function createApp() {
       // Attempt real email dispatch via Resend if RESEND_API_KEY is configured
       let emailSent = false;
       let emailDeliveryError: string | null = null;
-      try {
-        const dotenv = await import('dotenv');
-        dotenv.default.config({ override: true });
-      } catch {}
-      const resendApiKey = process.env.RESEND_API_KEY?.trim();
+      const emailCfg = await getEffectiveEmailConfig();
+      const resendApiKey = emailCfg.resendApiKey;
 
       if (resendApiKey && resendApiKey !== 're_123456789') {
         try {
           const resend = new Resend(resendApiKey);
-          let fromAddress = process.env.EMAIL_FROM?.trim() || 'Trek Consultancy Forum <onboarding@resend.dev>';
+          const rawFromAddress = emailCfg.emailFrom || 'Trek Consultancy Forum <onboarding@resend.dev>';
+          let fromAddress = rawFromAddress;
           const isUnverifiedPublicDomain = /@(gmail|yahoo|hotmail|outlook|icloud|live|aol|msn)\.com/i.test(fromAddress);
           if (fromAddress.includes('yourdomain.com') || isUnverifiedPublicDomain) {
             if (isUnverifiedPublicDomain) {
@@ -1782,6 +1827,7 @@ export async function createApp() {
 
           const { data: resendData, error: resendError } = await resend.emails.send({
             from: fromAddress,
+            replyTo: rawFromAddress,
             to: cleanEmail,
             subject: `${code} is your Trek Consultancy Forum verification code`,
             text: `Your Trek Consultancy Forum verification code is: ${code}\n\nThis code will expire in 15 minutes.\nIf you did not request this code, you can safely ignore this email.`,
@@ -1931,12 +1977,13 @@ export async function createApp() {
       const id = `usr-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
       const avatar = getRandomAvatar(cleanEmail || cleanName);
       const joinedDate = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      const passwordHash = hashPassword(cleanPass);
 
       const insertRes = await pool.query(`
-        INSERT INTO users (id, name, email, password, role, status, avatar, joined_date, threads_count, email_verified)
-        VALUES ($1, $2, $3, $4, 'User', 'active', $5, $6, 0, true)
+        INSERT INTO users (id, name, email, password, password_hash, role, status, avatar, joined_date, threads_count, email_verified)
+        VALUES ($1, $2, $3, NULL, $4, 'User', 'active', $5, $6, 0, true)
         RETURNING id, name, email, role, status, avatar, joined_date, threads_count, email_verified
-      `, [id, cleanName, cleanEmail, cleanPass, avatar, joinedDate]);
+      `, [id, cleanName, cleanEmail, passwordHash, avatar, joinedDate]);
 
       // If user had a guest chat session prior to registration, link the conversation and messages to their new account
       if (cleanSession) {
@@ -1975,9 +2022,19 @@ export async function createApp() {
         VALUES ($1, 'Joined Community', $2, 'User Registration', 'Just now', 'user')
       `, [`act-${Date.now()}`, cleanName]);
 
+      const newUser = insertRes.rows[0];
+      const token = signSessionToken({
+        id: newUser.id,
+        email: newUser.email,
+        name: newUser.name,
+        role: newUser.role
+      });
+      setSessionCookie(res, token);
+
       res.status(201).json({
         success: true,
-        user: insertRes.rows[0]
+        token,
+        user: newUser
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -1993,7 +2050,6 @@ export async function createApp() {
       const cleanCurrent = (currentLoggedInEmail || '').trim().toLowerCase();
       const cleanSession = (sessionId || '').trim();
 
-      // If an account is already logged in on this browser and differs from the target login
       if (cleanCurrent && cleanCurrent !== cleanEmail) {
         return res.status(409).json({
           error: `An account (${cleanCurrent}) is already active. You cannot log into another account at the same time. Please sign out first.`
@@ -2003,32 +2059,27 @@ export async function createApp() {
       const userRes = await pool.query('SELECT * FROM users WHERE LOWER(email) = $1', [cleanEmail]);
 
       if (userRes.rows.length === 0) {
-        // Fallback check for initial admin bootstrap
-        if ((cleanEmail === 'admin@trekconsultancy.com' || cleanEmail === 'admin@amacommunity.io') && cleanPass === 'admin123') {
-          return res.json({
-            success: true,
-            user: {
-              id: 'usr-admin',
-              name: 'Administrator',
-              email: cleanEmail,
-              role: 'Super Admin',
-              avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80'
-            }
-          });
-        }
         return res.status(401).json({ error: 'Invalid email or password.' });
       }
 
       const user = userRes.rows[0];
-      if (user.password !== cleanPass) {
+      const { valid, needsRehash } = verifyPassword(cleanPass, user.password_hash, user.password);
+      if (!valid) {
         return res.status(401).json({ error: 'Invalid password. Access denied.' });
+      }
+
+      if (needsRehash) {
+        const upgradedHash = hashPassword(cleanPass);
+        await pool.query(
+          'UPDATE users SET password_hash = $1, password = NULL WHERE id = $2',
+          [upgradedHash, user.id]
+        ).catch(() => {});
       }
 
       if (user.status === 'suspended') {
         return res.status(403).json({ error: 'This account is suspended.' });
       }
 
-      // If user had a guest chat session prior to login, link the conversation and messages to their account
       if (cleanSession) {
         try {
           await pool.query(`
@@ -2059,8 +2110,17 @@ export async function createApp() {
         }
       }
 
+      const token = signSessionToken({
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role
+      });
+      setSessionCookie(res, token);
+
       res.json({
         success: true,
+        token,
         user: {
           id: user.id,
           name: user.name,
@@ -2072,6 +2132,19 @@ export async function createApp() {
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
+  });
+
+  app.post('/api/auth/logout', (_req, res) => {
+    clearSessionCookie(res);
+    res.json({ success: true });
+  });
+
+  app.get('/api/auth/session', async (req, res) => {
+    const verified = await resolveVerifiedUser(req, pool);
+    if (!verified) {
+      return res.status(401).json({ authenticated: false, user: null });
+    }
+    res.json({ authenticated: true, user: verified });
   });
 
   // Newsletter Subscription
@@ -2261,15 +2334,20 @@ export async function createApp() {
       `, [JSON.stringify(updated)]);
 
       // Optional delivery via Resend if key exists and subscribers exist
-      const resendApiKey = process.env.RESEND_API_KEY?.trim();
+      const emailCfg = await getEffectiveEmailConfig();
+      const resendApiKey = emailCfg.resendApiKey;
       if (resendApiKey && subCount > 0) {
         try {
           const resend = new Resend(resendApiKey);
           const subs = await pool.query('SELECT email FROM newsletter_subscribers LIMIT 50');
           const emailList = subs.rows.map(r => r.email).filter(Boolean);
           if (emailList.length > 0) {
+            const rawFrom = emailCfg.emailFrom || 'Trek Consultancy Forum <onboarding@resend.dev>';
+            const isPublicDomain = /@(gmail|yahoo|hotmail|outlook|icloud|live|aol|msn)\.com/i.test(rawFrom) || rawFrom.includes('yourdomain.com');
+            const safeFrom = isPublicDomain ? 'Trek Consultancy Forum <onboarding@resend.dev>' : rawFrom;
             await resend.emails.send({
-              from: 'Trek Consultancy Forum <onboarding@resend.dev>',
+              from: safeFrom,
+              replyTo: rawFrom,
               to: emailList[0],
               bcc: emailList.slice(1),
               subject: newCampaign.subject,
@@ -2284,6 +2362,146 @@ export async function createApp() {
       res.status(201).json({ success: true, campaign: newCampaign, sentCount: subCount });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Admin Email Delivery Configuration (Resend API Key & EMAIL_FROM)
+  app.get('/api/admin/newsletter/email-config', async (_req, res) => {
+    try {
+      const cfg = await getEffectiveEmailConfig();
+      res.json({
+        resendApiKey: cfg.resendApiKey,
+        emailFrom: cfg.emailFrom,
+        isConfigured: Boolean(cfg.resendApiKey && cfg.resendApiKey !== 're_123456789'),
+        source: cfg.source,
+        updatedAt: cfg.updatedAt
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  const handleSaveEmailConfig = async (req: any, res: any) => {
+    try {
+      const { resendApiKey, emailFrom } = req.body || {};
+      const cleanKey = (resendApiKey ?? '').trim();
+      const cleanFrom = (emailFrom ?? '').trim();
+
+      if (!cleanFrom) {
+        return res.status(400).json({ error: 'Sender address (EMAIL_FROM) is required.' });
+      }
+
+      const payload = {
+        resendApiKey: cleanKey,
+        emailFrom: cleanFrom,
+        updatedAt: new Date().toISOString()
+      };
+
+      await pool.query(`
+        INSERT INTO settings (key, value) VALUES ('email_config', $1)
+        ON CONFLICT (key) DO UPDATE SET value = $1
+      `, [JSON.stringify(payload)]);
+
+      // Update runtime process.env immediately
+      if (cleanKey) process.env.RESEND_API_KEY = cleanKey;
+      if (cleanFrom) process.env.EMAIL_FROM = cleanFrom;
+
+      // Best-effort sync to local .env file if writable (ignored in serverless)
+      try {
+        const fs = await import('fs');
+        const path = await import('path');
+        const envPath = path.resolve(process.cwd(), '.env');
+        if (fs.existsSync(envPath)) {
+          let envContent = fs.readFileSync(envPath, 'utf8');
+          if (/^RESEND_API_KEY=/m.test(envContent)) {
+            envContent = envContent.replace(/^RESEND_API_KEY=.*$/m, `RESEND_API_KEY="${cleanKey}"`);
+          } else {
+            envContent += `\nRESEND_API_KEY="${cleanKey}"`;
+          }
+          if (/^EMAIL_FROM=/m.test(envContent)) {
+            envContent = envContent.replace(/^EMAIL_FROM=.*$/m, `EMAIL_FROM="${cleanFrom}"`);
+          } else {
+            envContent += `\nEMAIL_FROM="${cleanFrom}"`;
+          }
+          fs.writeFileSync(envPath, envContent, 'utf8');
+        }
+      } catch {}
+
+      await pool.query(`
+        INSERT INTO activity_logs (id, action, actor, target, time_ago, type)
+        VALUES ($1, 'Updated Email Sender Settings', 'Admin', $2, 'Just now', 'settings')
+      `, [`act-${Date.now()}`, cleanFrom]).catch(() => {});
+
+      res.json({
+        success: true,
+        config: {
+          resendApiKey: cleanKey,
+          emailFrom: cleanFrom,
+          isConfigured: Boolean(cleanKey && cleanKey !== 're_123456789'),
+          source: 'database',
+          updatedAt: payload.updatedAt
+        }
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  };
+
+  app.put('/api/admin/newsletter/email-config', handleSaveEmailConfig);
+  app.post('/api/admin/newsletter/email-config', handleSaveEmailConfig);
+
+  app.post('/api/admin/newsletter/email-config/test', async (req, res) => {
+    try {
+      const cfg = await getEffectiveEmailConfig();
+      const cleanKey = ((req.body?.resendApiKey ?? cfg.resendApiKey) || '').trim();
+
+      if (!cleanKey || !cleanKey.startsWith('re_') || cleanKey === 're_123456789') {
+        return res.status(400).json({
+          valid: false,
+          error: 'Please enter a valid Resend API key starting with "re_".'
+        });
+      }
+
+      const checkRes = await fetch('https://api.resend.com/domains', {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${cleanKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const bodyText = await checkRes.text();
+      let data: any = null;
+      try {
+        data = JSON.parse(bodyText);
+      } catch {}
+
+      if (checkRes.ok) {
+        const domainCount = Array.isArray(data?.data) ? data.data.length : 0;
+        return res.json({
+          valid: true,
+          message: `Resend API key verified! Connected to Resend (${domainCount} domain${domainCount === 1 ? '' : 's'} found).`
+        });
+      }
+
+      // Sending-restricted keys return 401/403 with restricted_api_key — which confirms the key itself is valid for sending emails
+      const msg = (data?.message || bodyText || '').toLowerCase();
+      if (data?.name === 'restricted_api_key' || msg.includes('restricted to only send emails')) {
+        return res.json({
+          valid: true,
+          message: 'Resend API key verified! (Sending-access API key is active and ready).'
+        });
+      }
+
+      return res.status(400).json({
+        valid: false,
+        error: data?.message || 'Resend rejected this API key. Please check the key and try again.'
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        valid: false,
+        error: err?.message || 'Unable to reach Resend API to verify key.'
+      });
     }
   });
 
@@ -4089,11 +4307,7 @@ Guidelines:
     }
   });
 
-  // =========================================================================
-  // ADMIN CUSTOMERS & WHOLE CONVERSATIONS MANAGEMENT
-  // =========================================================================
-
-  // 1. Get List of all Customers with basic details from DB & conversations aggregation
+  // Admin customers & conversation transcripts
   app.get('/api/admin/customers', async (_req, res) => {
     try {
       // Fetch registered users
@@ -4646,9 +4860,7 @@ Guidelines:
     }
   });
 
-  // ---------------------------------------------------------------------------
-  // Ephemeral In-Memory Document Parsers for Zero-Disk AI Analysis
-  // ---------------------------------------------------------------------------
+  // In-memory document parsers
   function decodePdfString(str: string): string {
     return str
       .replace(/\\\\/g, '\\')
@@ -5336,7 +5548,7 @@ CRITICAL DIRECTIVES FOR MAXIMUM INFORMATION RETENTION:
 
       if (extractedChunks.length === 0) {
         return res.status(400).json({
-          error: 'No readable text content could be recognized from this file or image. Please ensure the image contains clear, legible text, or supply a Gemini AI Studio API key.'
+          error: 'No readable text content could be recognized from this file or image. Please ensure the image contains clear, legible text, or supply a valid Gemini API key.'
         });
       }
 
@@ -5546,9 +5758,7 @@ CRITICAL DIRECTIVES FOR MAXIMUM INFORMATION RETENTION:
     }
   });
 
-  // =========================================================================
-  // AI ENGINE & MODEL CONFIGURATION (Neon PostgreSQL Sync)
-  // =========================================================================
+  // AI model settings
   app.get('/api/admin/settings/ai', async (_req, res) => {
     try {
       const dbConfig = await getAiConfigFromDb();
@@ -5820,8 +6030,8 @@ CRITICAL DIRECTIVES FOR MAXIMUM INFORMATION RETENTION:
     }
   });
 
-  // Agentic Browsing URL Reader & Inspector (Level 2 Standalone Endpoint)
-  app.post('/api/ai/browse-url', async (req, res) => {
+  // URL content fetcher
+  app.post('/api/ai/browse-url', requireAdmin, async (req, res) => {
     try {
       const { url } = req.body;
       if (!url || typeof url !== 'string' || !url.startsWith('http')) {
@@ -5857,7 +6067,7 @@ CRITICAL DIRECTIVES FOR MAXIMUM INFORMATION RETENTION:
     }
   });
 
-  app.post('/api/settings', async (req, res) => {
+  app.post('/api/settings', requireAdmin, async (req, res) => {
     try {
       const newSettings = req.body;
       await pool.query(`
@@ -5907,7 +6117,7 @@ CRITICAL DIRECTIVES FOR MAXIMUM INFORMATION RETENTION:
     }
   });
 
-  app.post('/api/hero', async (req, res) => {
+  app.post('/api/hero', requireAdmin, async (req, res) => {
     try {
       const heroSettings = req.body;
       if (heroSettings && Array.isArray(heroSettings.slides)) {
@@ -5924,9 +6134,7 @@ CRITICAL DIRECTIVES FOR MAXIMUM INFORMATION RETENTION:
     }
   });
 
-  // ---------------------------------------------------------------------------
-  // SEO & Metadata Management
-  // ---------------------------------------------------------------------------
+  // SEO & metadata configuration
   const fallbackSeoConfig = {
     metaTitle: 'Trek Consultancy Forum - Discussion Community & Support Portal',
     titleSeparator: ' - ',
@@ -5995,7 +6203,7 @@ CRITICAL DIRECTIVES FOR MAXIMUM INFORMATION RETENTION:
   };
 
   app.post('/api/admin/seo', handleSaveSeo);
-  app.post('/api/seo', handleSaveSeo);
+  app.post('/api/seo', requireAdmin, handleSaveSeo);
 
   // Dynamic robots.txt
   app.get('/robots.txt', async (_req, res) => {

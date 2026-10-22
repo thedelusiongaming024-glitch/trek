@@ -1,8 +1,5 @@
-/**
- * Agentic Web Browsing & Live URL Extraction Engine
- * Provides safe, timeout-bounded live web retrieval and HTML parsing
- * for LLM grounding and automated research without external browser dependencies.
- */
+import dns from 'dns';
+import net from 'net';
 
 export interface BrowsedPageResult {
   url: string;
@@ -13,43 +10,184 @@ export interface BrowsedPageResult {
   fetchedAt: string;
 }
 
-/**
- * Extracts HTTP/HTTPS URLs from any text string.
- */
 export function extractUrlsFromText(text: string): string[] {
   if (!text || typeof text !== 'string') return [];
   const urlRegex = /https?:\/\/[^\s<>"'{}|\\^`\[\]]+/gi;
   const matches = text.match(urlRegex) || [];
-  // Clean trailing punctuation like period, comma, parentheses
   const cleaned = matches.map(u => u.replace(/[.,;:!?)\]]+$/, '')).filter(Boolean);
   return Array.from(new Set(cleaned));
 }
 
-/**
- * Strips HTML boilerplate and extracts clean readable text/markdown.
- */
+function isPrivateOrReservedIpv4(ip: string): boolean {
+  const parts = ip.split('.');
+  if (parts.length !== 4) return true;
+  const octets = parts.map(p => Number(p));
+  if (octets.some(o => !Number.isInteger(o) || o < 0 || o > 255)) return true;
+
+  const [a, b, c] = octets;
+
+  if (a === 0) return true;
+  if (a === 10) return true;
+  if (a === 100 && b >= 64 && b <= 127) return true;
+  if (a === 127) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 0 && (c === 0 || c === 2)) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 198 && (b === 18 || b === 19)) return true;
+  if (a === 198 && b === 51 && c === 100) return true;
+  if (a === 203 && b === 0 && c === 113) return true;
+  if (a >= 224) return true;
+
+  return false;
+}
+
+export function isPrivateOrReservedIp(rawIp: string): boolean {
+  if (!rawIp) return true;
+  const ip = rawIp.trim().replace(/^\[|\]$/g, '').toLowerCase();
+
+  const version = net.isIP(ip);
+  if (version === 4) {
+    return isPrivateOrReservedIpv4(ip);
+  }
+
+  if (version === 6) {
+    if (ip === '::' || ip === '::1' || ip === '0:0:0:0:0:0:0:1' || ip === '0:0:0:0:0:0:0:0') {
+      return true;
+    }
+    if (
+      ip.startsWith('fc') ||
+      ip.startsWith('fd') ||
+      ip.startsWith('fe8') ||
+      ip.startsWith('fe9') ||
+      ip.startsWith('fea') ||
+      ip.startsWith('feb') ||
+      ip.startsWith('ff')
+    ) {
+      return true;
+    }
+    if (ip.startsWith('::ffff:')) {
+      const tail = ip.slice(7);
+      if (net.isIP(tail) === 4) {
+        return isPrivateOrReservedIpv4(tail);
+      }
+      const hexParts = tail.split(':');
+      if (hexParts.length === 2) {
+        const hi = parseInt(hexParts[0], 16);
+        const lo = parseInt(hexParts[1], 16);
+        if (!Number.isNaN(hi) && !Number.isNaN(lo)) {
+          const ipv4 = `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
+          return isPrivateOrReservedIpv4(ipv4);
+        }
+      }
+      return true;
+    }
+    if (ip.startsWith('2001:db8:') || ip.startsWith('2001:0db8:')) {
+      return true;
+    }
+    return false;
+  }
+
+  return true;
+}
+
+async function validateUrlForSsrf(targetUrl: string): Promise<{ ok: boolean; parsed?: URL; error?: string }> {
+  let parsed: URL;
+  try {
+    parsed = new URL(targetUrl);
+  } catch {
+    return { ok: false, error: 'Invalid URL format.' };
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return { ok: false, error: 'Security: Only HTTP and HTTPS protocols are allowed.' };
+  }
+
+  if (parsed.username || parsed.password) {
+    return { ok: false, error: 'Security: URLs with embedded credentials are not allowed.' };
+  }
+
+  if (parsed.port && parsed.port !== '80' && parsed.port !== '443') {
+    return { ok: false, error: 'Security: Non-standard network ports are blocked.' };
+  }
+
+  const rawHost = parsed.hostname.trim().toLowerCase().replace(/^\[|\]$/g, '');
+  if (!rawHost) {
+    return { ok: false, error: 'Invalid hostname.' };
+  }
+
+  if (
+    rawHost === 'localhost' ||
+    rawHost.endsWith('.localhost') ||
+    rawHost.endsWith('.local') ||
+    rawHost.endsWith('.internal') ||
+    rawHost.endsWith('.arpa') ||
+    rawHost === 'metadata.google.internal' ||
+    rawHost === 'instance-data'
+  ) {
+    return { ok: false, error: 'Security: Access to local/internal hostnames is blocked.' };
+  }
+
+  const dotParts = rawHost.split('.');
+  if (
+    /^(0x[0-9a-f]+|\d+)$/i.test(rawHost) ||
+    dotParts.every(p => /^(0x[0-9a-f]+|\d+)$/i.test(p))
+  ) {
+    if (dotParts.length !== 4 || dotParts.some(p => /^0\d+/.test(p) || /^0x/i.test(p))) {
+      return { ok: false, error: 'Security: Non-canonical or encoded IP literals are blocked.' };
+    }
+    if (isPrivateOrReservedIp(rawHost)) {
+      return { ok: false, error: 'Security: Access to private or reserved IP ranges is blocked.' };
+    }
+    return { ok: true, parsed };
+  }
+
+  if (net.isIP(rawHost) === 6) {
+    if (isPrivateOrReservedIp(rawHost)) {
+      return { ok: false, error: 'Security: Access to private or reserved IPv6 ranges is blocked.' };
+    }
+    return { ok: true, parsed };
+  }
+
+  try {
+    const records = await dns.promises.lookup(rawHost, { all: true, verbatim: true });
+    if (!records || records.length === 0) {
+      return { ok: false, error: 'DNS resolution returned no records for hostname.' };
+    }
+    for (const rec of records) {
+      if (isPrivateOrReservedIp(rec.address)) {
+        return {
+          ok: false,
+          error: 'Security: Hostname resolves to a private or reserved network address.'
+        };
+      }
+    }
+  } catch {
+    return { ok: false, error: 'Unable to resolve hostname.' };
+  }
+
+  return { ok: true, parsed };
+}
+
 export function cleanHtmlToText(html: string, maxChars = 4000): { title: string; text: string } {
   if (!html) return { title: '', text: '' };
 
-  // 1. Extract title
   let title = '';
   const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
   if (titleMatch && titleMatch[1]) {
     title = titleMatch[1].replace(/<[^>]+>/g, '').trim();
   }
 
-  // 2. Remove non-content elements
   let processed = html
-    .replace(/<!--[\s\S]*?-->/g, '') // comments
-    .replace(/<script[\s\S]*?<\/script>/gi, '') // scripts
-    .replace(/<style[\s\S]*?<\/style>/gi, '') // styles
-    .replace(/<noscript[\s\S]*?<\/noscript>/gi, '') // noscript
-    .replace(/<svg[\s\S]*?<\/svg>/gi, '') // svgs
-    .replace(/<nav[\s\S]*?<\/nav>/gi, '') // navbars
-    .replace(/<footer[\s\S]*?<\/footer>/gi, '') // footers
-    .replace(/<iframe[\s\S]*?<\/iframe>/gi, ''); // iframes
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, '')
+    .replace(/<svg[\s\S]*?<\/svg>/gi, '')
+    .replace(/<nav[\s\S]*?<\/nav>/gi, '')
+    .replace(/<footer[\s\S]*?<\/footer>/gi, '')
+    .replace(/<iframe[\s\S]*?<\/iframe>/gi, '');
 
-  // 3. Format key structural tags to markdown-like spacing
   processed = processed
     .replace(/<h[1-2][^>]*>([\s\S]*?)<\/h[1-2]>/gi, '\n\n## $1\n\n')
     .replace(/<h[3-6][^>]*>([\s\S]*?)<\/h[3-6]>/gi, '\n\n### $1\n\n')
@@ -59,10 +197,8 @@ export function cleanHtmlToText(html: string, maxChars = 4000): { title: string;
     .replace(/<div[^>]*>/gi, '\n')
     .replace(/<\/div>/gi, '\n');
 
-  // 4. Remove all remaining tags
   processed = processed.replace(/<[^>]+>/g, ' ');
 
-  // 5. Decode common HTML entities
   processed = processed
     .replace(/&nbsp;/gi, ' ')
     .replace(/&amp;/gi, '&')
@@ -74,13 +210,11 @@ export function cleanHtmlToText(html: string, maxChars = 4000): { title: string;
     .replace(/&mdash;/gi, '—')
     .replace(/&ndash;/gi, '–');
 
-  // 6. Normalize whitespace and blank lines
   processed = processed
     .replace(/[ \t]+/g, ' ')
     .replace(/\n\s*\n\s*\n+/g, '\n\n')
     .trim();
 
-  // Truncate to maximum characters safely
   if (processed.length > maxChars) {
     processed = processed.slice(0, maxChars) + '\n\n...[Content truncated for length]';
   }
@@ -88,54 +222,89 @@ export function cleanHtmlToText(html: string, maxChars = 4000): { title: string;
   return { title, text: processed };
 }
 
-/**
- * Fetches and extracts content from a given URL with timeout and safety bounds.
- */
 export async function fetchAndExtractPageContent(
   targetUrl: string,
   timeoutMs = 6000
 ): Promise<BrowsedPageResult> {
   const fetchedAt = new Date().toISOString();
+  const MAX_REDIRECTS = 3;
 
   try {
-    const parsed = new URL(targetUrl);
-    // Block private IP ranges (SSRF protection)
-    const hostname = parsed.hostname.toLowerCase();
-    if (
-      hostname === 'localhost' ||
-      hostname === '127.0.0.1' ||
-      hostname === '0.0.0.0' ||
-      hostname.startsWith('192.168.') ||
-      hostname.startsWith('10.') ||
-      hostname.startsWith('172.16.') ||
-      hostname.endsWith('.internal') ||
-      hostname.endsWith('.local')
-    ) {
+    let currentUrl = targetUrl;
+    let response: Response | null = null;
+    let finalParsedUrl: URL | null = null;
+
+    for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+      const check = await validateUrlForSsrf(currentUrl);
+      if (!check.ok || !check.parsed) {
+        return {
+          url: targetUrl,
+          title: 'Forbidden',
+          content: '',
+          success: false,
+          error: check.error || 'Security: URL blocked by SSRF filter.',
+          fetchedAt
+        };
+      }
+      finalParsedUrl = check.parsed;
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+      try {
+        response = await fetch(currentUrl, {
+          method: 'GET',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 (TrekConsultancyBot/1.0)',
+            Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.7',
+            'Accept-Language': 'en-US,en;q=0.9,ar;q=0.8,bn;q=0.7'
+          },
+          signal: controller.signal,
+          redirect: 'manual'
+        });
+      } finally {
+        clearTimeout(timer);
+      }
+
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get('location');
+        if (!location) {
+          return {
+            url: targetUrl,
+            title: `HTTP ${response.status}`,
+            content: '',
+            success: false,
+            error: 'Redirect response missing Location header.',
+            fetchedAt
+          };
+        }
+        if (hop === MAX_REDIRECTS) {
+          return {
+            url: targetUrl,
+            title: 'Too Many Redirects',
+            content: '',
+            success: false,
+            error: 'Maximum redirect limit exceeded.',
+            fetchedAt
+          };
+        }
+        currentUrl = new URL(location, currentUrl).toString();
+        continue;
+      }
+
+      break;
+    }
+
+    if (!response || !finalParsedUrl) {
       return {
         url: targetUrl,
-        title: 'Forbidden',
+        title: 'Fetch Failed',
         content: '',
         success: false,
-        error: 'Security: Access to local/private network addresses is blocked.',
+        error: 'No response received.',
         fetchedAt
       };
     }
-
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-    const response = await fetch(targetUrl, {
-      method: 'GET',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 (TrekConsultancyBot/1.0)',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.7',
-        'Accept-Language': 'en-US,en;q=0.9,ar;q=0.8,bn;q=0.7'
-      },
-      signal: controller.signal,
-      redirect: 'follow'
-    });
-
-    clearTimeout(timer);
 
     if (!response.ok) {
       return {
@@ -165,7 +334,7 @@ export async function fetchAndExtractPageContent(
 
     return {
       url: targetUrl,
-      title: title || parsed.hostname,
+      title: title || finalParsedUrl.hostname,
       content: text,
       success: true,
       fetchedAt

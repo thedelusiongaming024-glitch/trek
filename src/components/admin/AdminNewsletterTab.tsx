@@ -18,6 +18,9 @@ import {
   Sparkles,
   Filter,
   Eye,
+  EyeOff,
+  Key,
+  Save,
   Check,
   X,
   Clock,
@@ -68,13 +71,26 @@ export const AdminNewsletterTab: React.FC = () => {
   const [deleteCampaignConfirmId, setDeleteCampaignConfirmId] = useState<string | null>(null);
   const [isDeletingCampaign, setIsDeletingCampaign] = useState(false);
 
+  // Email Sender Configuration (RESEND_API_KEY & EMAIL_FROM)
+  const [resendApiKey, setResendApiKey] = useState('');
+  const [emailFrom, setEmailFrom] = useState('Trek Consultancy Forum <onboarding@resend.dev>');
+  const [showResendKey, setShowResendKey] = useState(false);
+  const [isSavingEmailConfig, setIsSavingEmailConfig] = useState(false);
+  const [emailConfigSaved, setEmailConfigSaved] = useState(false);
+  const [emailConfigError, setEmailConfigError] = useState('');
+  const [emailConfigSource, setEmailConfigSource] = useState<'database' | 'env'>('env');
+  const [emailConfigUpdatedAt, setEmailConfigUpdatedAt] = useState<string | null>(null);
+  const [isTestingApiKey, setIsTestingApiKey] = useState(false);
+  const [apiKeyTestResult, setApiKeyTestResult] = useState<{ valid: boolean; message: string } | null>(null);
+
   // Fetch data
   const fetchData = async () => {
     try {
       setIsLoading(true);
-      const [subsRes, campsRes] = await Promise.all([
+      const [subsRes, campsRes, emailCfgRes] = await Promise.all([
         fetch('/api/newsletter'),
-        fetch('/api/admin/newsletter/campaigns')
+        fetch('/api/admin/newsletter/campaigns'),
+        fetch('/api/admin/newsletter/email-config')
       ]);
 
       if (subsRes.ok) {
@@ -85,10 +101,80 @@ export const AdminNewsletterTab: React.FC = () => {
         const campsData = await campsRes.json();
         setCampaigns(campsData || []);
       }
+      if (emailCfgRes.ok) {
+        const cfgData = await emailCfgRes.json();
+        if (cfgData.resendApiKey) setResendApiKey(cfgData.resendApiKey);
+        if (cfgData.emailFrom) setEmailFrom(cfgData.emailFrom);
+        if (cfgData.source) setEmailConfigSource(cfgData.source);
+        if (cfgData.updatedAt) setEmailConfigUpdatedAt(cfgData.updatedAt);
+      }
     } catch (err) {
       console.error('Failed to load newsletter data:', err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSaveEmailConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!emailFrom.trim()) {
+      setEmailConfigError('Sender address (EMAIL_FROM) is required.');
+      return;
+    }
+    try {
+      setIsSavingEmailConfig(true);
+      setEmailConfigError('');
+      setEmailConfigSaved(false);
+      const res = await fetch('/api/admin/newsletter/email-config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          resendApiKey: resendApiKey.trim(),
+          emailFrom: emailFrom.trim()
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setResendApiKey(data.config.resendApiKey);
+        setEmailFrom(data.config.emailFrom);
+        setEmailConfigSource('database');
+        setEmailConfigUpdatedAt(data.config.updatedAt);
+        setEmailConfigSaved(true);
+        setTimeout(() => setEmailConfigSaved(false), 3000);
+      } else {
+        setEmailConfigError(data.error || 'Failed to save email settings.');
+      }
+    } catch {
+      setEmailConfigError('Network error while saving email settings.');
+    } finally {
+      setIsSavingEmailConfig(false);
+    }
+  };
+
+  const handleTestApiKey = async () => {
+    const clean = resendApiKey.trim();
+    if (!clean) {
+      setApiKeyTestResult({ valid: false, message: 'Please enter a Resend API key first.' });
+      return;
+    }
+    try {
+      setIsTestingApiKey(true);
+      setApiKeyTestResult(null);
+      const res = await fetch('/api/admin/newsletter/email-config/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resendApiKey: clean })
+      });
+      const data = await res.json();
+      if (res.ok && data.valid) {
+        setApiKeyTestResult({ valid: true, message: data.message || 'Resend API key is valid!' });
+      } else {
+        setApiKeyTestResult({ valid: false, message: data.error || 'Invalid Resend API key.' });
+      }
+    } catch {
+      setApiKeyTestResult({ valid: false, message: 'Network error while verifying API key.' });
+    } finally {
+      setIsTestingApiKey(false);
     }
   };
 
@@ -783,39 +869,164 @@ export const AdminNewsletterTab: React.FC = () => {
       {/* 6. Tab Content C: Email Sender Configuration */}
       {activeSubTab === 'settings' && (
         <div className="max-w-3xl space-y-4">
-          <div className="p-5 rounded-xl bg-white border border-slate-200/90 shadow-2xs space-y-4">
-            <div className="flex items-center gap-2 text-slate-900 font-bold text-sm pb-2 border-b border-slate-100">
+          <form onSubmit={handleSaveEmailConfig} className="p-5 rounded-xl bg-white border border-slate-200/90 shadow-2xs space-y-5">
+            <div className="flex items-center gap-2 text-slate-900 font-bold text-sm pb-3 border-b border-slate-100">
               <Mail className="w-4 h-4 text-teal-600" />
-              <span>Email Delivery Configuration</span>
+              <span>Email Delivery & Resend API Configuration</span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+            {emailConfigError && (
+              <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{emailConfigError}</span>
+              </div>
+            )}
+
+            {emailConfigSaved && (
+              <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Email delivery settings saved to database and applied immediately (no manual <code>.env</code> edit required).</span>
+              </div>
+            )}
+
+            <div className="space-y-4 text-xs">
+              {/* Outbound Provider Info */}
               <div className="space-y-1">
-                <label className="text-slate-700 font-medium">Outbound Mail Provider</label>
+                <label className="text-slate-700 font-semibold block">Outbound Mail Provider</label>
                 <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-800 font-mono text-[11px] flex items-center justify-between">
-                  <span>Resend (High-Deliverability SMTP API)</span>
-                  <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[9px] font-bold">READY</span>
+                  <span>Resend (Transactional OTP Verification & Newsletter Broadcast API)</span>
+                  <a
+                    href="https://resend.com/api-keys"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-teal-700 hover:text-teal-800 font-sans font-semibold underline"
+                  >
+                    <span>Resend Dashboard</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-slate-700 font-medium">Default Sender Address</label>
-                <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-800 font-mono text-[11px]">
-                  Trek Consultancy Forum &lt;onboarding@resend.dev&gt;
+              {/* RESEND_API_KEY */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-slate-700 font-semibold flex items-center gap-1.5">
+                    <Key className="w-3.5 h-3.5 text-teal-600" />
+                    <span>Resend API Key (<code className="text-[11px] font-mono text-teal-700">RESEND_API_KEY</code>)</span>
+                  </label>
+                  <span className="text-[10px] text-slate-400">Used for OTP verification & newsletter broadcasts</span>
                 </div>
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type={showResendKey ? 'text' : 'password'}
+                      value={resendApiKey}
+                      onChange={(e) => {
+                        setResendApiKey(e.target.value);
+                        if (apiKeyTestResult) setApiKeyTestResult(null);
+                      }}
+                      placeholder="re_ajK7NuLH_TfHfBwcML4dLXBTW69HSibqL"
+                      className="w-full pl-3 pr-20 py-2 rounded-lg border border-slate-300 bg-white text-slate-900 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-teal-600 focus:border-teal-600 shadow-2xs"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowResendKey(!showResendKey)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 px-1.5 py-1 rounded text-[11px] flex items-center gap-1 cursor-pointer"
+                    >
+                      {showResendKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      <span>{showResendKey ? 'Hide' : 'Show'}</span>
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleTestApiKey}
+                    disabled={isTestingApiKey || !resendApiKey.trim()}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-teal-200 bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50 shrink-0"
+                  >
+                    {isTestingApiKey ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-teal-600" />
+                        <span>Testing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5 text-teal-600" />
+                        <span>Test Key</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                {apiKeyTestResult && (
+                  <div className={`p-2.5 rounded-lg border text-xs flex items-center gap-2 ${
+                    apiKeyTestResult.valid
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                      : 'bg-rose-50 border-rose-200 text-rose-700'
+                  }`}>
+                    {apiKeyTestResult.valid ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                    )}
+                    <span className="font-medium">{apiKeyTestResult.message}</span>
+                  </div>
+                )}
+                <p className="text-[11px] text-slate-500">
+                  Resend API Key for real transactional email delivery (OTP verification & newsletter issues). Get a free key at <a href="https://resend.com" target="_blank" rel="noopener noreferrer" className="text-teal-600 underline">https://resend.com</a>.
+                </p>
+              </div>
+
+              {/* EMAIL_FROM */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-slate-700 font-semibold flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5 text-teal-600" />
+                    <span>Default Sender Address (<code className="text-[11px] font-mono text-teal-700">EMAIL_FROM</code>)</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setEmailFrom('Trek Consultancy Forum <onboarding@resend.dev>')}
+                    className="text-[10px] text-teal-600 hover:text-teal-700 underline cursor-pointer"
+                  >
+                    Use Resend Default (onboarding@resend.dev)
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  required
+                  value={emailFrom}
+                  onChange={(e) => setEmailFrom(e.target.value)}
+                  placeholder="Trek Consultancy Forum <thedelusiongaming024@gmail.com>"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-900 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-teal-600 focus:border-teal-600 shadow-2xs"
+                />
+                <p className="text-[11px] text-slate-500">
+                  Default sender before custom domain verification is <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-slate-700">onboarding@resend.dev</code> (e.g. <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-slate-700">Trek Consultancy Forum &lt;thedelusiongaming024@gmail.com&gt;</code>).
+                </p>
               </div>
             </div>
 
-            <div className="p-3 rounded-lg bg-blue-50/70 border border-blue-200 text-blue-900 text-xs space-y-1">
-              <span className="font-semibold flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-blue-600" />
-                <span>Custom Domain Verification</span>
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-3">
+              <span className="text-[11px] text-slate-400 font-mono">
+                {emailConfigUpdatedAt ? `Last updated: ${new Date(emailConfigUpdatedAt).toLocaleString()}` : 'Using active configuration'}
               </span>
-              <p className="text-[11px] text-blue-800 leading-relaxed">
-                To send newsletters directly from your corporate brand domain (e.g. <code>newsletter@trekconsultancy.com</code>), configure your DNS SPF and DKIM records in your Resend account, then set <code>EMAIL_FROM=newsletter@trekconsultancy.com</code> in your environment variables.
-              </p>
+              <button
+                type="submit"
+                disabled={isSavingEmailConfig || !emailFrom.trim()}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {isSavingEmailConfig ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Saving Settings...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-3.5 h-3.5" />
+                    <span>Save Email Settings</span>
+                  </>
+                )}
+              </button>
             </div>
-          </div>
+          </form>
         </div>
       )}
 
@@ -1069,7 +1280,7 @@ export const AdminNewsletterTab: React.FC = () => {
               </div>
               <div className="flex items-center gap-2">
                 <span className="font-semibold text-slate-500 w-16">From:</span>
-                <span className="text-slate-700">Trek Consultancy Forum &lt;onboarding@resend.dev&gt;</span>
+                <span className="text-slate-700">{emailFrom || 'Trek Consultancy Forum <onboarding@resend.dev>'}</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="font-semibold text-slate-500 w-16">Date:</span>

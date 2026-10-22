@@ -437,6 +437,7 @@ export default function App() {
     setAdminAuthUser(null);
     setCurrentUser(null);
     try {
+      localStorage.removeItem('trek_auth_token');
       localStorage.removeItem('trek_admin_auth');
       localStorage.removeItem('ama_admin_auth');
       localStorage.removeItem('trek_current_user');
@@ -447,6 +448,7 @@ export default function App() {
     } catch {
       // ignore
     }
+    fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
     setIsAuthModalOpen(false);
     showToast(language === 'ar' ? 'تم تسجيل الخروج من بوابتي الإدارة والمجتمع بنجاح.' : (language === 'bn' ? 'অ্যাডমিন ও কমিউনিটি উভয় পোর্টাল থেকেই সাইন আউট সম্পন্ন।' : 'Signed out of both Administrator and Community portals.'));
   };
@@ -537,6 +539,7 @@ export default function App() {
     setCurrentUser(null);
     setAdminAuthUser(null);
     try {
+      localStorage.removeItem('trek_auth_token');
       localStorage.removeItem('trek_current_user');
       localStorage.removeItem('ama_current_user');
       localStorage.removeItem('trek_admin_auth');
@@ -547,6 +550,7 @@ export default function App() {
     } catch {
       // ignore
     }
+    fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
     showToast(language === 'ar' ? 'تم تسجيل الخروج من منتدى تريك للاستشارات بنجاح.' : (language === 'bn' ? 'ট্রেক কনসালটেন্সি ফোরাম থেকে লগআউট সম্পন্ন।' : 'Signed out of Trek Consultancy Forum.'));
   };
 
