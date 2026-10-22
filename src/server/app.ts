@@ -2183,13 +2183,37 @@ export async function createApp() {
   app.get('/api/admin/newsletter/campaigns', async (_req, res) => {
     try {
       const result = await pool.query("SELECT value FROM settings WHERE key = 'newsletter_campaigns'");
-      if (result.rows.length > 0 && result.rows[0].value) {
+      if (result.rows.length > 0 && result.rows[0].value !== undefined && result.rows[0].value !== null) {
         const val = typeof result.rows[0].value === 'string' ? JSON.parse(result.rows[0].value) : result.rows[0].value;
-        if (Array.isArray(val) && val.length > 0) {
+        if (Array.isArray(val)) {
           return res.json(val);
         }
       }
       res.json(defaultNewsletterCampaigns);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.delete('/api/admin/newsletter/campaigns/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const cur = await pool.query("SELECT value FROM settings WHERE key = 'newsletter_campaigns'");
+      let campaigns = defaultNewsletterCampaigns;
+      if (cur.rows.length > 0 && cur.rows[0].value !== undefined && cur.rows[0].value !== null) {
+        try {
+          const parsed = typeof cur.rows[0].value === 'string' ? JSON.parse(cur.rows[0].value) : cur.rows[0].value;
+          if (Array.isArray(parsed)) campaigns = parsed;
+        } catch {}
+      }
+
+      const updated = campaigns.filter((c: any) => c.id !== id);
+      await pool.query(`
+        INSERT INTO settings (key, value) VALUES ('newsletter_campaigns', $1)
+        ON CONFLICT (key) DO UPDATE SET value = $1
+      `, [JSON.stringify(updated)]);
+
+      res.json({ success: true, id, campaigns: updated });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

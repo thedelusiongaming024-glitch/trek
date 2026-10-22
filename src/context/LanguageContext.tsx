@@ -272,10 +272,10 @@ const dictionary: Record<string, { en: string; bn: string; ar: string }> = {
   "Privacy Policy": { en: "Privacy Policy", bn: "গোপনীয়তা নীতি", ar: "سياسة الخصوصية" },
   "Terms of Service": { en: "Terms of Service", bn: "ব্যবহারের শর্তাবলী", ar: "شروط الخدمة" },
   "Refund Policy": { en: "Refund Policy", bn: "রিফান্ড পলিসি", ar: "سياسة الاسترداد" },
-  "© 2023–2026 B2bfiy. All Rights Reserved.": {
-    en: "© 2023–2026 B2bfiy. All Rights Reserved.",
-    bn: "© ২০২৩–২০২৬ B2bfiy। সর্বস্বত্ব সংরক্ষিত।",
-    ar: "© ٢٠٢٣–٢٠٢٦ B2bfiy. جميع الحقوق محفوظة."
+  "© 2023–2026 Copyright. All Rights Reserved.": {
+    en: "© 2023–2026 Copyright. All Rights Reserved.",
+    bn: "© ২০২৩–২০২৬ কপিরাইট। সর্বস্বত্ব সংরক্ষিত।",
+    ar: "© ٢٠٢٣–٢٠٢٦ حقوق النشر. جميع الحقوق محفوظة."
   },
 
   // Modals & Forms

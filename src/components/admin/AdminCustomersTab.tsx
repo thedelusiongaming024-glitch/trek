@@ -277,7 +277,7 @@ export const AdminCustomersTab: React.FC<AdminCustomersTabProps> = ({ currentAdm
       </div>
 
       {/* Metrics KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
         <div className="p-4 rounded-xl bg-white border border-slate-200/90 shadow-2xs">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-slate-500">
@@ -326,24 +326,6 @@ export const AdminCustomersTab: React.FC<AdminCustomersTabProps> = ({ currentAdm
           </p>
           <p className="text-[11px] text-slate-400 mt-0.5">
             {language === 'bn' ? 'ব্যবহারকারী ও এআই বার্তা' : language === 'ar' ? 'متبادلة مع الذكاء الاصطناعي' : 'Exchanged with AI & Staff'}
-          </p>
-        </div>
-
-        <div className="p-4 rounded-xl bg-white border border-slate-200/90 shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500">
-              {language === 'bn' ? 'ডাটাবেস স্ট্যাটাস' : language === 'ar' ? 'حالة قاعدة البيانات' : 'Database Status'}
-            </span>
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              Live
-            </span>
-          </div>
-          <p className="text-sm font-semibold text-slate-800 mt-2 truncate">
-            PostgreSQL Neon Sync
-          </p>
-          <p className="text-[11px] text-slate-400 mt-0.5">
-            {language === 'bn' ? 'তাৎক্ষণিক সিঙ্ক্রোনাইজেশন' : language === 'ar' ? 'مزامنة فورية حية' : 'Real-time multi-turn history'}
           </p>
         </div>
       </div>
@@ -843,23 +825,23 @@ export const AdminCustomersTab: React.FC<AdminCustomersTabProps> = ({ currentAdm
                                     ? customerDetail?.customer.name || 'Customer'
                                     : isStaff
                                     ? (language === 'bn'
-                                        ? 'একজন সিনিয়র এক্সিকিউটিভ আপনার প্রশ্নের দায়িত্ব গ্রহণ করেছেন'
+                                        ? 'একজন এক্সিকিউটিভ আপনার প্রশ্নটি গ্রহণ করেছেন'
                                         : language === 'ar'
-                                        ? 'استلم مسؤول تنفيذي أول استفسارك'
-                                        : 'An Executive Senior received your query')
-                                    : (language === 'bn' ? 'এআই অ্যাসিস্ট্যান্ট' : language === 'ar' ? 'المساعد الذকি' : 'AI Assistant')}
+                                        ? 'استلم مسؤول تنفيذي استفسارك'
+                                        : 'An executive has received your query')
+                                    : (language === 'bn' ? 'এআই অ্যাসিস্ট্যান্ট' : language === 'ar' ? 'المساعد الذكي' : 'AI Assistant')}
                                 </span>
 
                                 <span
-                                  className={`px-1.5 py-0.2 rounded text-[9px] font-semibold uppercase tracking-wider ${
+                                  className={`px-1.5 py-0.2 rounded text-[9px] font-semibold tracking-wider ${
                                     isUserMsg
-                                      ? 'bg-slate-100 text-slate-600 border border-slate-200'
+                                      ? 'bg-slate-100 text-slate-600 border border-slate-200 uppercase'
                                       : isStaff
                                       ? 'bg-teal-50 text-teal-700 border border-teal-200'
-                                      : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                                      : 'bg-indigo-50 text-indigo-700 border border-indigo-200 uppercase'
                                   }`}
                                 >
-                                  {isUserMsg ? 'User' : isStaff ? (language === 'bn' ? 'এক্সিকিউটিভ' : language === 'ar' ? 'تنفيذي' : 'EXECUTIVE') : 'AI'}
+                                  {isUserMsg ? 'User' : isStaff ? (language === 'bn' ? 'ট্রেক এক্সিকিউটিভ' : language === 'ar' ? 'مسؤول تريك التنفيذي' : 'Trek Executive') : 'AI'}
                                 </span>
 
                                 <span className="text-[10px] text-slate-400 ml-auto font-mono">
@@ -897,10 +879,10 @@ export const AdminCustomersTab: React.FC<AdminCustomersTabProps> = ({ currentAdm
                         </span>
                         <span className="text-[11px] text-teal-700 font-semibold bg-teal-50 px-2 py-0.5 rounded border border-teal-200/80">
                           {language === 'bn' 
-                            ? 'একজন সিনিয়র এক্সিকিউটিভ হিসেবে উত্তর পাঠানো হবে' 
+                            ? 'ট্রেক এক্সিকিউটিভ হিসেবে উত্তর পাঠানো হবে' 
                             : language === 'ar' 
-                            ? 'الرد بصفة مسؤول تنفيذي أول' 
-                            : 'An Executive Senior reached your query'}
+                            ? 'الرد بصفة مسؤول تريك التنفيذي' 
+                            : 'Trek Executive'}
                         </span>
                       </div>
 

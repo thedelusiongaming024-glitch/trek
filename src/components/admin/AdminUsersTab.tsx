@@ -165,16 +165,9 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                     </span>
                   </td>
 
-                  {/* Toggle Status & Delete Button */}
+                  {/* Delete Button */}
                   <td className="py-3.5 px-5 text-right">
                     <div className="flex items-center justify-end gap-1.5">
-                      <button
-                        onClick={() => onToggleStatus(user.id)}
-                        className="px-2.5 py-1 rounded-md text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors cursor-pointer shadow-2xs"
-                      >
-                        {user.status === 'active' ? 'Suspend' : 'Reactivate'}
-                      </button>
-
                       {onDeleteUser && (
                         <button
                           onClick={() => {

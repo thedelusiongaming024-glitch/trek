@@ -617,7 +617,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
                         {m.source && (m.source === 'STAFF' || m.text.includes('Senior Advisory & Support resolution') || m.text.includes('سفير الدعم وحل معتمد') || m.text.includes('সিনিয়র কনসালটেন্ট টিম কর্তৃক')) ? (
                           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50/90 border border-amber-200/60 text-amber-900 text-[11px] font-semibold mb-2">
                             <CheckCircle2 className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                            <span>{language === 'ar' ? 'استلم مسؤول تنفيذي أول استفسارك' : (language === 'bn' ? 'একজন সিনিয়র এক্সিকিউটিভ আপনার প্রশ্নের দায়িত্ব গ্রহণ করেছেন' : 'An Executive Senior has received your query')}</span>
+                            <span>{language === 'ar' ? 'استلم مسؤول تنفيذي استفسارك' : (language === 'bn' ? 'একজন এক্সিকিউটিভ আপনার প্রশ্নটি গ্রহণ করেছেন' : 'An executive has received your query')}</span>
                           </div>
                         ) : m.source && (m.source === 'RAG' || m.text.includes('From Knowledge Base') || m.text.includes('قاعدة المعرفة') || m.text.includes('নলেজ বেস')) ? (
                           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-teal-50/90 border border-teal-200/60 text-teal-800 text-[11px] font-semibold mb-2">
@@ -730,7 +730,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
                               : m.source === 'RAG'
                               ? t('Knowledge Base')
                               : m.source === 'STAFF'
-                              ? (language === 'ar' ? 'مسؤول تنفيذي أول' : (language === 'bn' ? 'সিনিয়র এক্সিকিউটিভ' : 'Executive Senior'))
+                              ? (language === 'ar' ? 'مسؤول تريك التنفيذي' : (language === 'bn' ? 'ট্রেক এক্সিকিউটিভ' : 'Trek Executive'))
                               : t('AI Answer')}
                           </span>
                         )}

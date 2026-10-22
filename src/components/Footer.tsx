@@ -82,44 +82,11 @@ export const Footer: React.FC<FooterProps> = () => {
             {/* Copyright */}
             <div className="text-xs sm:text-sm text-white/80 font-normal">
               {language === 'bn' ? (
-                <>
-                  © ২০২৩–২০২৬{' '}
-                  <a
-                    href="https://b2bfiy.me"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-medium text-white hover:text-teal-200 underline underline-offset-4 decoration-white/40 hover:decoration-teal-200 transition-colors cursor-pointer"
-                  >
-                    B2bfiy
-                  </a>
-                  । সর্বস্বত্ব সংরক্ষিত।
-                </>
+                <>© ২০২৩–২০২৬ কপিরাইট। সর্বস্বত্ব সংরক্ষিত।</>
               ) : language === 'ar' ? (
-                <>
-                  © ٢٠٢٣–٢٠٢٦{' '}
-                  <a
-                    href="https://b2bfiy.me"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-medium text-white hover:text-teal-200 underline underline-offset-4 decoration-white/40 hover:decoration-teal-200 transition-colors cursor-pointer"
-                  >
-                    B2bfiy
-                  </a>
-                  . جميع الحقوق محفوظة.
-                </>
+                <>© ٢٠٢٣–٢٠٢٦ حقوق النشر. جميع الحقوق محفوظة.</>
               ) : (
-                <>
-                  © 2023–2026{' '}
-                  <a
-                    href="https://b2bfiy.me"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-medium text-white hover:text-teal-200 underline underline-offset-4 decoration-white/40 hover:decoration-teal-200 transition-colors cursor-pointer"
-                  >
-                    B2bfiy
-                  </a>
-                  . All Rights Reserved.
-                </>
+                <>© 2023–2026 Copyright. All Rights Reserved.</>
               )}
             </div>
           </div>

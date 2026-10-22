@@ -65,6 +65,8 @@ export const AdminNewsletterTab: React.FC = () => {
   // Deletion modal
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteCampaignConfirmId, setDeleteCampaignConfirmId] = useState<string | null>(null);
+  const [isDeletingCampaign, setIsDeletingCampaign] = useState(false);
 
   // Fetch data
   const fetchData = async () => {
@@ -162,6 +164,27 @@ export const AdminNewsletterTab: React.FC = () => {
       console.error('Failed to remove subscriber:', err);
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  // Delete Campaign / Published Issue
+  const handleDeleteCampaign = async (id: string) => {
+    try {
+      setIsDeletingCampaign(true);
+      const res = await fetch(`/api/admin/newsletter/campaigns/${encodeURIComponent(id)}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        setCampaigns(prev => prev.filter(c => c.id !== id));
+        if (previewCampaign?.id === id) {
+          setPreviewCampaign(null);
+        }
+        setDeleteCampaignConfirmId(null);
+      }
+    } catch (err) {
+      console.error('Failed to delete campaign issue:', err);
+    } finally {
+      setIsDeletingCampaign(false);
     }
   };
 
@@ -633,7 +656,13 @@ export const AdminNewsletterTab: React.FC = () => {
                 </span>
               </div>
 
-              {campaigns.map((camp) => (
+              {campaigns.length === 0 ? (
+                <div className="p-8 rounded-xl bg-white border border-slate-200/90 text-center space-y-2">
+                  <FileText className="w-8 h-8 text-slate-300 mx-auto" />
+                  <p className="text-xs font-semibold text-slate-700">No published issues on file</p>
+                  <p className="text-[11px] text-slate-400">Draft and publish a new weekly digest to see it listed here.</p>
+                </div>
+              ) : campaigns.map((camp) => (
                 <div
                   key={camp.id}
                   className="p-4 rounded-xl bg-white border border-slate-200/90 shadow-2xs hover:border-slate-300 transition-all space-y-3"
@@ -662,14 +691,25 @@ export const AdminNewsletterTab: React.FC = () => {
                       )}
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setPreviewCampaign(camp)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-teal-500 hover:text-teal-700 text-slate-600 text-xs font-medium transition-colors cursor-pointer shrink-0"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                      <span>Preview Email</span>
-                    </button>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setPreviewCampaign(camp)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-teal-500 hover:text-teal-700 text-slate-600 text-xs font-medium transition-colors cursor-pointer"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>Preview Email</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setDeleteCampaignConfirmId(camp.id)}
+                        className="p-1.5 rounded-lg border border-slate-200 hover:border-rose-300 hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                        title="Delete issue"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 text-[11px] text-slate-500">
@@ -863,6 +903,35 @@ export const AdminNewsletterTab: React.FC = () => {
                 className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-medium cursor-pointer"
               >
                 {isDeleting ? 'Removing...' : 'Confirm Remove'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 8b. Modal: Delete Published Issue Confirmation */}
+      {deleteCampaignConfirmId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in">
+          <div className="relative w-full max-w-sm bg-white rounded-xl border border-slate-200 shadow-xl p-5 space-y-3">
+            <h3 className="text-sm font-semibold text-slate-900">Delete Published Issue?</h3>
+            <p className="text-xs text-slate-500">
+              Are you sure you want to permanently delete this published newsletter issue from the archive?
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteCampaignConfirmId(null)}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-600 hover:bg-slate-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingCampaign}
+                onClick={() => handleDeleteCampaign(deleteCampaignConfirmId)}
+                className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-medium cursor-pointer"
+              >
+                {isDeletingCampaign ? 'Deleting...' : 'Delete Issue'}
               </button>
             </div>
           </div>

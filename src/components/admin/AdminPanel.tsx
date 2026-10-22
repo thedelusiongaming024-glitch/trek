@@ -249,26 +249,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </button>
             </div>
           </div>
-
-          {/* System Status Info Card */}
-          <div className="mt-3 p-3 rounded-xl bg-white border border-slate-200/80 shadow-2xs text-xs space-y-1.5 hidden md:block">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-slate-700">
-                {language === 'bn' ? 'ডাটাবেস সিঙ্ক' : language === 'ar' ? 'مزامنة قاعدة البيانات' : 'Database Sync'}
-              </span>
-              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/70">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                {language === 'bn' ? 'সরাসরি' : language === 'ar' ? 'مباشر' : 'Live'}
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-500 leading-normal">
-              {language === 'bn' 
-                ? 'পোস্টগ্রিসকিউএল ডাটাবেসের সাথে সরাসরি সংযুক্ত। পাবলিক পোর্টালে তাৎক্ষণিকভাবে প্রতিফলিত হয়।' 
-                : language === 'ar'
-                ? 'اتصال مباشر بقاعدة بيانات PostgreSQL. تنعكس التغييرات فورياً على البوابة العامة.'
-                : 'Direct connection to PostgreSQL. Changes reflect instantly on the public portal.'}
-            </p>
-          </div>
         </aside>
 
         {/* Dynamic Content Region */}

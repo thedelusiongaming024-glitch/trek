@@ -167,46 +167,7 @@ export const TopicDetailModal: React.FC<TopicDetailModalProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {showEdit && (
-              <button
-                type="button"
-                onClick={() => onEditTopic?.(topic)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
-                  isAuthor && (topic.editCount || 0) >= 3
-                    ? 'text-slate-500 bg-slate-100 hover:bg-slate-200/80 border border-slate-200'
-                    : 'text-teal-700 hover:text-teal-800 bg-teal-50 hover:bg-teal-100/80 border border-teal-200/80'
-                }`}
-                title={
-                  isAuthor && (topic.editCount || 0) >= 3
-                    ? t('Edit limit reached (3/3 used)', 'সম্পাদনা সীমা অতিক্রম করেছে (৩/৩ ব্যবহৃত)', 'تم الوصول للحد الأقصى للتعديل (3/3 مستخدمة)')
-                    : (isAuthor ? t('Edit your post', 'আপনার পোস্ট সম্পাদনা করুন', 'تعديل منشورك') : t('Edit post (Admin)', 'পোস্ট সম্পাদনা (অ্যাডমিন)', 'تعديل المنشور (المشرف)'))
-                }
-                aria-label="Edit post"
-              >
-                <Pencil className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">
-                  {isAuthor ? t('Edit Your Post', 'পোস্ট সম্পাদনা', 'تعديل المنشور') : t('Edit Post', 'পোস্ট সম্পাদনা', 'تعديل')}
-                </span>
-                {isAuthor && (topic.editCount || 0) > 0 && (
-                  <span className="text-[10px] font-mono font-bold opacity-80">
-                    ({topic.editCount}/3)
-                  </span>
-                )}
-              </button>
-            )}
-            {showDelete && (
-              <button
-                type="button"
-                onClick={() => onDeleteTopic?.(topic)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100/80 border border-rose-200/70 transition-colors cursor-pointer"
-                title={isAuthor ? t('Delete your post', 'পোস্ট মুছুন', 'حذف منشورك') : t('Delete post (Admin)', 'পোস্ট মুছুন (অ্যাডমিন)', 'حذف المنشور (المشرف)')}
-                aria-label="Delete post"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">{isAuthor ? t('Delete Your Post', 'পোস্ট মুছুন', 'حذف المنشور') : t('Delete Post', 'পোস্ট মুছুন', 'حذف')}</span>
-              </button>
-            )}
+          <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={handleShare}
               className="min-w-[40px] min-h-[40px] flex items-center justify-center p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
@@ -232,7 +193,7 @@ export const TopicDetailModal: React.FC<TopicDetailModalProps> = ({
           </div>
 
           {/* Action Row */}
-          <div className="flex items-center justify-between py-2 border-y border-slate-200/80 text-xs text-slate-500">
+          <div className="flex flex-wrap items-center justify-between gap-2 py-2 border-y border-slate-200/80 text-xs text-slate-500">
             <div className="flex items-center gap-4">
               <span className="flex items-center gap-1.5">
                 <Eye className="w-4 h-4 text-slate-400" />
@@ -248,7 +209,7 @@ export const TopicDetailModal: React.FC<TopicDetailModalProps> = ({
               </span>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={(e) => onToggleLike(e, topic.id)}
@@ -262,6 +223,34 @@ export const TopicDetailModal: React.FC<TopicDetailModalProps> = ({
                 <ThumbsUp className={`w-3.5 h-3.5 ${topic.isLiked ? 'fill-teal-500 text-teal-500' : ''}`} />
                 <span><strong className="font-bold">{formatNumber(topic.likes)}</strong> {topic.likes === 1 ? t('Like') : t('Likes')}</span>
               </button>
+
+              {showEdit && (
+                <button
+                  type="button"
+                  onClick={() => onEditTopic?.(topic)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-colors cursor-pointer ${
+                    isAuthor && (topic.editCount || 0) >= 3
+                      ? 'text-slate-500 bg-slate-100 hover:bg-slate-200/80 border-slate-200'
+                      : 'text-teal-700 hover:text-teal-800 bg-teal-50 hover:bg-teal-100/80 border-teal-200/80'
+                  }`}
+                  title={
+                    isAuthor && (topic.editCount || 0) >= 3
+                      ? t('Edit limit reached (3/3 used)', 'সম্পাদনা সীমা অতিক্রম করেছে (৩/৩ ব্যবহৃত)', 'تم الوصول للحد الأقصى للتعديل (3/3 مستخدمة)')
+                      : (isAuthor ? t('Edit your post', 'আপনার পোস্ট সম্পাদনা করুন', 'تعديل منشورك') : t('Edit post (Admin)', 'পোস্ট সম্পাদনা (অ্যাডমিন)', 'تعديل المنشور (المشرف)'))
+                  }
+                  aria-label="Edit post"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  <span className="text-xs font-semibold">
+                    {isAuthor ? t('Edit Your Post', 'পোস্ট সম্পাদনা', 'تعديل المنشور') : t('Edit Post', 'পোস্ট সম্পাদনা', 'تعديل')}
+                  </span>
+                  {isAuthor && (topic.editCount || 0) > 0 && (
+                    <span className="text-[10px] font-mono font-bold opacity-80">
+                      ({topic.editCount}/3)
+                    </span>
+                  )}
+                </button>
+              )}
 
               {showDelete && (
                 <button

@@ -42,6 +42,35 @@ var import_serverless = require("@neondatabase/serverless");
 var import_ws = __toESM(require("ws"), 1);
 var import_dotenv = __toESM(require("dotenv"), 1);
 var import_fs = __toESM(require("fs"), 1);
+try {
+  if (typeof WebSocket !== "undefined") {
+    const probe = new WebSocket("ws://127.0.0.1:1");
+    probe.onerror = (e) => {
+      const proto = Object.getPrototypeOf(e);
+      if (proto && proto.constructor?.name === "ErrorEvent") {
+        const desc = Object.getOwnPropertyDescriptor(proto, "message");
+        if (desc && !desc.set) {
+          const originalGet = desc.get;
+          Object.defineProperty(proto, "message", {
+            get() {
+              return this._custom_msg_override !== void 0 ? this._custom_msg_override : originalGet?.call(this);
+            },
+            set(val) {
+              this._custom_msg_override = val;
+            },
+            configurable: true,
+            enumerable: true
+          });
+        }
+      }
+      try {
+        probe.close();
+      } catch {
+      }
+    };
+  }
+} catch {
+}
 import_dotenv.default.config();
 if (!process.env.DATABASE_URL && import_fs.default.existsSync("env.txt")) {
   import_dotenv.default.config({ path: "env.txt" });
@@ -408,7 +437,18 @@ var pool = {
   },
   connect: async () => {
     if (realPool) {
-      return await realPool.connect();
+      let timer;
+      const timeoutPromise = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error("Neon pool connect timeout (12000ms)")), 12e3);
+      });
+      try {
+        const client = await Promise.race([realPool.connect(), timeoutPromise]);
+        clearTimeout(timer);
+        return client;
+      } catch (err) {
+        clearTimeout(timer);
+        throw err;
+      }
     }
     throw new Error("DATABASE_URL is not configured \u2014 no database connection is available.");
   }
@@ -619,13 +659,23 @@ async function initDb() {
           replies       INT DEFAULT 0,
           is_featured   BOOLEAN DEFAULT FALSE,
           is_popular    BOOLEAN DEFAULT FALSE,
+          status        VARCHAR(20) DEFAULT 'approved',
+          edit_count    INT DEFAULT 0,
           content       TEXT NOT NULL,
           created_at    TIMESTAMPTZ DEFAULT NOW()
         );
 
+        ALTER TABLE topics ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'approved';
+        ALTER TABLE topics ADD COLUMN IF NOT EXISTS edit_count INT DEFAULT 0;
+        ALTER TABLE topics ADD COLUMN IF NOT EXISTS last_approved_title VARCHAR(500);
+        ALTER TABLE topics ADD COLUMN IF NOT EXISTS last_approved_category VARCHAR(255);
+        ALTER TABLE topics ADD COLUMN IF NOT EXISTS last_approved_category_slug VARCHAR(255);
+        ALTER TABLE topics ADD COLUMN IF NOT EXISTS last_approved_content TEXT;
+
         CREATE TABLE IF NOT EXISTS replies (
           id          VARCHAR(64) PRIMARY KEY,
           topic_id    VARCHAR(64) NOT NULL REFERENCES topics(id) ON DELETE CASCADE,
+          parent_reply_id VARCHAR(64) REFERENCES replies(id) ON DELETE CASCADE,
           author      VARCHAR(255) NOT NULL,
           author_role VARCHAR(100) DEFAULT 'Member',
           author_avatar TEXT,
@@ -633,6 +683,23 @@ async function initDb() {
           content     TEXT NOT NULL,
           likes       INT DEFAULT 0,
           created_at  TIMESTAMPTZ DEFAULT NOW()
+        );
+
+        ALTER TABLE replies ADD COLUMN IF NOT EXISTS parent_reply_id VARCHAR(64) REFERENCES replies(id) ON DELETE CASCADE;
+        CREATE INDEX IF NOT EXISTS idx_replies_parent_reply_id ON replies (parent_reply_id);
+
+        CREATE TABLE IF NOT EXISTS user_notifications (
+          id          VARCHAR(64) PRIMARY KEY,
+          user_id     VARCHAR(64),
+          user_email  VARCHAR(255) NOT NULL,
+          topic_id    VARCHAR(64),
+          topic_title VARCHAR(500) NOT NULL,
+          type        VARCHAR(30) NOT NULL,
+          title       VARCHAR(255) NOT NULL,
+          message     TEXT NOT NULL,
+          is_read     BOOLEAN DEFAULT FALSE,
+          created_at  TIMESTAMPTZ DEFAULT NOW(),
+          read_at     TIMESTAMPTZ
         );
       `);
       await client.query(`
@@ -2314,11 +2381,53 @@ async function createApp() {
       checks
     });
   });
-  app.get("/api/topics", async (_req, res) => {
+  function buildNestedReplies(replyRows) {
+    const replyMap = /* @__PURE__ */ new Map();
+    const topLevelReplies = [];
+    for (const row of replyRows) {
+      const replyObj = {
+        id: row.id,
+        topicId: row.topic_id,
+        parentReplyId: row.parent_reply_id || null,
+        author: row.author,
+        authorRole: row.author_role,
+        authorAvatar: row.author_avatar,
+        timeAgo: row.time_ago,
+        createdAt: row.created_at,
+        content: row.content,
+        likes: row.likes || 0,
+        nestedReplies: []
+      };
+      replyMap.set(row.id, replyObj);
+    }
+    for (const row of replyRows) {
+      const current = replyMap.get(row.id);
+      if (!current) continue;
+      if (current.parentReplyId && replyMap.has(current.parentReplyId)) {
+        let topParent = replyMap.get(current.parentReplyId);
+        while (topParent.parentReplyId && replyMap.has(topParent.parentReplyId)) {
+          topParent = replyMap.get(topParent.parentReplyId);
+        }
+        topParent.nestedReplies.push(current);
+      } else {
+        topLevelReplies.push(current);
+      }
+    }
+    return {
+      repliesList: topLevelReplies,
+      totalCount: replyRows.length
+    };
+  }
+  app.get("/api/topics", async (req, res) => {
     try {
-      const topicsRes = await pool.query(`
-        SELECT * FROM topics ORDER BY created_at DESC
-      `);
+      const statusFilter = (req.query.status || "").trim().toLowerCase();
+      let query = "SELECT * FROM topics ORDER BY created_at DESC";
+      let params = [];
+      if (statusFilter && ["approved", "pending", "rejected"].includes(statusFilter)) {
+        query = "SELECT * FROM topics WHERE status = $1 ORDER BY created_at DESC";
+        params = [statusFilter];
+      }
+      const topicsRes = await pool.query(query, params);
       const repliesRes = await pool.query(`
         SELECT * FROM replies ORDER BY created_at ASC
       `);
@@ -2327,37 +2436,36 @@ async function createApp() {
         if (!repliesByTopic[reply.topic_id]) {
           repliesByTopic[reply.topic_id] = [];
         }
-        repliesByTopic[reply.topic_id].push({
-          id: reply.id,
-          author: reply.author,
-          authorRole: reply.author_role,
-          authorAvatar: reply.author_avatar,
-          timeAgo: reply.time_ago,
-          createdAt: reply.created_at,
-          content: reply.content,
-          likes: reply.likes || 0
-        });
+        repliesByTopic[reply.topic_id].push(reply);
       }
-      const topics = topicsRes.rows.map((t) => ({
-        id: t.id,
-        title: t.title,
-        author: t.author,
-        authorEmail: t.author_email,
-        authorId: t.author_id,
-        authorRole: t.author_role,
-        authorAvatar: t.author_avatar,
-        timeAgo: t.time_ago,
-        createdAt: t.created_at,
-        category: t.category,
-        categorySlug: t.category_slug,
-        views: t.views || 0,
-        likes: t.likes || 0,
-        replies: repliesByTopic[t.id]?.length ?? (t.replies || 0),
-        isFeatured: Boolean(t.is_featured),
-        isPopular: Boolean(t.is_popular),
-        content: t.content,
-        repliesList: repliesByTopic[t.id] || []
-      }));
+      const topics = topicsRes.rows.map((t) => {
+        const topicRows = repliesByTopic[t.id] || [];
+        const { repliesList, totalCount } = buildNestedReplies(topicRows);
+        return {
+          id: t.id,
+          title: t.title,
+          author: t.author,
+          authorEmail: t.author_email,
+          authorId: t.author_id,
+          authorRole: t.author_role,
+          authorAvatar: t.author_avatar,
+          timeAgo: t.time_ago,
+          createdAt: t.created_at,
+          category: t.category,
+          categorySlug: t.category_slug,
+          views: t.views || 0,
+          likes: t.likes || 0,
+          replies: totalCount > 0 ? totalCount : t.replies || 0,
+          isFeatured: Boolean(t.is_featured),
+          isPopular: Boolean(t.is_popular),
+          status: t.status || "approved",
+          editCount: Number(t.edit_count || 0),
+          lastApprovedTitle: t.last_approved_title || null,
+          lastApprovedContent: t.last_approved_content || null,
+          content: t.content,
+          repliesList
+        };
+      });
       res.json(topics);
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -2485,11 +2593,19 @@ async function createApp() {
       } = req.body;
       const id = `topic-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
       const avatar = authorAvatar || getRandomAvatar(authorEmail || author);
+      const roleClean = (authorRole || "").toLowerCase();
+      const isAdmin = roleClean.includes("admin") || roleClean.includes("super admin") || roleClean.includes("staff") || req.body.isAdmin === true;
+      const status = isAdmin ? "approved" : "pending";
+      const finalCategorySlug = (categorySlug || (category || "").toLowerCase().replace(/[^a-z0-9]+/g, "-") || "general").trim();
+      const approvedTitle = status === "approved" ? title : null;
+      const approvedCategory = status === "approved" ? category : null;
+      const approvedCategorySlug = status === "approved" ? finalCategorySlug : null;
+      const approvedContent = status === "approved" ? content : null;
       const insertRes = await pool.query(`
-        INSERT INTO topics (id, title, author, author_email, author_id, author_role, author_avatar, time_ago, category, category_slug, views, likes, replies, is_featured, is_popular, content)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 1, 0, 0, false, false, $11)
+        INSERT INTO topics (id, title, author, author_email, author_id, author_role, author_avatar, time_ago, category, category_slug, views, likes, replies, is_featured, is_popular, status, content, edit_count, last_approved_title, last_approved_category, last_approved_category_slug, last_approved_content)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 1, 0, 0, false, false, $11, $12, 0, $13, $14, $15, $16)
         RETURNING *
-      `, [id, title, author || "Community Member", authorEmail || null, authorId || null, authorRole || "Member", avatar, timeAgo || "Just now", category, categorySlug, content]);
+      `, [id, title, author || "Community Member", authorEmail || null, authorId || null, authorRole || "Member", avatar, timeAgo || "Just now", category, finalCategorySlug, status, content, approvedTitle, approvedCategory, approvedCategorySlug, approvedContent]);
       const newTopic = {
         id: insertRes.rows[0].id,
         title: insertRes.rows[0].title,
@@ -2507,13 +2623,17 @@ async function createApp() {
         replies: 0,
         isFeatured: false,
         isPopular: false,
+        status: insertRes.rows[0].status || status,
+        editCount: 0,
+        lastApprovedTitle: insertRes.rows[0].last_approved_title || null,
+        lastApprovedContent: insertRes.rows[0].last_approved_content || null,
         content: insertRes.rows[0].content,
         repliesList: []
       };
       await pool.query(`
         INSERT INTO activity_logs (id, action, actor, target, time_ago, type)
-        VALUES ($1, 'Published Topic', $2, $3, 'Just now', 'topic')
-      `, [`act-${Date.now()}`, author || "Community Member", title]);
+        VALUES ($1, $2, $3, $4, 'Just now', 'topic')
+      `, [`act-${Date.now()}`, status === "approved" ? "Published Topic" : "Submitted Topic (Pending Approval)", author || "Community Member", title]);
       res.status(201).json(newTopic);
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -2586,8 +2706,10 @@ async function createApp() {
       const userName = (req.headers["x-user-name"] || req.body?.userName || "").trim().toLowerCase();
       const userId = (req.headers["x-user-id"] || req.body?.userId || "").trim();
       let isAllowed = false;
+      let isAdmin = false;
       if (userRole === "Super Admin" || userRole === "Moderator" || userRole === "Admin") {
         isAllowed = true;
+        isAdmin = true;
       }
       if (!isAllowed && userEmail) {
         const uRes = await pool.query(
@@ -2598,6 +2720,7 @@ async function createApp() {
           const r = uRes.rows[0].role;
           if (r === "Super Admin" || r === "Moderator" || r === "Admin") {
             isAllowed = true;
+            isAdmin = true;
           }
         }
       }
@@ -2620,6 +2743,22 @@ async function createApp() {
           error: "Permission denied: Only administrators and the author who posted this discussion can edit it."
         });
       }
+      const currentEditCount = Number(topic.edit_count || 0);
+      if (!isAdmin && currentEditCount >= 3) {
+        return res.status(400).json({
+          error: "Maximum edit limit reached. You can only edit your post up to 3 times."
+        });
+      }
+      let newStatus = topic.status || "approved";
+      let nextEditCount = currentEditCount;
+      const prevApprovedTitle = topic.last_approved_title || (topic.status === "approved" ? topic.title : null);
+      const prevApprovedCategory = topic.last_approved_category || (topic.status === "approved" ? topic.category : null);
+      const prevApprovedCategorySlug = topic.last_approved_category_slug || (topic.status === "approved" ? topic.category_slug : null);
+      const prevApprovedContent = topic.last_approved_content || (topic.status === "approved" ? topic.content : null);
+      if (!isAdmin) {
+        newStatus = "pending";
+        nextEditCount = currentEditCount + 1;
+      }
       const cleanTitle = (title !== void 0 ? title : topic.title).trim();
       const cleanCategory = (category !== void 0 ? category : topic.category).trim();
       let cleanCategorySlug = (categorySlug !== void 0 ? categorySlug : topic.category_slug || "").trim();
@@ -2629,22 +2768,26 @@ async function createApp() {
       const cleanContent = (content !== void 0 ? content : topic.content).trim();
       const updateRes = await pool.query(`
         UPDATE topics
-        SET title = $1, category = $2, category_slug = $3, content = $4
-        WHERE id = $5
+        SET title = $1, category = $2, category_slug = $3, content = $4, status = $5, edit_count = $6,
+            last_approved_title = COALESCE($7, last_approved_title),
+            last_approved_category = COALESCE($8, last_approved_category),
+            last_approved_category_slug = COALESCE($9, last_approved_category_slug),
+            last_approved_content = COALESCE($10, last_approved_content)
+        WHERE id = $11
         RETURNING *
-      `, [cleanTitle, cleanCategory, cleanCategorySlug, cleanContent, id]);
+      `, [cleanTitle, cleanCategory, cleanCategorySlug, cleanContent, newStatus, nextEditCount, prevApprovedTitle, prevApprovedCategory, prevApprovedCategorySlug, prevApprovedContent, id]);
       const updated = updateRes.rows[0];
+      await pool.query(`
+        INSERT INTO activity_logs (id, action, actor, target, time_ago, type)
+        VALUES ($1, $2, $3, $4, 'Just now', 'topic')
+      `, [
+        `act-${Date.now()}`,
+        newStatus === "pending" ? "Edited Topic (Pending Review)" : "Edited Topic",
+        userName || topic.author || "Member",
+        cleanTitle
+      ]);
       const repliesRes = await pool.query("SELECT * FROM replies WHERE topic_id = $1 ORDER BY created_at ASC", [id]);
-      const repliesList = repliesRes.rows.map((reply) => ({
-        id: reply.id,
-        author: reply.author,
-        authorRole: reply.author_role,
-        authorAvatar: reply.author_avatar,
-        timeAgo: reply.time_ago,
-        createdAt: reply.created_at,
-        content: reply.content,
-        likes: reply.likes || 0
-      }));
+      const { repliesList, totalCount } = buildNestedReplies(repliesRes.rows);
       res.json({
         id: updated.id,
         title: updated.title,
@@ -2659,9 +2802,13 @@ async function createApp() {
         categorySlug: updated.category_slug,
         views: updated.views || 0,
         likes: updated.likes || 0,
-        replies: repliesList.length,
+        replies: totalCount > 0 ? totalCount : updated.replies || 0,
         isFeatured: Boolean(updated.is_featured),
         isPopular: Boolean(updated.is_popular),
+        status: updated.status,
+        editCount: Number(updated.edit_count || 0),
+        lastApprovedTitle: updated.last_approved_title || null,
+        lastApprovedContent: updated.last_approved_content || null,
         content: updated.content,
         repliesList
       });
@@ -2693,6 +2840,215 @@ async function createApp() {
       res.status(500).json({ error: err.message });
     }
   });
+  app.post("/api/topics/:id/approve", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const result = await pool.query(`
+        UPDATE topics
+        SET status = 'approved',
+            last_approved_title = title,
+            last_approved_category = category,
+            last_approved_category_slug = category_slug,
+            last_approved_content = content
+        WHERE id = $1
+        RETURNING *
+      `, [id]);
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Topic not found" });
+      }
+      const topic = result.rows[0];
+      if (topic.author_email || topic.author_id) {
+        const notifId = `notif-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+        await pool.query(`
+          INSERT INTO user_notifications (id, user_id, user_email, topic_id, topic_title, type, title, message, is_read, created_at)
+          VALUES ($1, $2, $3, $4, $5, 'topic_approved', $6, $7, false, NOW())
+        `, [
+          notifId,
+          topic.author_id || null,
+          topic.author_email || "",
+          topic.id,
+          topic.title,
+          Number(topic.edit_count || 0) > 0 ? "Edited Question Approved! \u{1F389}" : "Discussion Question Approved! \u{1F389}",
+          Number(topic.edit_count || 0) > 0 ? `Your edited question "${topic.title}" has been approved by the admin and is now live on the forum.` : `Your question "${topic.title}" has been approved by the admin and is now live on the forum.`
+        ]);
+      }
+      await pool.query(`
+        INSERT INTO activity_logs (id, action, actor, target, time_ago, type)
+        VALUES ($1, 'Approved Discussion', 'Admin', $2, 'Just now', 'topic')
+      `, [`act-${Date.now()}`, topic.title]);
+      res.json({ success: true, topic: { ...topic, status: "approved" } });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+  app.post("/api/topics/:id/reject", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { reason } = req.body || {};
+      const result = await pool.query("SELECT * FROM topics WHERE id = $1", [id]);
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Topic not found" });
+      }
+      const topic = result.rows[0];
+      const isEditRejection = Number(topic.edit_count || 0) > 0 || Boolean(topic.last_approved_title);
+      if (isEditRejection) {
+        const restoredTitle = topic.last_approved_title || topic.title;
+        const restoredCategory = topic.last_approved_category || topic.category;
+        const restoredCategorySlug = topic.last_approved_category_slug || topic.category_slug;
+        const restoredContent = topic.last_approved_content || topic.content;
+        const updateRes = await pool.query(`
+          UPDATE topics
+          SET title = $1, category = $2, category_slug = $3, content = $4, status = 'approved'
+          WHERE id = $5
+          RETURNING *
+        `, [restoredTitle, restoredCategory, restoredCategorySlug, restoredContent, id]);
+        const restored = updateRes.rows[0];
+        if (topic.author_email || topic.author_id) {
+          const notifId = `notif-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+          const rejectMsg = reason?.trim() ? `Your edit for question "${restoredTitle}" was reviewed and rejected by the admin. Your original question remains unchanged and live on the forum. Reason: ${reason.trim()}` : `Your edit for question "${restoredTitle}" was reviewed and rejected by the admin. Your original question remains unchanged and live on the forum.`;
+          await pool.query(`
+            INSERT INTO user_notifications (id, user_id, user_email, topic_id, topic_title, type, title, message, is_read, created_at)
+            VALUES ($1, $2, $3, $4, $5, 'topic_rejected', $6, $7, false, NOW())
+          `, [
+            notifId,
+            topic.author_id || null,
+            topic.author_email || "",
+            topic.id,
+            restoredTitle,
+            "Edit Rejected by Admin",
+            rejectMsg
+          ]);
+        }
+        await pool.query(`
+          INSERT INTO activity_logs (id, action, actor, target, time_ago, type)
+          VALUES ($1, 'Rejected Edit on Discussion (Reverted to Original Approved Content)', 'Admin', $2, 'Just now', 'topic')
+        `, [`act-${Date.now()}`, restoredTitle]);
+        const repliesRes = await pool.query("SELECT * FROM replies WHERE topic_id = $1 ORDER BY created_at ASC", [id]);
+        const { repliesList, totalCount } = buildNestedReplies(repliesRes.rows);
+        return res.json({
+          success: true,
+          reverted: true,
+          topic: {
+            id: restored.id,
+            title: restored.title,
+            author: restored.author,
+            authorEmail: restored.author_email,
+            authorId: restored.author_id,
+            authorRole: restored.author_role,
+            authorAvatar: restored.author_avatar,
+            timeAgo: restored.time_ago,
+            createdAt: restored.created_at,
+            category: restored.category,
+            categorySlug: restored.category_slug,
+            views: restored.views || 0,
+            likes: restored.likes || 0,
+            replies: totalCount > 0 ? totalCount : restored.replies || 0,
+            isFeatured: Boolean(restored.is_featured),
+            isPopular: Boolean(restored.is_popular),
+            status: "approved",
+            editCount: Number(restored.edit_count || 0),
+            lastApprovedTitle: restored.last_approved_title || null,
+            lastApprovedContent: restored.last_approved_content || null,
+            content: restored.content,
+            repliesList
+          }
+        });
+      }
+      if (topic.author_email || topic.author_id) {
+        const notifId = `notif-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+        const rejectMsg = reason?.trim() ? `Your question "${topic.title}" was reviewed and rejected by the admin. Reason: ${reason.trim()}` : `Your question "${topic.title}" was reviewed and rejected by the admin.`;
+        await pool.query(`
+          INSERT INTO user_notifications (id, user_id, user_email, topic_id, topic_title, type, title, message, is_read, created_at)
+          VALUES ($1, $2, $3, $4, $5, 'topic_rejected', $6, $7, false, NOW())
+        `, [
+          notifId,
+          topic.author_id || null,
+          topic.author_email || "",
+          topic.id,
+          topic.title,
+          "Discussion Post Rejected",
+          rejectMsg
+        ]);
+      }
+      await pool.query(`
+        INSERT INTO activity_logs (id, action, actor, target, time_ago, type)
+        VALUES ($1, 'Rejected & Deleted Discussion', 'Admin', $2, 'Just now', 'topic')
+      `, [`act-${Date.now()}`, topic.title]);
+      await pool.query("DELETE FROM replies WHERE topic_id = $1", [id]);
+      await pool.query("DELETE FROM topics WHERE id = $1", [id]);
+      res.json({ success: true, deleted: true, topicId: id });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+  app.get("/api/notifications", async (req, res) => {
+    try {
+      const email = (req.query.email || req.query.userEmail || "").trim().toLowerCase();
+      const userId = (req.query.userId || req.query.user_id || "").trim();
+      if (!email && !userId) {
+        return res.json([]);
+      }
+      const result = await pool.query(`
+        SELECT * FROM user_notifications
+        WHERE (
+          (LOWER(user_email) = LOWER($1) AND $1 != '')
+          OR (user_id = $2 AND $2 != '')
+        )
+        AND is_read = FALSE
+        ORDER BY created_at DESC
+        LIMIT 10
+      `, [email, userId]);
+      const notifications = result.rows.map((n) => ({
+        id: n.id,
+        userId: n.user_id,
+        userEmail: n.user_email,
+        topicId: n.topic_id,
+        topicTitle: n.topic_title,
+        type: n.type,
+        title: n.title,
+        message: n.message,
+        isRead: Boolean(n.is_read),
+        createdAt: n.created_at,
+        readAt: n.read_at
+      }));
+      res.json(notifications);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+  app.post("/api/notifications/:id/read", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await pool.query(`
+        UPDATE user_notifications SET is_read = TRUE, read_at = NOW() WHERE id = $1
+      `, [id]);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+  app.post("/api/notifications/mark-all-read", async (req, res) => {
+    try {
+      const { email, userId } = req.body || {};
+      const cleanEmail = (email || "").trim().toLowerCase();
+      const cleanUserId = (userId || "").trim();
+      if (!cleanEmail && !cleanUserId) {
+        return res.json({ success: true });
+      }
+      await pool.query(`
+        UPDATE user_notifications
+        SET is_read = TRUE, read_at = NOW()
+        WHERE (
+          (LOWER(user_email) = LOWER($1) AND $1 != '')
+          OR (user_id = $2 AND $2 != '')
+        )
+        AND is_read = FALSE
+      `, [cleanEmail, cleanUserId]);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
   app.post("/api/topics/:id/like", async (req, res) => {
     try {
       const { id } = req.params;
@@ -2709,30 +3065,55 @@ async function createApp() {
   app.post("/api/topics/:id/replies", async (req, res) => {
     try {
       const { id: topicId } = req.params;
-      const { author, content, authorAvatar, authorRole } = req.body;
+      const { author, content, authorAvatar, authorRole, parentReplyId } = req.body;
       const replyId = `rep-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
       const avatar = authorAvatar || getRandomAvatar(author);
+      let validParentId = null;
+      if (parentReplyId && typeof parentReplyId === "string" && parentReplyId.trim()) {
+        const checkParent = await pool.query("SELECT id FROM replies WHERE id = $1 AND topic_id = $2", [parentReplyId.trim(), topicId]);
+        if (checkParent.rowCount && checkParent.rowCount > 0) {
+          validParentId = parentReplyId.trim();
+        }
+      }
       const replyRes = await pool.query(`
-        INSERT INTO replies (id, topic_id, author, author_role, author_avatar, time_ago, content, likes)
-        VALUES ($1, $2, $3, $4, $5, 'Just now', $6, 0)
+        INSERT INTO replies (id, topic_id, parent_reply_id, author, author_role, author_avatar, time_ago, content, likes)
+        VALUES ($1, $2, $3, $4, $5, $6, 'Just now', $7, 0)
         RETURNING *
-      `, [replyId, topicId, author || "Community Member", authorRole || "Member", avatar, content]);
+      `, [replyId, topicId, validParentId, author || "Community Member", authorRole || "Member", avatar, content]);
       await pool.query("UPDATE topics SET replies = (SELECT COUNT(*) FROM replies WHERE topic_id = $1) WHERE id = $1", [topicId]);
       const reply = {
         id: replyRes.rows[0].id,
+        topicId: replyRes.rows[0].topic_id,
+        parentReplyId: replyRes.rows[0].parent_reply_id || null,
         author: replyRes.rows[0].author,
         authorRole: replyRes.rows[0].author_role,
         authorAvatar: replyRes.rows[0].author_avatar,
         timeAgo: replyRes.rows[0].time_ago,
         createdAt: replyRes.rows[0].created_at || (/* @__PURE__ */ new Date()).toISOString(),
         content: replyRes.rows[0].content,
-        likes: 0
+        likes: 0,
+        nestedReplies: []
       };
       await pool.query(`
         INSERT INTO activity_logs (id, action, actor, target, time_ago, type)
-        VALUES ($1, 'Added Reply', $2, 'Discussion Thread', 'Just now', 'reply')
-      `, [`act-${Date.now()}`, author || "Community Member"]);
+        VALUES ($1, $2, $3, 'Discussion Thread', 'Just now', 'reply')
+      `, [`act-${Date.now()}`, validParentId ? "Added Nested Reply" : "Added Reply", author || "Community Member"]);
       res.status(201).json(reply);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+  app.delete("/api/replies/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const findRes = await pool.query("SELECT topic_id FROM replies WHERE id = $1", [id]);
+      if (findRes.rowCount === 0) {
+        return res.status(404).json({ error: "Reply not found" });
+      }
+      const topicId = findRes.rows[0].topic_id;
+      await pool.query("DELETE FROM replies WHERE id = $1", [id]);
+      await pool.query("UPDATE topics SET replies = (SELECT COUNT(*) FROM replies WHERE topic_id = $1) WHERE id = $1", [topicId]);
+      res.json({ success: true, deletedId: id, topicId });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -3920,7 +4301,7 @@ Securing internal microservice communications across hybrid multi-cloud topologi
     if (isGreeting) {
       if (userLang === "bn") {
         return {
-          reply: `\u09A8\u09AE\u09B8\u09CD\u0995\u09BE\u09B0 / \u0986\u09B8\u09B8\u09BE\u09B2\u09BE\u09AE\u09C1 \u0986\u09B2\u09BE\u0987\u0995\u09C1\u09AE! **${forumName}** \u098F\u0986\u0987 \u0985\u09CD\u09AF\u09BE\u09B8\u09BF\u09B8\u09CD\u099F\u09CD\u09AF\u09BE\u09A8\u09CD\u099F\u09C7 \u0986\u09AA\u09A8\u09BE\u0995\u09C7 \u09B8\u09CD\u09AC\u09BE\u0997\u09A4\u09AE\u0964
+          reply: `\u09A8\u09AE\u09B8\u09CD\u0995\u09BE\u09B0 / \u0986\u09B8\u09B8\u09BE\u09B2\u09BE\u09AE\u09C1 \u0986\u09B2\u09BE\u0987\u0995\u09C1\u09AE! **${forumName}** \u098F\u0986\u0987 \u098F\u099C\u09C7\u09A8\u09CD\u099F\u09C7 \u0986\u09AA\u09A8\u09BE\u0995\u09C7 \u09B8\u09CD\u09AC\u09BE\u0997\u09A4\u09AE\u0964
 
 \u0986\u09AE\u09BF \u0986\u09AA\u09A8\u09BE\u0995\u09C7 \u099F\u09CD\u09B0\u09C7\u0995\u09C7\u09B0 \u09B8\u09AE\u09CD\u09AA\u09C2\u09B0\u09CD\u09A3 \u09AA\u09CD\u09B0\u09BE\u09A4\u09BF\u09B7\u09CD\u09A0\u09BE\u09A8\u09BF\u0995 \u09A8\u09B2\u09C7\u099C \u09AC\u09C7\u09B8 \u0993 \u09A1\u09BE\u099F\u09BE\u09AC\u09C7\u099C\u09C7\u09B0 \u09A4\u09A5\u09CD\u09AF\u09C7\u09B0 \u09AD\u09BF\u09A4\u09CD\u09A4\u09BF\u09A4\u09C7 \u09B8\u09B9\u09BE\u09DF\u09A4\u09BE \u0995\u09B0\u09A4\u09C7 \u09AA\u09BE\u09B0\u09BF:
 
@@ -3936,7 +4317,7 @@ Securing internal microservice communications across hybrid multi-cloud topologi
         };
       }
       return {
-        reply: `Hello and welcome to **${forumName}**! I am your 24/7 AI Consultant & Support Assistant.
+        reply: `Hello and welcome to **${forumName}**! I am your 24/7 AI Consultant & Support Agent.
 
 I am fully equipped with our verified knowledge base to answer questions across our core service pillars:
 
@@ -4642,7 +5023,7 @@ ${topTkt.adminAnswer}`,
     }
     if (userLang === "bn") {
       return {
-        reply: `\u0986\u09AE\u09BF Trek Consultancy-\u09B0 \u098F\u0986\u0987 \u09B8\u09BE\u09AA\u09CB\u09B0\u09CD\u099F \u0985\u09CD\u09AF\u09BE\u09B8\u09BF\u09B8\u09CD\u099F\u09CD\u09AF\u09BE\u09A8\u09CD\u099F\u0964 \u0986\u09AA\u09A8\u09BE\u09B0 \u09AA\u09CD\u09B0\u09B6\u09CD\u09A8\u09C7\u09B0 \u0989\u09A4\u09CD\u09A4\u09B0 \u09A6\u09BF\u09A4\u09C7 \u0986\u09AE\u09BF \u0986\u09A8\u09A8\u09CD\u09A6\u09C7\u09B0 \u09B8\u09BE\u09A5\u09C7 \u09AA\u09CD\u09B0\u09B8\u09CD\u09A4\u09C1\u09A4!
+        reply: `\u0986\u09AE\u09BF Trek Consultancy-\u09B0 \u098F\u0986\u0987 \u09B8\u09BE\u09AA\u09CB\u09B0\u09CD\u099F \u098F\u099C\u09C7\u09A8\u09CD\u099F\u0964 \u0986\u09AA\u09A8\u09BE\u09B0 \u09AA\u09CD\u09B0\u09B6\u09CD\u09A8\u09C7\u09B0 \u0989\u09A4\u09CD\u09A4\u09B0 \u09A6\u09BF\u09A4\u09C7 \u0986\u09AE\u09BF \u0986\u09A8\u09A8\u09CD\u09A6\u09C7\u09B0 \u09B8\u09BE\u09A5\u09C7 \u09AA\u09CD\u09B0\u09B8\u09CD\u09A4\u09C1\u09A4!
 
 \u0986\u09AE\u09BE\u09A6\u09C7\u09B0 \u09AA\u09CD\u09B2\u09CD\u09AF\u09BE\u099F\u09AB\u09B0\u09CD\u09AE\u09C7\u09B0 \u09AE\u09BE\u09A7\u09CD\u09AF\u09AE\u09C7 \u0986\u09AA\u09A8\u09BF \u09A8\u09BF\u09AE\u09CD\u09A8\u09B2\u09BF\u0996\u09BF\u09A4 \u09AC\u09BF\u09B7\u09DF\u0997\u09C1\u09B2\u09CB \u09B8\u09AE\u09CD\u09AA\u09B0\u09CD\u0995\u09C7 \u09AF\u09C7\u0995\u09CB\u09A8\u09CB \u09A4\u09A5\u09CD\u09AF \u0993 \u09B8\u09AE\u09BE\u09A7\u09BE\u09A8 \u09AA\u09C7\u09A4\u09C7 \u09AA\u09BE\u09B0\u09C7\u09A8:
 
@@ -4658,7 +5039,7 @@ ${topTkt.adminAnswer}`,
       };
     }
     return {
-      reply: `I am your Trek Consultancy AI Support Assistant, and I am glad to assist you!
+      reply: `I am your Trek Consultancy AI Support Agent, and I am glad to assist you!
 
 I can provide direct guidance, regulatory steps, and technical explanations across all of our enterprise services:
 
@@ -5054,7 +5435,7 @@ ${page.content}
             }
           }
         }
-        const systemInstruction = `You are Trek Support Assistant, the premier AI Executive Consultant and support assistant for Trek Consultancy Forum.
+        const systemInstruction = `You are Trek Support Agent, the premier AI Executive Consultant and support agent for Trek Consultancy Forum.
 
 CLIENT IDENTITY & CONTEXT:
 - Client Name: ${clientDisplayName || "Esteemed Client / Guest"}
@@ -7170,10 +7551,45 @@ Disallow: /api/
 }
 
 // server.ts
+try {
+  if (typeof WebSocket !== "undefined") {
+    const probe = new WebSocket("ws://127.0.0.1:1");
+    probe.onerror = (e) => {
+      const proto = Object.getPrototypeOf(e);
+      if (proto && proto.constructor?.name === "ErrorEvent") {
+        const desc = Object.getOwnPropertyDescriptor(proto, "message");
+        if (desc && !desc.set) {
+          const originalGet = desc.get;
+          Object.defineProperty(proto, "message", {
+            get() {
+              return this._custom_msg_override !== void 0 ? this._custom_msg_override : originalGet?.call(this);
+            },
+            set(val) {
+              this._custom_msg_override = val;
+            },
+            configurable: true,
+            enumerable: true
+          });
+        }
+      }
+      try {
+        probe.close();
+      } catch {
+      }
+    };
+  }
+} catch {
+}
 import_dotenv2.default.config();
 if (!process.env.DATABASE_URL && import_fs2.default.existsSync("env.txt")) {
   import_dotenv2.default.config({ path: "env.txt" });
 }
+process.on("uncaughtException", (err) => {
+  console.warn("[Server] Uncaught exception trapped:", err?.message || err);
+});
+process.on("unhandledRejection", (reason) => {
+  console.warn("[Server] Unhandled rejection trapped:", reason?.message || reason);
+});
 function isPortAvailable(port) {
   return new Promise((resolve) => {
     const tester = import_net.default.createServer().once("error", () => resolve(false)).once("listening", () => {

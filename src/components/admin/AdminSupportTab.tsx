@@ -40,7 +40,7 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
   settings,
   onSaveSettings
 }) => {
-  const [subTab, setSubTab] = useState<'tickets' | 'faqs' | 'knowledge-chunks' | 'conversations' | 'widget-settings'>('tickets');
+  const [subTab, setSubTab] = useState<'tickets' | 'faqs' | 'knowledge-chunks' | 'widget-settings'>('tickets');
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [faqs, setFaqs] = useState<FAQItem[]>([]);
   const [categories, setCategories] = useState<FAQCategory[]>([]);
@@ -355,10 +355,6 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
             <span className="text-base font-bold font-mono text-slate-900">{faqs.length}</span>
             <span className="text-[10px] font-medium text-slate-500 uppercase tracking-tight">FAQs</span>
           </div>
-          <div className="px-3 py-1.5 rounded-lg bg-white border border-slate-200/90 shadow-2xs flex flex-col items-center justify-center shrink-0 min-w-[75px]">
-            <span className="text-base font-bold font-mono text-slate-900">{conversations.length}</span>
-            <span className="text-[10px] font-medium text-slate-500 uppercase tracking-tight">Chats</span>
-          </div>
         </div>
       </div>
 
@@ -406,18 +402,6 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
         >
           <Layers className="w-3.5 h-3.5 text-slate-600" />
           <span>Knowledge Chunks</span>
-        </button>
-
-        <button
-          onClick={() => setSubTab('conversations')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
-            subTab === 'conversations'
-              ? 'bg-white text-slate-900 shadow-2xs font-semibold'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <MessagesSquare className="w-3.5 h-3.5 text-amber-500" />
-          <span>Live Chats</span>
         </button>
 
         <button
@@ -797,187 +781,7 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
         <AdminKnowledgeChunksTab onNotify={showNotification} />
       )}
 
-      {/* SUB-VIEW 4: LIVE CHAT SESSIONS */}
-      {subTab === 'conversations' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Left: Chat Sessions List */}
-          <div className="lg:col-span-5 space-y-3">
-            <div className="p-3.5 rounded-xl bg-white border border-slate-200/90 shadow-2xs flex items-center justify-between">
-              <div>
-                <h3 className="text-xs font-semibold text-slate-900">Active Chat Sessions</h3>
-                <p className="text-[11px] text-slate-500">{conversations.length} visitor conversations</p>
-              </div>
-              <button
-                onClick={fetchData}
-                className="p-1 text-slate-500 hover:text-slate-800 rounded-md hover:bg-slate-100 cursor-pointer"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            {conversations.length === 0 ? (
-              <div className="p-8 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
-                <MessagesSquare className="w-7 h-7 mx-auto opacity-40 mb-1" />
-                <p className="text-xs">No active chat sessions recorded yet.</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {conversations.map(c => {
-                  const isActive = activeSessionId === c.sessionId;
-                  const isFlaggedLead = tickets.some(t => t.sessionId === c.sessionId && t.subject?.includes('[Auto-Flagged VIP Lead]'));
-                  return (
-                    <div
-                      key={c.sessionId}
-                      onClick={() => handleOpenConversation(c.sessionId)}
-                      className={`p-3 rounded-xl transition-colors cursor-pointer border ${
-                        isActive
-                          ? 'bg-amber-50/50 border-amber-300 shadow-2xs'
-                          : 'bg-white hover:bg-slate-50 border-slate-200/90 shadow-2xs'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          {c.isGuest === false && c.userEmail ? (
-                            <>
-                              <span className="font-semibold text-slate-900 truncate max-w-[130px]" title={c.userEmail}>
-                                {c.userName || c.userEmail}
-                              </span>
-                              <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wider bg-teal-100 text-teal-800 border border-teal-200 shrink-0">
-                                User
-                              </span>
-                            </>
-                          ) : (
-                            <>
-                              <span className="font-mono font-medium text-slate-700 truncate max-w-[130px]">
-                                {c.sessionId}
-                              </span>
-                              <span className="px-1.5 py-0.2 rounded text-[9px] font-medium uppercase tracking-wider bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
-                                Guest
-                              </span>
-                            </>
-                          )}
-                          {isFlaggedLead && (
-                            <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-0.5 shrink-0">
-                              <Zap className="w-2.5 h-2.5 text-amber-600" /> VIP
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-[10px] text-slate-400 font-mono shrink-0">
-                          {new Date(c.lastActive).toLocaleTimeString()}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-600 mt-1 line-clamp-1">
-                        <span className="font-semibold text-slate-700">{c.lastSender}: </span>
-                        {c.lastMessage}
-                      </p>
-                      <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-slate-100 text-[10px] text-slate-400 font-mono">
-                        <span>{c.messageCount} messages</span>
-                        <span className="text-amber-700 font-medium font-sans">Inspect &rarr;</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Right: Message Transcripts & Staff Intervention */}
-          <div className="lg:col-span-7">
-            {activeSessionId ? (
-              <div className="rounded-xl p-4 bg-white border border-slate-200/90 shadow-2xs space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                  <div>
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-700">Transcript</span>
-                    <h3 className="text-xs font-mono font-semibold text-slate-900 flex items-center gap-2">
-                      <span>Session: {activeSessionId}</span>
-                      {conversations.find(c => c.sessionId === activeSessionId)?.userEmail ? (
-                        <span className="text-teal-700 font-sans font-medium text-[11px]">
-                          ({conversations.find(c => c.sessionId === activeSessionId)?.userName ? `${conversations.find(c => c.sessionId === activeSessionId)?.userName} - ` : ''}{conversations.find(c => c.sessionId === activeSessionId)?.userEmail})
-                        </span>
-                      ) : (
-                        <span className="text-slate-400 font-sans text-[11px]">
-                          (Guest Visitor)
-                        </span>
-                      )}
-                    </h3>
-                  </div>
-                  <span className="px-2 py-0.5 rounded text-emerald-800 bg-emerald-50 border border-emerald-200 text-[10px] font-medium font-mono">
-                    Connected
-                  </span>
-                </div>
-
-                {/* Messages stream */}
-                <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
-                  {sessionMessages.map((m, idx) => {
-                    const isUser = m.sender === 'user';
-                    const isStaff = m.source === 'STAFF';
-                    return (
-                      <div
-                        key={m.id || idx}
-                        className={`flex gap-2.5 ${isUser ? 'justify-end' : 'justify-start'}`}
-                      >
-                        {!isUser && (
-                          <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 text-white ${
-                            isStaff ? 'bg-amber-600' : 'bg-teal-600'
-                          }`}>
-                            {isStaff ? <ShieldCheck className="w-3.5 h-3.5" /> : <Bot className="w-3.5 h-3.5" />}
-                          </div>
-                        )}
-                        <div className={`p-2.5 rounded-lg max-w-[80%] text-xs leading-normal ${
-                          isUser
-                            ? 'bg-teal-600 text-white'
-                            : isStaff
-                            ? 'bg-amber-50 border border-amber-200 text-amber-950'
-                            : 'bg-slate-100 text-slate-800'
-                        }`}>
-                          <p className="whitespace-pre-wrap">{(m.message || m.content || '').replace(/^\[[^\]]+\]:\s*/, '')}</p>
-                          <div className={`text-[9px] mt-1 flex items-center justify-between gap-2 font-mono ${
-                            isUser ? 'text-teal-100' : 'text-slate-400'
-                          }`}>
-                            <span>{isStaff ? 'EXECUTIVE SENIOR' : (m.source || (isUser ? 'USER' : 'AI'))}</span>
-                            <span>{m.createdAt ? new Date(m.createdAt).toLocaleTimeString() : ''}</span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Staff intervention reply box */}
-                <div className="pt-2 border-t border-slate-100 space-y-1.5">
-                  <label className="block text-[11px] font-semibold text-slate-700">
-                    Executive Senior Direct Message:
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={staffReplyText}
-                      onChange={(e) => setStaffReplyText(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSendStaffReply()}
-                      placeholder="Type executive senior response to customer..."
-                      className="flex-1 px-3 py-1.5 text-xs rounded-lg bg-slate-50 border border-slate-200 focus:bg-white focus:border-teal-600 focus:ring-1 focus:ring-teal-600/30 focus:outline-none text-slate-800"
-                    />
-                    <button
-                      onClick={handleSendStaffReply}
-                      disabled={sendingStaffReply || !staffReplyText.trim()}
-                      className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-medium shadow-2xs transition-colors cursor-pointer shrink-0"
-                    >
-                      {sendingStaffReply ? 'Sending...' : 'Send'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-xl p-8 bg-white border border-slate-200 text-center text-slate-400 space-y-2">
-                <MessagesSquare className="w-7 h-7 mx-auto text-slate-300" />
-                <p className="text-xs">Select a visitor chat session from the left to read transcript or intervene.</p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* SUB-VIEW 5: FLOATING MESSENGER CONFIGURATION */}
+      {/* SUB-VIEW 4: FLOATING MESSENGER CONFIGURATION */}
       {subTab === 'widget-settings' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Settings Form */}

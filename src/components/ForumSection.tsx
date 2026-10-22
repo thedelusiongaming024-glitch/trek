@@ -83,15 +83,8 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
   ];
 
   return (
-    <section id="forum" className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-20">
-      {/* 1. Primary Section Heading: "Notable Forums" */}
-      <div className="text-center mb-10">
-        <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight font-heading">
-          {t('Notable Forums')}
-        </h2>
-      </div>
-
-      {/* 2. Subheader Bar: "Trek Consultancy Forum" on left, "Post a Question" button on right */}
+    <section id="forum" className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 sm:pt-28 pb-20">
+      {/* Subheader Bar: "Trek Consultancy Forum" on left, "Post a Question" button on right */}
       <div className="flex items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-2 sm:gap-3">
           <h3 className="text-xl sm:text-2xl font-bold text-slate-900 font-heading tracking-tight">

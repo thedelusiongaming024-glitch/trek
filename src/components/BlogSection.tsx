@@ -42,7 +42,7 @@ export const BlogSection: React.FC<BlogSectionProps> = ({
   };
 
   return (
-    <section id="blog" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
+    <section id="blog" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 sm:pt-28 pb-12 sm:pb-16">
       {/* Centered Heading */}
       <div className="text-center mb-10 sm:mb-12">
         <div className="inline-flex items-center gap-2 mb-2">

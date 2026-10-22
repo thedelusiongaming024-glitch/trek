@@ -1,5 +1,4 @@
 import React from 'react';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
 interface CalloutBannerProps {
@@ -64,30 +63,6 @@ export const CalloutBanner: React.FC<CalloutBannerProps> = ({ onAskQuestion }) =
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Slider indicator and edge navigation arrows on canvas below banner */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 flex items-center justify-between">
-        <button
-          aria-label="Previous slide"
-          className="w-8 h-8 rounded-full border border-white/80 bg-white/75 text-slate-600 hover:text-slate-900 flex items-center justify-center transition-all shadow-xs cursor-pointer backdrop-blur-md"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-        </button>
-
-        {/* Centered Slider Bar indicator */}
-        <div className="flex items-center justify-center gap-2">
-          <div className="h-1 w-12 rounded-full bg-[#00a8b5]" />
-          <div className="h-1 w-3 rounded-full bg-slate-300 hover:bg-slate-400 transition-colors cursor-pointer" />
-          <div className="h-1 w-3 rounded-full bg-slate-300 hover:bg-slate-400 transition-colors cursor-pointer" />
-        </div>
-
-        <button
-          aria-label="Next slide"
-          className="w-8 h-8 rounded-full border border-white/80 bg-white/75 text-slate-600 hover:text-slate-900 flex items-center justify-center transition-all shadow-xs cursor-pointer backdrop-blur-md"
-        >
-          <ArrowRight className="w-3.5 h-3.5" />
-        </button>
       </div>
     </section>
   );
