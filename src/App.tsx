@@ -46,9 +46,31 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterCategory>('popular');
   
-  // Real Database State (starts empty, populated from PostgreSQL)
-  const [topics, setTopics] = useState<ForumTopic[]>([]);
-  const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
+  // Real Database State (initialized from cache if available to prevent first-scroll pop-in layout shifts)
+  const [topics, setTopics] = useState<ForumTopic[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('trek_cached_topics');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch {}
+    }
+    return [];
+  });
+  const [blogPosts, setBlogPosts] = useState<BlogPost[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('trek_cached_blogs');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch {}
+    }
+    return [];
+  });
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [platformSettings, setPlatformSettings] = useState<PlatformSettings>({
@@ -342,11 +364,17 @@ export default function App() {
           };
         });
         setTopics(mappedTopics);
+        try {
+          localStorage.setItem('trek_cached_topics', JSON.stringify(mappedTopics));
+        } catch {}
       } else if (topicsRes.status === 'rejected') {
         console.error('[fetchData] /api/topics threw:', topicsRes.reason);
       }
       if (blogsRes.status === 'fulfilled' && Array.isArray(blogsRes.value)) {
         setBlogPosts(blogsRes.value);
+        try {
+          localStorage.setItem('trek_cached_blogs', JSON.stringify(blogsRes.value));
+        } catch {}
       }
       if (usersRes.status === 'fulfilled' && Array.isArray(usersRes.value)) {
         setAdminUsers(usersRes.value);
@@ -398,6 +426,17 @@ export default function App() {
   useEffect(() => {
     applySeoToDocument(seoSettings);
   }, [seoSettings]);
+
+  // Preload and GPU-decode post-hero wallpaper on mount so first scroll is instant with zero stutter
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const img = new Image();
+      img.src = trekSaudiBg;
+      if (typeof img.decode === 'function') {
+        img.decode().catch(() => {});
+      }
+    }
+  }, []);
 
   const handleAdminLogin = (user: { id?: string; name: string; email: string; role: string; avatar?: string }) => {
     const fullUser = {
@@ -2019,29 +2058,25 @@ export default function App() {
             heroSettings={heroSettings}
           />
 
-          {/* Post-Hero Container with On-Scroll Background & Matching Project Gradient */}
-          <div className="relative">
-            {/* Fixed On-Scroll Background Image Layer */}
+          {/* Post-Hero Container with GPU-Accelerated Hardware Background */}
+          <div className="relative bg-[#08151f]">
+            {/* Sticky Viewport Background Layer (Zero-Repaint GPU Compositor Parallax) */}
             <div 
-              className="absolute inset-0 pointer-events-none overflow-hidden select-none z-0"
+              className="sticky top-0 left-0 w-full h-screen overflow-hidden pointer-events-none select-none z-0 -mb-[100vh]"
               aria-hidden="true"
             >
-              {/* Saudi Corporate Partner Background Image with Fixed Scroll (sm:bg-fixed) */}
+              {/* High-Tech Custom Wallpaper Layer with 100% GPU Acceleration */}
               <div 
-                className="absolute inset-0 bg-top bg-no-repeat bg-cover sm:bg-fixed opacity-45 transition-opacity duration-300"
+                className="absolute inset-0 bg-center bg-no-repeat bg-cover transform-gpu will-change-transform opacity-100"
                 style={{ 
                   backgroundImage: `url(${trekSaudiBg})`,
-                  backgroundPosition: 'center 10%'
+                  backgroundPosition: 'center center'
                 }}
               />
 
-              {/* Seamless Matching Project Gradient */}
-              <div className="absolute inset-0 bg-gradient-to-b from-[#f8f9fd]/75 via-[#f8f9fd]/85 to-[#f8f9fd]/95" />
-
-              {/* Ambient Brand Mesh / Glow Accents matching project theme */}
-              <div className="absolute top-10 right-1/4 w-[500px] h-[500px] bg-teal-500/10 rounded-full blur-[100px] pointer-events-none" />
-              <div className="absolute top-1/2 left-10 w-[600px] h-[600px] bg-cyan-500/8 rounded-full blur-[110px] pointer-events-none" />
-              <div className="absolute bottom-20 right-10 w-[500px] h-[400px] bg-emerald-500/8 rounded-full blur-[100px] pointer-events-none" />
+              {/* Seamless Vignette Transitions: Blends smoothly from dark Hero at top and into Footer at bottom */}
+              <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-slate-950/80 to-transparent pointer-events-none" />
+              <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[#1c4447]/80 to-transparent pointer-events-none" />
             </div>
 
             {/* Foreground Content */}
@@ -2066,6 +2101,7 @@ export default function App() {
                 onOpenChat={() => setIsChatOpen(!isChatOpen)}
                 searchQuery={searchQuery}
                 settings={platformSettings}
+                isLoading={isLoadingData}
               />
 
               {/* 3. "New to Communities?" Callout Banner */}
@@ -2081,6 +2117,7 @@ export default function App() {
                 onRequireAuth={(prompt) => {
                   triggerAuthModal(prompt || 'To participate in blog activities, please log in or create an account.');
                 }}
+                isLoading={isLoadingData}
               />
 
               {/* 5. Newsletter Subscription Section */}

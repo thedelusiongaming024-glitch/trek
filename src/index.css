@@ -144,38 +144,38 @@
 
 html {
   scrollbar-gutter: stable;
-  scroll-behavior: smooth;
+  scroll-behavior: auto;
 }
 
-/* Enhanced Glass Navbar: Frosted Luxury White matching local server (Pic 2) */
+/* Enhanced Glass Navbar: Frosted Luxury White with Hardware-Accelerated Transition */
 .glass-navbar {
   background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.85);
-  box-shadow: 0 10px 35px -5px rgba(0, 0, 0, 0.08), 
+  box-shadow: 0 12px 38px -5px rgba(0, 0, 0, 0.09), 
               0 2px 6px -1px rgba(0, 0, 0, 0.04), 
               inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.95);
   transform: translateZ(0);
   -webkit-transform: translateZ(0);
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
-  will-change: background-color, border-color, box-shadow;
+  will-change: background-color, border-color;
 }
 
 .glass-navbar-scrolled {
-  background: rgba(255, 255, 255, 0.94);
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.90);
-  box-shadow: 0 14px 45px -5px rgba(0, 0, 0, 0.12), 
-              0 4px 10px -2px rgba(0, 0, 0, 0.05), 
-              inset 0 1px 2px 0 rgba(255, 255, 255, 0.98);
+  box-shadow: 0 12px 38px -5px rgba(0, 0, 0, 0.09), 
+              0 2px 6px -1px rgba(0, 0, 0, 0.04), 
+              inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.95);
   transform: translateZ(0);
   -webkit-transform: translateZ(0);
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
-  will-change: background-color, border-color, box-shadow;
+  will-change: background-color, border-color;
 }
 
 /* Custom smooth scrollbar */

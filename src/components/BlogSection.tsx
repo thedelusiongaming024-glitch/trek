@@ -12,6 +12,7 @@ interface BlogSectionProps {
   hasMore: boolean;
   currentUser?: { name: string; email: string; role: string; avatar?: string } | null;
   onRequireAuth?: (prompt?: string) => void;
+  isLoading?: boolean;
 }
 
 export const BlogSection: React.FC<BlogSectionProps> = ({
@@ -20,7 +21,8 @@ export const BlogSection: React.FC<BlogSectionProps> = ({
   onShowMore,
   hasMore,
   currentUser,
-  onRequireAuth
+  onRequireAuth,
+  isLoading = false
 }) => {
   const { t, formatNumber, formatDate, formatTimeAgo, translateCategory } = useLanguage();
 
@@ -46,27 +48,49 @@ export const BlogSection: React.FC<BlogSectionProps> = ({
       {/* Centered Heading */}
       <div className="text-center mb-10 sm:mb-12">
         <div className="inline-flex items-center gap-2 mb-2">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight font-heading">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white tracking-tight font-heading drop-shadow-sm">
             {t('Trek Consultancy Insights')}
           </h2>
           {!currentUser && (
             <button
               type="button"
               onClick={() => onRequireAuth?.('To participate in blog activities, like articles, and read full content, you must have an account and be logged in.')}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-700 text-[11px] font-semibold hover:bg-amber-500/25 transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-400/20 border border-amber-400/35 text-amber-300 text-[11px] font-semibold hover:bg-amber-400/30 transition-colors cursor-pointer backdrop-blur-md"
             >
               <Lock className="w-3 h-3" />
               <span>{t('Login Required to Participate')}</span>
             </button>
           )}
         </div>
-        <p className="text-xs sm:text-sm text-slate-600 mt-1 max-w-md mx-auto px-2">
+        <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-md mx-auto px-2">
           {t('Insights, architectural tutorials, and product documentation from our core engineering team.')}
         </p>
       </div>
 
       {/* 3-Column Card Grid */}
-      {posts.length === 0 ? (
+      {isLoading && posts.length === 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+          {[1, 2, 3].map((i) => (
+            <div 
+              key={i} 
+              className="rounded-3xl bg-white/75 backdrop-blur-xl border border-white/80 overflow-hidden shadow-sm animate-pulse flex flex-col h-[380px]"
+            >
+              <div className="aspect-[16/10] bg-slate-200/80 w-full" />
+              <div className="p-6 space-y-3 flex-1 flex flex-col justify-between">
+                <div className="space-y-2">
+                  <div className="h-4 bg-slate-200/80 rounded w-1/3" />
+                  <div className="h-5 bg-slate-200/90 rounded w-5/6" />
+                  <div className="h-4 bg-slate-100 rounded w-full" />
+                </div>
+                <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                  <div className="h-4 bg-slate-200/70 rounded w-1/4" />
+                  <div className="h-4 bg-slate-200/70 rounded w-1/4" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : posts.length === 0 ? (
         <div className="text-center py-12 px-4 rounded-3xl bg-white/60 backdrop-blur-xl border border-white/80 max-w-lg mx-auto">
           <p className="text-sm font-semibold text-slate-700">{t('No blog articles published yet')}</p>
           <p className="text-xs text-slate-500 mt-1">{t('Articles published from the admin console will appear here.')}</p>

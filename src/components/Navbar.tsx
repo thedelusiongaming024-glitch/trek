@@ -88,7 +88,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       <div className="w-full max-w-7xl flex flex-col items-center">
         {/* Floating Glassmorphic Pill Capsule Navbar - Pure Light Theme */}
         <nav
-          className={`pointer-events-auto w-full rounded-full transition-[background-color,border-color,box-shadow] duration-200 ease-out flex items-center justify-between transform-gpu py-2.5 px-4 sm:px-6 ${
+          className={`pointer-events-auto w-full rounded-full transition-[background-color,border-color] duration-200 ease-out flex items-center justify-between transform-gpu py-2.5 px-4 sm:px-6 ${
             isScrolled
               ? 'glass-navbar-scrolled'
               : 'glass-navbar'

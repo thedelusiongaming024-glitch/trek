@@ -34,6 +34,7 @@ interface ForumSectionProps {
   onOpenChat?: () => void;
   searchQuery: string;
   settings?: PlatformSettings;
+  isLoading?: boolean;
 }
 
 export const ForumSection: React.FC<ForumSectionProps> = ({
@@ -53,7 +54,8 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
   onSelectRecentTopic,
   onOpenChat,
   searchQuery,
-  settings
+  settings,
+  isLoading = false
 }) => {
   const { language, t, formatNumber } = useLanguage();
   const [visibleCount, setVisibleCount] = useState<number>(5);
@@ -87,11 +89,11 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
       {/* Subheader Bar: "Trek Consultancy Forum" on left, "Post a Question" button on right */}
       <div className="flex items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-2 sm:gap-3">
-          <h3 className="text-xl sm:text-2xl font-bold text-slate-900 font-heading tracking-tight">
+          <h3 className="text-xl sm:text-2xl font-bold text-white font-heading tracking-tight drop-shadow-sm">
             {t('Trek Consultancy Forum')}
           </h3>
-          <span className="text-xs px-2.5 sm:px-3 py-1 rounded-full bg-white/80 border border-white/80 text-slate-700 font-medium backdrop-blur-md shadow-xs">
-            <strong className="font-bold text-slate-900">{formatNumber(filteredTopics.length)}</strong> {language === 'bn' ? 'টি আলোচনা' : language === 'ar' ? 'مناقشة' : 'Discussions'}
+          <span className="text-xs px-2.5 sm:px-3 py-1 rounded-full bg-slate-900/60 border border-white/20 text-white font-medium backdrop-blur-md shadow-xs">
+            <strong className="font-bold text-teal-300">{formatNumber(filteredTopics.length)}</strong> {language === 'bn' ? 'টি আলোচনা' : language === 'ar' ? 'مناقشة' : 'Discussions'}
           </span>
         </div>
 
@@ -107,7 +109,7 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
 
       {/* 3. Filter Tabs Bar with edge-to-edge mobile swipe */}
       <div className="mb-6 -mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto pb-2 scrollbar-none">
-        <div className="inline-flex items-center gap-1.5 p-1.5 rounded-2xl bg-white/75 border border-white/80 shadow-[0_4px_20px_rgba(31,38,135,0.05)] backdrop-blur-xl min-w-max">
+        <div className="inline-flex items-center gap-1.5 p-1.5 rounded-2xl bg-slate-900/60 border border-white/15 shadow-[0_4px_20px_rgba(0,0,0,0.25)] backdrop-blur-xl min-w-max">
           {tabs.map((tab) => {
             const isActive = activeFilter === tab.id;
             return (
@@ -116,11 +118,11 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
                 onClick={() => onSelectFilter(tab.id)}
                 className={`flex items-center gap-1.5 px-3.5 sm:px-4 py-2 sm:py-2.5 min-h-[40px] rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                   isActive
-                    ? 'bg-teal-500/15 text-teal-700 border border-teal-500/30 backdrop-blur-md shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/40 border border-transparent'
+                    ? 'bg-teal-500 text-white shadow-md shadow-teal-500/30'
+                    : 'text-slate-300 hover:text-white hover:bg-white/10 border border-transparent'
                 }`}
               >
-                <span className={isActive ? 'text-teal-600' : 'text-slate-400'}>
+                <span className={isActive ? 'text-white' : 'text-slate-400'}>
                   {tab.icon}
                 </span>
                 <span>{t(tab.label)}</span>
@@ -163,7 +165,27 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
             </div>
           )}
 
-          {filteredTopics.length === 0 ? (
+          {isLoading && filteredTopics.length === 0 ? (
+            <div className="space-y-4">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div 
+                  key={i} 
+                  className="rounded-2xl bg-white/75 backdrop-blur-xl border border-white/80 p-5 sm:p-6 shadow-sm animate-pulse space-y-3"
+                >
+                  <div className="flex justify-between items-center">
+                    <div className="h-5 bg-slate-200/90 rounded-md w-3/5" />
+                    <div className="h-6 w-16 bg-slate-200/90 rounded-full" />
+                  </div>
+                  <div className="h-4 bg-slate-100 rounded-md w-full" />
+                  <div className="h-4 bg-slate-100 rounded-md w-4/5" />
+                  <div className="flex items-center gap-4 pt-2">
+                    <div className="h-6 w-24 bg-slate-200/80 rounded-full" />
+                    <div className="h-4 w-20 bg-slate-100 rounded" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : filteredTopics.length === 0 ? (
             <div className="rounded-3xl bg-white/75 backdrop-blur-xl border border-white/80 p-12 text-center shadow-md">
               <AlertCircle className="w-10 h-10 text-slate-400 mx-auto mb-3" />
               <h4 className="text-base font-semibold text-slate-800 mb-1">
