@@ -35,7 +35,7 @@ try {
 
 dotenv.config();
 
-// Ensure WebSocket constructor is configured for Node.js environments (Vercel serverless / Node < 22)
+// Ensure WebSocket constructor is configured for Node.js environments
 if (!neonConfig.webSocketConstructor) {
   neonConfig.webSocketConstructor = ws;
 }

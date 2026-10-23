@@ -132,7 +132,10 @@ export interface NewsletterCampaign {
   content: string;
   sentAt: string;
   recipientCount: number;
-  status: 'sent' | 'draft' | 'scheduled';
+  totalSubscribers?: number;
+  failedCount?: number;
+  status: 'sent' | 'partial' | 'failed' | 'draft' | 'scheduled';
+  deliveryError?: string;
   author?: string;
   tags?: string[];
 }

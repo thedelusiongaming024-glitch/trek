@@ -1,4 +1,6 @@
 import express from 'express';
+import fs from 'node:fs';
+import path from 'node:path';
 import zlib from 'node:zlib';
 import { GoogleGenAI } from '@google/genai';
 import { Resend } from 'resend';
@@ -361,13 +363,11 @@ export async function executeAiCompletion({
   }
 }
 
-// Builds and returns a fully-configured Express app with all API routes
-// registered, but WITHOUT starting an HTTP listener and WITHOUT any static
-// file / SPA serving. This is shared between the local dev server
-// (server.ts) and the Vercel serverless function (api/index.ts).
+// Builds and returns the Express application with all API routes registered.
 export async function createApp() {
   const app = express();
 
+  app.set('trust proxy', 1);
   app.disable('x-powered-by');
   app.use(securityHeadersMiddleware);
   app.use(corsMiddleware);
@@ -1767,6 +1767,421 @@ export async function createApp() {
     };
   };
 
+  // Parse sender display name, Resend-safe From address, and clean Reply-To address
+  const resolveSenderConfig = (rawEmailFrom?: string) => {
+    const raw = (rawEmailFrom || 'Trek Consultancy Forum <onboarding@resend.dev>').trim();
+    const angleMatch = raw.match(/^(.*?)<([^<>]+)>\s*$/);
+    let displayName = 'Trek Consultancy Forum';
+    let extractedEmail = '';
+
+    if (angleMatch) {
+      const parsedName = angleMatch[1].trim().replace(/^["']|["']$/g, '').trim();
+      if (parsedName) displayName = parsedName;
+      extractedEmail = angleMatch[2].trim().toLowerCase();
+    } else if (/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(raw)) {
+      extractedEmail = raw.toLowerCase();
+    }
+
+    const sanitizedName = displayName.replace(/[<>"]/g, '').trim() || 'Trek Consultancy Forum';
+    const isConsumerOrPlaceholderDomain =
+      !extractedEmail ||
+      /@(gmail|googlemail|yahoo|hotmail|outlook|icloud|live|aol|msn|protonmail|proton|yandex|zoho)\.[a-z.]+$/i.test(extractedEmail) ||
+      extractedEmail.endsWith('@yourdomain.com') ||
+      extractedEmail.endsWith('@example.com');
+
+    const safeEmail = isConsumerOrPlaceholderDomain ? 'onboarding@resend.dev' : extractedEmail;
+    const fromAddress = `${sanitizedName} <${safeEmail}>`;
+    const fallbackFromAddress = `${sanitizedName} <onboarding@resend.dev>`;
+
+    const replyToAddress =
+      extractedEmail &&
+      extractedEmail !== 'onboarding@resend.dev' &&
+      !extractedEmail.endsWith('@yourdomain.com') &&
+      !extractedEmail.endsWith('@example.com')
+        ? extractedEmail
+        : undefined;
+
+    return {
+      displayName: sanitizedName,
+      extractedEmail,
+      fromAddress,
+      fallbackFromAddress,
+      replyToAddress,
+      usedPublicDomainFallback: isConsumerOrPlaceholderDomain && extractedEmail !== 'onboarding@resend.dev'
+    };
+  };
+
+  let cachedTrekLogoBase64: string | null | undefined = undefined;
+  const getTrekLogoAttachment = () => {
+    if (cachedTrekLogoBase64 === undefined) {
+      const candidates = [
+        path.resolve(process.cwd(), 'public', 'trek-logo.png'),
+        path.resolve(process.cwd(), 'dist', 'trek-logo.png'),
+        path.resolve(process.cwd(), 'src', 'assets', 'trek-logo.png')
+      ];
+      cachedTrekLogoBase64 = null;
+      for (const filePath of candidates) {
+        try {
+          if (fs.existsSync(filePath)) {
+            cachedTrekLogoBase64 = fs.readFileSync(filePath).toString('base64');
+            break;
+          }
+        } catch {}
+      }
+    }
+    if (!cachedTrekLogoBase64) return null;
+    return {
+      filename: 'trek-logo.png',
+      content: cachedTrekLogoBase64,
+      contentType: 'image/png',
+      contentId: 'trek-logo'
+    };
+  };
+
+  const escapeEmailHtml = (text: string): string =>
+    text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+
+  const formatInlineMarkdownHtml = (rawLine: string): string => {
+    let html = escapeEmailHtml(rawLine);
+    html = html.replace(/`([^`]+)`/g, '<code style="background-color:#ecfeff;color:#0e7490;border:1px solid #cffafe;padding:2px 6px;border-radius:5px;font-family:Consolas,Monaco,monospace;font-size:13px;">$1</code>');
+    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong style="color:#0f172a;font-weight:700;">$1</strong>');
+    html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" style="color:#0e7490;text-decoration:underline;font-weight:600;">$1</a>');
+    return html;
+  };
+
+  const renderMarkdownToEmailHtml = (markdown: string): string => {
+    const lines = (markdown || '').replace(/\r\n/g, '\n').split('\n');
+    const blocks: string[] = [];
+    let listItems: string[] = [];
+    let listType: 'ul' | 'ol' | null = null;
+    let paragraphLines: string[] = [];
+
+    const flushList = () => {
+      if (listItems.length > 0 && listType) {
+        const tag = listType;
+        blocks.push(
+          `<${tag} style="margin:0 0 18px 0;padding-left:22px;color:#334155;font-size:15px;line-height:1.75;">${listItems
+            .map((item) => `<li style="margin-bottom:8px;">${item}</li>`)
+            .join('')}</${tag}>`
+        );
+        listItems = [];
+        listType = null;
+      }
+    };
+
+    const flushParagraph = () => {
+      if (paragraphLines.length > 0) {
+        blocks.push(
+          `<p style="margin:0 0 16px 0;font-size:15px;line-height:1.75;color:#334155;">${paragraphLines.join('<br>')}</p>`
+        );
+        paragraphLines = [];
+      }
+    };
+
+    for (const rawLine of lines) {
+      const trimmed = rawLine.trim();
+      if (!trimmed) {
+        flushParagraph();
+        flushList();
+        continue;
+      }
+
+      if (/^---+$/.test(trimmed) || /^\*\*\*+$/.test(trimmed)) {
+        flushParagraph();
+        flushList();
+        blocks.push('<hr style="border:none;border-top:1px solid #e2e8f0;margin:26px 0;">');
+        continue;
+      }
+
+      const h3 = trimmed.match(/^###\s+(.+)$/);
+      if (h3) {
+        flushParagraph();
+        flushList();
+        blocks.push(`<h3 style="margin:22px 0 8px 0;font-size:16px;font-weight:700;color:#0f172a;line-height:1.4;">${formatInlineMarkdownHtml(h3[1])}</h3>`);
+        continue;
+      }
+
+      const h2 = trimmed.match(/^##\s+(.+)$/);
+      if (h2) {
+        flushParagraph();
+        flushList();
+        blocks.push(`<h2 style="margin:24px 0 10px 0;padding-bottom:6px;border-bottom:2px solid #ecfeff;font-size:18px;font-weight:800;color:#0f172a;line-height:1.35;">${formatInlineMarkdownHtml(h2[1])}</h2>`);
+        continue;
+      }
+
+      const h1 = trimmed.match(/^#\s+(.+)$/);
+      if (h1) {
+        flushParagraph();
+        flushList();
+        blocks.push(`<h1 style="margin:24px 0 12px 0;font-size:21px;font-weight:800;color:#0f172a;line-height:1.3;">${formatInlineMarkdownHtml(h1[1])}</h1>`);
+        continue;
+      }
+
+      const ulMatch = trimmed.match(/^[-*]\s+(.+)$/);
+      if (ulMatch) {
+        flushParagraph();
+        if (listType && listType !== 'ul') flushList();
+        listType = 'ul';
+        listItems.push(formatInlineMarkdownHtml(ulMatch[1]));
+        continue;
+      }
+
+      const olMatch = trimmed.match(/^\d+\.\s+(.+)$/);
+      if (olMatch) {
+        flushParagraph();
+        if (listType && listType !== 'ol') flushList();
+        listType = 'ol';
+        listItems.push(formatInlineMarkdownHtml(olMatch[1]));
+        continue;
+      }
+
+      const quoteMatch = trimmed.match(/^>\s*(.+)$/);
+      if (quoteMatch) {
+        flushParagraph();
+        flushList();
+        blocks.push(
+          `<blockquote style="margin:0 0 18px 0;padding:12px 16px;border-left:4px solid #16b8c4;background-color:#ecfeff;color:#0f172a;font-size:14px;line-height:1.65;border-radius:0 10px 10px 0;">${formatInlineMarkdownHtml(quoteMatch[1])}</blockquote>`
+        );
+        continue;
+      }
+
+      flushList();
+      paragraphLines.push(formatInlineMarkdownHtml(trimmed));
+    }
+
+    flushParagraph();
+    flushList();
+    return blocks.join('\n');
+  };
+
+  const stripMarkdownToPlainText = (markdown: string): string =>
+    (markdown || '')
+      .replace(/\r\n/g, '\n')
+      .replace(/^#{1,6}\s+/gm, '')
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/\*([^*]+)\*/g, '$1')
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '$1 ($2)')
+      .trim();
+
+  const renderNewsletterEmail = (campaign: {
+    subject: string;
+    previewText?: string;
+    content: string;
+    author?: string;
+    sentAt?: string;
+  }) => {
+    const safeSubject = escapeEmailHtml(campaign.subject);
+    const safePreview = escapeEmailHtml((campaign.previewText || '').trim());
+    const safeAuthor = escapeEmailHtml((campaign.author || 'Trek Consultancy Editorial Team').trim());
+    const formattedDate = new Date(campaign.sentAt || Date.now()).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+    const bodyHtml = renderMarkdownToEmailHtml(campaign.content);
+
+    const plainTextParts = [
+      'TREK CONSULTANCY',
+      campaign.subject,
+      campaign.previewText ? campaign.previewText.trim() : '',
+      `Published by ${campaign.author || 'Trek Consultancy Editorial Team'} • ${formattedDate}`,
+      '------------------------------------------------------------',
+      stripMarkdownToPlainText(campaign.content),
+      '------------------------------------------------------------',
+      `© ${new Date().getFullYear()} Trek Consultancy Forum. All rights reserved.`
+    ].filter(Boolean);
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${safeSubject}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1e293b;">
+  ${safePreview ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">${safePreview}</div>` : ''}
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f1f5f9;padding:36px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background-color:#ffffff;border-radius:18px;border:1px solid #cbd5e1;overflow:hidden;box-shadow:0 8px 24px rgba(15,23,42,0.06);">
+          <!-- Trek Brand Dual-Color Top Accent Strip (Cyan #16b8c4 + Orange #f27c22) -->
+          <tr>
+            <td style="padding:0;margin:0;line-height:0;font-size:0;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td width="72%" height="6" style="background-color:#16b8c4;height:6px;line-height:6px;font-size:0;">&nbsp;</td>
+                  <td width="28%" height="6" style="background-color:#f27c22;height:6px;line-height:6px;font-size:0;">&nbsp;</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <!-- Branded Logo Header -->
+          <tr>
+            <td style="padding:24px 32px 20px 32px;border-bottom:1px solid #e2e8f0;background-color:#ffffff;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td valign="middle">
+                    <img src="cid:trek-logo" alt="Trek Consultancy" width="156" height="42" style="display:block;height:42px;width:auto;max-width:172px;border:0;outline:none;text-decoration:none;font-size:18px;font-weight:800;color:#16b8c4;" />
+                  </td>
+                  <td align="right" valign="middle">
+                    <span style="display:inline-block;padding:5px 12px;border-radius:999px;background-color:#ecfeff;border:1px solid #a5f3fc;color:#0e7490;font-size:11px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;">
+                      Community Update
+                    </span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <!-- Branded Hero Subject & Teaser Section -->
+          <tr>
+            <td style="padding:28px 32px 22px 32px;background-color:#f8fafc;border-bottom:1px solid #e2e8f0;">
+              <div style="margin:0 0 12px 0;line-height:0;">
+                <span style="display:inline-block;width:28px;height:4px;background-color:#16b8c4;border-radius:2px;"></span><span style="display:inline-block;width:12px;height:4px;background-color:#f27c22;border-radius:2px;margin-left:4px;"></span>
+              </div>
+              <h1 style="margin:0 0 12px 0;font-size:23px;font-weight:800;color:#0f172a;line-height:1.3;letter-spacing:-0.3px;">
+                ${safeSubject}
+              </h1>
+              ${
+                safePreview
+                  ? `<div style="margin:12px 0 0 0;padding:12px 16px;background-color:#fff7ed;border-left:4px solid #f27c22;border-radius:0 10px 10px 0;font-size:14px;line-height:1.6;color:#9a3412;font-weight:500;">${safePreview}</div>`
+                  : ''
+              }
+              <div style="margin:16px 0 0 0;font-size:12px;color:#64748b;">
+                Published by <strong style="color:#0f172a;">${safeAuthor}</strong> &bull; ${formattedDate}
+              </div>
+            </td>
+          </tr>
+          <!-- Main Body Copy -->
+          <tr>
+            <td style="padding:30px 32px 34px 32px;background-color:#ffffff;">
+              ${bodyHtml}
+            </td>
+          </tr>
+          <!-- Branded Footer -->
+          <tr>
+            <td style="padding:24px 32px;background-color:#f8fafc;border-top:1px solid #e2e8f0;text-align:center;">
+              <div style="margin:0 0 10px 0;line-height:0;">
+                <span style="display:inline-block;width:32px;height:3px;background-color:#16b8c4;border-radius:2px;"></span><span style="display:inline-block;width:14px;height:3px;background-color:#f27c22;border-radius:2px;margin-left:4px;"></span>
+              </div>
+              <div style="margin:0 0 6px 0;font-size:13px;font-weight:800;letter-spacing:0.8px;">
+                <span style="color:#0e7490;">TREK</span> <span style="color:#ea580c;">CONSULTANCY</span>
+              </div>
+              <div style="font-size:12px;line-height:1.6;color:#475569;font-weight:600;">
+                &copy; ${new Date().getFullYear()} Trek Consultancy Forum. All rights reserved.
+              </div>
+              <div style="margin-top:4px;font-size:11px;line-height:1.6;color:#64748b;">
+                You received this official community update because your email address is subscribed on our portal.
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+    return { html, text: plainTextParts.join('\n\n') };
+  };
+
+  const sleepMs = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const sendSingleResendEmail = async (
+    resend: Resend,
+    params: {
+      fromAddress: string;
+      fallbackFromAddress: string;
+      replyToAddress?: string;
+      to: string;
+      subject: string;
+      text: string;
+      html: string;
+    }
+  ): Promise<{
+    ok: boolean;
+    id?: string;
+    error?: string;
+    isSandboxRestriction?: boolean;
+    usedFallbackSender?: boolean;
+  }> => {
+    let activeFrom = params.fromAddress;
+    let usedFallbackSender = false;
+    const logoAttachment = params.html.includes('cid:trek-logo') ? getTrekLogoAttachment() : null;
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const payload: any = {
+          from: activeFrom,
+          to: [params.to],
+          subject: params.subject,
+          text: params.text,
+          html: params.html
+        };
+        if (params.replyToAddress) {
+          payload.replyTo = params.replyToAddress;
+        }
+        if (logoAttachment) {
+          payload.attachments = [logoAttachment];
+        }
+
+        const { data, error } = await resend.emails.send(payload);
+        if (!error && data?.id) {
+          return { ok: true, id: data.id, usedFallbackSender };
+        }
+
+        const errMsg = error?.message || 'Unknown Resend delivery error';
+        const errName = (error as any)?.name || '';
+        const statusCode = (error as any)?.statusCode;
+
+        // Retry automatically on Resend 2 req/sec rate limit
+        if (
+          attempt < 3 &&
+          (statusCode === 429 || errName === 'rate_limit_exceeded' || /too many requests|rate limit/i.test(errMsg))
+        ) {
+          await sleepMs(700 * attempt);
+          continue;
+        }
+
+        // If custom sender domain is not verified yet on Resend, automatically retry once with onboarding@resend.dev
+        if (
+          !usedFallbackSender &&
+          activeFrom !== params.fallbackFromAddress &&
+          /domain is not verified/i.test(errMsg)
+        ) {
+          console.warn(`[Resend Notice] Custom sender '${activeFrom}' is not verified yet on Resend. Retrying with '${params.fallbackFromAddress}'.`);
+          activeFrom = params.fallbackFromAddress;
+          usedFallbackSender = true;
+          continue;
+        }
+
+        const isSandboxRestriction =
+          /only send testing emails to your own email address|verify a domain at resend\.com\/domains/i.test(errMsg);
+
+        return {
+          ok: false,
+          error: errMsg,
+          isSandboxRestriction,
+          usedFallbackSender
+        };
+      } catch (ex: any) {
+        const exMsg = ex?.message || 'Unexpected exception while contacting Resend API';
+        if (attempt < 3 && /429|rate limit|network|fetch/i.test(exMsg)) {
+          await sleepMs(700 * attempt);
+          continue;
+        }
+        return { ok: false, error: exMsg };
+      }
+    }
+
+    return { ok: false, error: 'Email delivery failed after retries.' };
+  };
+
   // Send Email Verification Code
   app.post('/api/auth/send-verification', async (req, res) => {
     try {
@@ -1813,82 +2228,113 @@ export async function createApp() {
       const resendApiKey = emailCfg.resendApiKey;
 
       if (resendApiKey && resendApiKey !== 're_123456789') {
-        try {
-          const resend = new Resend(resendApiKey);
-          const rawFromAddress = emailCfg.emailFrom || 'Trek Consultancy Forum <onboarding@resend.dev>';
-          let fromAddress = rawFromAddress;
-          const isUnverifiedPublicDomain = /@(gmail|yahoo|hotmail|outlook|icloud|live|aol|msn)\.com/i.test(fromAddress);
-          if (fromAddress.includes('yourdomain.com') || isUnverifiedPublicDomain) {
-            if (isUnverifiedPublicDomain) {
-              console.warn(`[Resend Notice] Sender '${fromAddress}' uses a public mailbox domain (@gmail/@yahoo/etc.) which cannot be verified on Resend. Falling back to 'Trek Consultancy Forum <onboarding@resend.dev>'. To send from a custom domain, add and verify your domain at https://resend.com/domains.`);
-            }
-            fromAddress = 'Trek Consultancy Forum <onboarding@resend.dev>';
-          }
+        const resend = new Resend(resendApiKey);
+        const senderCfg = resolveSenderConfig(emailCfg.emailFrom);
+        if (senderCfg.usedPublicDomainFallback) {
+          console.warn(`[Resend Notice] Sender '${emailCfg.emailFrom}' uses a public mailbox domain which cannot be verified on Resend. Using '${senderCfg.fromAddress}' with Reply-To '${senderCfg.replyToAddress || 'none'}'.`);
+        }
 
-          const { data: resendData, error: resendError } = await resend.emails.send({
-            from: fromAddress,
-            replyTo: rawFromAddress,
-            to: cleanEmail,
-            subject: `${code} is your Trek Consultancy Forum verification code`,
-            text: `Your Trek Consultancy Forum verification code is: ${code}\n\nThis code will expire in 15 minutes.\nIf you did not request this code, you can safely ignore this email.`,
-            html: `
-              <!DOCTYPE html>
-              <html>
-              <head>
-                <meta charset="utf-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Trek Consultancy Forum Verification Code</title>
-              </head>
-              <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b;">
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; padding: 40px 16px;">
-                  <tr>
-                    <td align="center">
-                      <table role="presentation" width="100%" style="max-width: 480px; background-color: #ffffff; border-radius: 20px; border: 1px solid #e2e8f0; padding: 36px 32px; box-shadow: 0 4px 12px rgba(0,0,0,0.04);">
-                        <tr>
-                          <td>
-                            <div style="font-size: 22px; font-weight: 800; color: #00a8b5; letter-spacing: -0.5px; margin-bottom: 24px;">
-                              Trek Consultancy Forum
-                            </div>
-                            <h1 style="font-size: 20px; font-weight: 700; color: #0f172a; margin: 0 0 12px 0;">
-                              Verify Your Email Address
-                            </h1>
-                            <p style="font-size: 14px; line-height: 1.6; color: #475569; margin: 0 0 20px 0;">
-                              Hello${cleanName ? ` <strong>${cleanName}</strong>` : ''},<br>
-                              Thank you for registering with <strong>Trek Consultancy Forum</strong>. Please use the following 6-digit confirmation code to complete your verification:
-                            </p>
-                            <div style="background-color: #f0fdfa; border: 1.5px dashed #00a8b5; border-radius: 14px; padding: 18px 24px; text-align: center; margin: 24px 0;">
-                              <span style="font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #0d9488; display: inline-block;">
-                                ${code}
-                              </span>
-                            </div>
-                            <p style="font-size: 13px; line-height: 1.6; color: #64748b; margin: 0 0 24px 0;">
-                              ⏱️ This code will expire in <strong>15 minutes</strong>.<br>
-                              If you did not request this email, please disregard it — no account will be created without this code.
-                            </p>
-                            <div style="border-top: 1px solid #f1f5f9; padding-top: 20px; font-size: 12px; color: #94a3b8; line-height: 1.5;">
-                              This is an automated notification from Trek Consultancy Forum Support & Identity Service.
-                            </div>
-                          </td>
-                        </tr>
-                      </table>
-                    </td>
-                  </tr>
-                </table>
-              </body>
-              </html>
-            `
-          });
+        const sendResult = await sendSingleResendEmail(resend, {
+          fromAddress: senderCfg.fromAddress,
+          fallbackFromAddress: senderCfg.fallbackFromAddress,
+          replyToAddress: senderCfg.replyToAddress,
+          to: cleanEmail,
+          subject: `${code} is your Trek Consultancy Forum verification code`,
+          text: `Your Trek Consultancy Forum verification code is: ${code}\n\nThis code will expire in 15 minutes.\nIf you did not request this code, you can safely ignore this email.`,
+          html: `
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Trek Consultancy Forum Verification Code</title>
+            </head>
+            <body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f1f5f9; padding: 40px 16px;">
+                <tr>
+                  <td align="center">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 500px; background-color: #ffffff; border-radius: 18px; border: 1px solid #cbd5e1; overflow: hidden; box-shadow: 0 8px 24px rgba(15,23,42,0.06);">
+                      <!-- Trek Brand Dual-Color Top Accent Strip -->
+                      <tr>
+                        <td style="padding: 0; margin: 0; line-height: 0; font-size: 0;">
+                          <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                            <tr>
+                              <td width="72%" height="6" style="background-color: #16b8c4; height: 6px; line-height: 6px; font-size: 0;">&nbsp;</td>
+                              <td width="28%" height="6" style="background-color: #f27c22; height: 6px; line-height: 6px; font-size: 0;">&nbsp;</td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      <!-- Branded Header with Logo -->
+                      <tr>
+                        <td style="padding: 24px 32px 18px 32px; border-bottom: 1px solid #e2e8f0; background-color: #ffffff;">
+                          <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                            <tr>
+                              <td valign="middle">
+                                <img src="cid:trek-logo" alt="Trek Consultancy" width="156" height="42" style="display: block; height: 42px; width: auto; max-width: 172px; border: 0; outline: none; text-decoration: none; font-size: 18px; font-weight: 800; color: #16b8c4;" />
+                              </td>
+                              <td align="right" valign="middle">
+                                <span style="display: inline-block; padding: 5px 12px; border-radius: 999px; background-color: #ecfeff; border: 1px solid #a5f3fc; color: #0e7490; font-size: 11px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase;">
+                                  Security Verification
+                                </span>
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      <!-- Card Body -->
+                      <tr>
+                        <td style="padding: 32px;">
+                          <div style="margin: 0 0 10px 0; line-height: 0;">
+                            <span style="display: inline-block; width: 26px; height: 4px; background-color: #16b8c4; border-radius: 2px;"></span><span style="display: inline-block; width: 10px; height: 4px; background-color: #f27c22; border-radius: 2px; margin-left: 4px;"></span>
+                          </div>
+                          <h1 style="font-size: 21px; font-weight: 800; color: #0f172a; margin: 0 0 12px 0; letter-spacing: -0.3px;">
+                            Verify Your Email Address
+                          </h1>
+                          <p style="font-size: 14px; line-height: 1.65; color: #475569; margin: 0 0 20px 0;">
+                            Hello${cleanName ? ` <strong>${escapeEmailHtml(cleanName)}</strong>` : ''},<br>
+                            Thank you for joining <strong>Trek Consultancy Forum</strong>. Please use the following 6-digit verification code to complete your account setup:
+                          </p>
+                          <div style="background-color: #ecfeff; border: 2px dashed #16b8c4; border-radius: 14px; padding: 18px 24px; text-align: center; margin: 24px 0;">
+                            <span style="font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 34px; font-weight: 800; letter-spacing: 10px; color: #0e7490; display: inline-block;">
+                              ${code}
+                            </span>
+                          </div>
+                          <div style="padding: 12px 16px; background-color: #fff7ed; border-left: 3px solid #f27c22; border-radius: 0 8px 8px 0; font-size: 13px; line-height: 1.6; color: #9a3412; margin: 0 0 24px 0;">
+                            ⏱️ This verification code will expire in <strong>15 minutes</strong>.<br>
+                            If you did not request this email, please disregard it — no account will be created.
+                          </div>
+                          <div style="border-top: 1px solid #f1f5f9; padding-top: 18px; font-size: 12px; color: #64748b; line-height: 1.5;">
+                            This is an automated notification from Trek Consultancy Forum Identity Service.
+                          </div>
+                        </td>
+                      </tr>
+                      <!-- Footer -->
+                      <tr>
+                        <td style="padding: 18px 32px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
+                          <div style="font-size: 12px; font-weight: 800; letter-spacing: 0.6px; margin-bottom: 2px;">
+                            <span style="color: #0e7490;">TREK</span> <span style="color: #ea580c;">CONSULTANCY</span>
+                          </div>
+                          <div style="font-size: 11px; color: #64748b;">
+                            &copy; ${new Date().getFullYear()} Trek Consultancy Forum. All rights reserved.
+                          </div>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </body>
+            </html>
+          `
+        });
 
-          if (resendError) {
-            console.error('[Resend Error]:', resendError);
-            emailDeliveryError = resendError.message;
-          } else {
-            emailSent = true;
-            console.log(`[Resend Success] OTP email sent to ${cleanEmail} (ID: ${resendData?.id})`);
-          }
-        } catch (resendEx: any) {
-          console.error('[Resend Exception]:', resendEx?.message);
-          emailDeliveryError = resendEx?.message;
+        if (sendResult.ok) {
+          emailSent = true;
+          console.log(`[Resend Success] OTP email sent to ${cleanEmail} (ID: ${sendResult.id})`);
+        } else {
+          console.error('[Resend Error]:', sendResult.error);
+          emailDeliveryError = sendResult.error || 'Email delivery failed';
         }
       }
 
@@ -2148,7 +2594,7 @@ export async function createApp() {
   });
 
   // Newsletter Subscription
-  app.get('/api/newsletter', async (_req, res) => {
+  app.get('/api/newsletter', requireAdmin, async (_req, res) => {
     try {
       const result = await pool.query('SELECT * FROM newsletter_subscribers ORDER BY subscribed_at DESC');
       res.json(result.rows);
@@ -2224,7 +2670,7 @@ export async function createApp() {
   ];
 
   // Admin Newsletter Endpoints
-  app.delete(['/api/admin/newsletter/:id', '/api/newsletter/:id'], async (req, res) => {
+  app.delete(['/api/admin/newsletter/:id', '/api/newsletter/:id'], requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       await pool.query('DELETE FROM newsletter_subscribers WHERE id = $1 OR email = $1', [id]);
@@ -2292,6 +2738,121 @@ export async function createApp() {
     }
   });
 
+  const dispatchNewsletterCampaign = async (campaign: {
+    issueNumber?: number;
+    subject: string;
+    previewText?: string;
+    content: string;
+    author?: string;
+  }) => {
+    const subsRes = await pool.query('SELECT email FROM newsletter_subscribers ORDER BY subscribed_at ASC');
+    const emailList = Array.from(
+      new Set(
+        subsRes.rows
+          .map((r: any) => (r.email || '').trim().toLowerCase())
+          .filter((e: string) => Boolean(e && e.includes('@')))
+      )
+    );
+    const totalSubscribers = emailList.length;
+
+    const emailCfg = await getEffectiveEmailConfig();
+    const resendApiKey = (emailCfg.resendApiKey || '').trim();
+
+    if (!resendApiKey || !resendApiKey.startsWith('re_') || resendApiKey === 're_123456789') {
+      return {
+        deliveredCount: 0,
+        failedCount: totalSubscribers,
+        totalSubscribers,
+        status: 'failed' as const,
+        deliveryError: 'Resend API key is missing or invalid. Configure a valid RESEND_API_KEY in Email Sender Settings.'
+      };
+    }
+
+    if (totalSubscribers === 0) {
+      return {
+        deliveredCount: 0,
+        failedCount: 0,
+        totalSubscribers: 0,
+        status: 'failed' as const,
+        deliveryError: 'No active subscribers found to receive this newsletter.'
+      };
+    }
+
+    const resend = new Resend(resendApiKey);
+    const senderCfg = resolveSenderConfig(emailCfg.emailFrom);
+    const rendered = renderNewsletterEmail(campaign);
+
+    const deliveredEmails: string[] = [];
+    const failedItems: Array<{ email: string; error: string; isSandboxRestriction?: boolean }> = [];
+
+    for (let i = 0; i < emailList.length; i++) {
+      const recipientEmail = emailList[i];
+      if (i > 0) {
+        // Respect Resend's 2 requests/second rate limit
+        await sleepMs(520);
+      }
+
+      const sendRes = await sendSingleResendEmail(resend, {
+        fromAddress: senderCfg.fromAddress,
+        fallbackFromAddress: senderCfg.fallbackFromAddress,
+        replyToAddress: senderCfg.replyToAddress,
+        to: recipientEmail,
+        subject: campaign.subject,
+        text: rendered.text,
+        html: rendered.html
+      });
+
+      if (sendRes.ok) {
+        deliveredEmails.push(recipientEmail);
+        console.log(`[Newsletter Sent] -> ${recipientEmail} (ID: ${sendRes.id})`);
+      } else {
+        const errText = sendRes.error || 'Delivery rejected by mail provider';
+        failedItems.push({
+          email: recipientEmail,
+          error: errText,
+          isSandboxRestriction: sendRes.isSandboxRestriction
+        });
+        console.warn(`[Newsletter Failed] -> ${recipientEmail}: ${errText}`);
+      }
+    }
+
+    const deliveredCount = deliveredEmails.length;
+    const failedCount = failedItems.length;
+    const status: 'sent' | 'partial' | 'failed' =
+      deliveredCount === totalSubscribers && totalSubscribers > 0
+        ? 'sent'
+        : deliveredCount > 0
+        ? 'partial'
+        : 'failed';
+
+    let deliveryError: string | undefined;
+    if (failedCount > 0) {
+      const sandboxBlocked = failedItems.filter((f) => f.isSandboxRestriction);
+      if (sandboxBlocked.length > 0) {
+        const blockedList = sandboxBlocked.slice(0, 3).map((f) => f.email).join(', ');
+        const moreSuffix = sandboxBlocked.length > 3 ? ` +${sandboxBlocked.length - 3} more` : '';
+        deliveryError =
+          deliveredCount > 0
+            ? `Delivered to ${deliveredCount} of ${totalSubscribers} subscriber(s). ${sandboxBlocked.length} recipient(s) (${blockedList}${moreSuffix}) blocked by Resend Sandbox Mode: unverified 'onboarding@resend.dev' can only send to your Resend account owner email until you verify a custom domain at resend.com/domains.`
+            : `0 of ${totalSubscribers} delivered. Blocked by Resend Sandbox Mode (${blockedList}${moreSuffix}): unverified 'onboarding@resend.dev' can only send to your Resend account owner email until you verify a custom domain at resend.com/domains.`;
+      } else {
+        const firstErr = failedItems[0];
+        deliveryError =
+          deliveredCount > 0
+            ? `Delivered to ${deliveredCount} of ${totalSubscribers} subscriber(s); ${failedCount} failed (${firstErr.email}: ${firstErr.error}).`
+            : `Delivery failed for all ${totalSubscribers} subscriber(s) (${firstErr.email}: ${firstErr.error}).`;
+      }
+    }
+
+    return {
+      deliveredCount,
+      failedCount,
+      totalSubscribers,
+      status,
+      deliveryError
+    };
+  };
+
   app.post('/api/admin/newsletter/broadcast', async (req, res) => {
     try {
       const { subject, previewText, content, author, tags } = req.body;
@@ -2309,22 +2870,28 @@ export async function createApp() {
         } catch {}
       }
 
-      // Count active subscribers
-      const subsRes = await pool.query('SELECT COUNT(*) as count FROM newsletter_subscribers');
-      const subCount = parseInt(subsRes.rows[0]?.count || '0', 10);
-
-      const nextIssue = (campaigns[0]?.issueNumber || 44) + 1;
-      const newCampaign = {
+      const maxIssue = campaigns.reduce((max: number, c: any) => Math.max(max, Number(c.issueNumber) || 0), 42);
+      const nextIssue = maxIssue + 1;
+      const draftCampaign = {
         id: `camp-${Date.now()}`,
         issueNumber: nextIssue,
         subject: subject.trim(),
         previewText: (previewText || '').trim(),
         content: content.trim(),
         author: author?.trim() || 'Trek Consultancy Editorial Team',
-        sentAt: new Date().toISOString(),
-        recipientCount: subCount || 1,
-        status: 'sent',
         tags: Array.isArray(tags) ? tags : ['Weekly Digest', 'Architecture']
+      };
+
+      const delivery = await dispatchNewsletterCampaign(draftCampaign);
+
+      const newCampaign = {
+        ...draftCampaign,
+        sentAt: new Date().toISOString(),
+        recipientCount: delivery.deliveredCount,
+        totalSubscribers: delivery.totalSubscribers,
+        failedCount: delivery.failedCount,
+        status: delivery.status,
+        deliveryError: delivery.deliveryError
       };
 
       const updated = [newCampaign, ...campaigns];
@@ -2333,33 +2900,84 @@ export async function createApp() {
         ON CONFLICT (key) DO UPDATE SET value = $1
       `, [JSON.stringify(updated)]);
 
-      // Optional delivery via Resend if key exists and subscribers exist
-      const emailCfg = await getEffectiveEmailConfig();
-      const resendApiKey = emailCfg.resendApiKey;
-      if (resendApiKey && subCount > 0) {
+      await pool.query(`
+        INSERT INTO activity_logs (id, action, actor, target, time_ago, type)
+        VALUES ($1, $2, 'Admin', $3, 'Just now', 'newsletter')
+      `, [
+        `act-${Date.now()}`,
+        delivery.status === 'sent'
+          ? `Broadcasted Newsletter (${delivery.deliveredCount} delivered)`
+          : delivery.status === 'partial'
+          ? `Partially Broadcasted Newsletter (${delivery.deliveredCount}/${delivery.totalSubscribers})`
+          : `Failed Newsletter Broadcast`,
+        newCampaign.subject
+      ]).catch(() => {});
+
+      res.status(201).json({
+        success: delivery.deliveredCount > 0,
+        campaign: newCampaign,
+        sentCount: delivery.deliveredCount,
+        failedCount: delivery.failedCount,
+        totalSubscribers: delivery.totalSubscribers,
+        deliveryError: delivery.deliveryError
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/admin/newsletter/campaigns/:id/resend', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const cur = await pool.query("SELECT value FROM settings WHERE key = 'newsletter_campaigns'");
+      let campaigns: any[] = defaultNewsletterCampaigns;
+      if (cur.rows.length > 0 && cur.rows[0].value) {
         try {
-          const resend = new Resend(resendApiKey);
-          const subs = await pool.query('SELECT email FROM newsletter_subscribers LIMIT 50');
-          const emailList = subs.rows.map(r => r.email).filter(Boolean);
-          if (emailList.length > 0) {
-            const rawFrom = emailCfg.emailFrom || 'Trek Consultancy Forum <onboarding@resend.dev>';
-            const isPublicDomain = /@(gmail|yahoo|hotmail|outlook|icloud|live|aol|msn)\.com/i.test(rawFrom) || rawFrom.includes('yourdomain.com');
-            const safeFrom = isPublicDomain ? 'Trek Consultancy Forum <onboarding@resend.dev>' : rawFrom;
-            await resend.emails.send({
-              from: safeFrom,
-              replyTo: rawFrom,
-              to: emailList[0],
-              bcc: emailList.slice(1),
-              subject: newCampaign.subject,
-              text: newCampaign.content
-            });
-          }
-        } catch (mailErr) {
-          console.warn('[Newsletter Broadcast Warning]', mailErr);
-        }
+          const parsed = typeof cur.rows[0].value === 'string' ? JSON.parse(cur.rows[0].value) : cur.rows[0].value;
+          if (Array.isArray(parsed)) campaigns = parsed;
+        } catch {}
       }
 
-      res.status(201).json({ success: true, campaign: newCampaign, sentCount: subCount });
+      const idx = campaigns.findIndex((c: any) => c.id === id);
+      if (idx === -1) {
+        return res.status(404).json({ error: 'Newsletter issue not found.' });
+      }
+
+      const target = campaigns[idx];
+      const delivery = await dispatchNewsletterCampaign({
+        issueNumber: target.issueNumber,
+        subject: target.subject,
+        previewText: target.previewText,
+        content: target.content,
+        author: target.author
+      });
+
+      const updatedCampaign = {
+        ...target,
+        sentAt: new Date().toISOString(),
+        recipientCount: delivery.deliveredCount,
+        totalSubscribers: delivery.totalSubscribers,
+        failedCount: delivery.failedCount,
+        status: delivery.status,
+        deliveryError: delivery.deliveryError
+      };
+
+      const updatedList = [...campaigns];
+      updatedList[idx] = updatedCampaign;
+
+      await pool.query(`
+        INSERT INTO settings (key, value) VALUES ('newsletter_campaigns', $1)
+        ON CONFLICT (key) DO UPDATE SET value = $1
+      `, [JSON.stringify(updatedList)]);
+
+      res.json({
+        success: delivery.deliveredCount > 0,
+        campaign: updatedCampaign,
+        sentCount: delivery.deliveredCount,
+        failedCount: delivery.failedCount,
+        totalSubscribers: delivery.totalSubscribers,
+        deliveryError: delivery.deliveryError
+      });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -2477,10 +3095,19 @@ export async function createApp() {
       } catch {}
 
       if (checkRes.ok) {
-        const domainCount = Array.isArray(data?.data) ? data.data.length : 0;
+        const domains = Array.isArray(data?.data) ? data.data : [];
+        const verifiedDomains = domains
+          .filter((d: any) => d?.status === 'verified' && d?.name)
+          .map((d: any) => d.name as string);
+        const sandboxMode = verifiedDomains.length === 0;
+
         return res.json({
           valid: true,
-          message: `Resend API key verified! Connected to Resend (${domainCount} domain${domainCount === 1 ? '' : 's'} found).`
+          sandboxMode,
+          verifiedDomains,
+          message: sandboxMode
+            ? 'API key verified! Note: 0 verified domains found on Resend (Sandbox Mode active — emails can only be sent to your Resend account owner email until you verify a custom domain at resend.com/domains).'
+            : `API key verified! Connected with ${verifiedDomains.length} verified domain${verifiedDomains.length === 1 ? '' : 's'} (${verifiedDomains.join(', ')}) — ready for unrestricted delivery.`
         });
       }
 
@@ -2489,7 +3116,8 @@ export async function createApp() {
       if (data?.name === 'restricted_api_key' || msg.includes('restricted to only send emails')) {
         return res.json({
           valid: true,
-          message: 'Resend API key verified! (Sending-access API key is active and ready).'
+          sandboxMode: false,
+          message: 'Resend API key verified! (Sending-access API key is active — use "Send Test Email" below to verify inbox delivery).'
         });
       }
 
@@ -2502,6 +3130,56 @@ export async function createApp() {
         valid: false,
         error: err?.message || 'Unable to reach Resend API to verify key.'
       });
+    }
+  });
+
+  app.post('/api/admin/newsletter/email-config/send-test', async (req, res) => {
+    try {
+      const cfg = await getEffectiveEmailConfig();
+      const cleanKey = ((req.body?.resendApiKey ?? cfg.resendApiKey) || '').trim();
+      const rawFrom = ((req.body?.emailFrom ?? cfg.emailFrom) || '').trim();
+      const toEmail = ((req.body?.toEmail ?? '') || '').trim().toLowerCase();
+
+      if (!cleanKey || !cleanKey.startsWith('re_') || cleanKey === 're_123456789') {
+        return res.status(400).json({ error: 'Please provide a valid Resend API key starting with "re_".' });
+      }
+      if (!toEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toEmail)) {
+        return res.status(400).json({ error: 'Please enter a valid recipient email address for the test.' });
+      }
+
+      const resend = new Resend(cleanKey);
+      const senderCfg = resolveSenderConfig(rawFrom);
+      const rendered = renderNewsletterEmail({
+        subject: 'Trek Consultancy Forum — Test Delivery Confirmation',
+        previewText: 'Your outbound Resend email configuration is working properly.',
+        author: 'Trek Consultancy Mail System',
+        content: `## Outbound Email Delivery Verified\n\nThis test message confirms that **Trek Consultancy Forum** can successfully dispatch HTML + plain-text emails through your Resend API configuration.\n\n- **Active Sender**: \`${senderCfg.fromAddress}\`\n- **Reply-To**: \`${senderCfg.replyToAddress || 'Not set'}\`\n- **Recipient**: \`${toEmail}\`\n\nIf you see this in your inbox, your newsletter broadcasts and verification codes are ready to deliver.`
+      });
+
+      const sendRes = await sendSingleResendEmail(resend, {
+        fromAddress: senderCfg.fromAddress,
+        fallbackFromAddress: senderCfg.fallbackFromAddress,
+        replyToAddress: senderCfg.replyToAddress,
+        to: toEmail,
+        subject: 'Trek Consultancy Forum — Test Delivery Confirmation',
+        text: rendered.text,
+        html: rendered.html
+      });
+
+      if (!sendRes.ok) {
+        const hint = sendRes.isSandboxRestriction
+          ? 'Resend Sandbox Restriction: Unverified onboarding@resend.dev can only deliver to your own Resend account email address. Verify your custom domain at resend.com/domains to send to external addresses.'
+          : sendRes.error || 'Email delivery failed.';
+        return res.status(400).json({ success: false, error: hint });
+      }
+
+      return res.json({
+        success: true,
+        messageId: sendRes.id,
+        message: `Test email accepted by Resend (ID: ${sendRes.id}) and dispatched to ${toEmail}! Check your inbox (and Promotions/Spam tab).`
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err?.message || 'Failed to send test email.' });
     }
   });
 

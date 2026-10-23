@@ -294,7 +294,8 @@ export function corsMiddleware(req: Request, res: Response, next: NextFunction):
     return next();
   }
 
-  const host = req.headers.host || '';
+  const rawHost = (req.headers['x-forwarded-host'] as string) || req.headers.host || '';
+  const host = rawHost.split(',')[0].trim();
   const allowedList = (process.env.ALLOWED_ORIGINS || '')
     .split(',')
     .map(s => s.trim().toLowerCase())
@@ -303,7 +304,10 @@ export function corsMiddleware(req: Request, res: Response, next: NextFunction):
   let isAllowed = false;
   try {
     const parsedOrigin = new URL(origin);
-    if (parsedOrigin.host.toLowerCase() === host.toLowerCase()) {
+    if (
+      parsedOrigin.host.toLowerCase() === host.toLowerCase() ||
+      parsedOrigin.hostname.toLowerCase() === host.split(':')[0].toLowerCase()
+    ) {
       isAllowed = true;
     } else if (
       (parsedOrigin.hostname === 'localhost' || parsedOrigin.hostname === '127.0.0.1') &&

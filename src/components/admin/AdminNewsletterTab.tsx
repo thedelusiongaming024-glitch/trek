@@ -64,6 +64,17 @@ export const AdminNewsletterTab: React.FC = () => {
   const [composeAuthor, setComposeAuthor] = useState('Trek Consultancy Editorial Team');
   const [isBroadcasting, setIsBroadcasting] = useState(false);
   const [broadcastSuccess, setBroadcastSuccess] = useState(false);
+  const [broadcastFeedback, setBroadcastFeedback] = useState<{
+    type: 'success' | 'partial' | 'error';
+    message: string;
+  } | null>(null);
+
+  // Resend existing campaign state
+  const [resendingCampaignId, setResendingCampaignId] = useState<string | null>(null);
+  const [resendFeedback, setResendFeedback] = useState<{
+    type: 'success' | 'partial' | 'error';
+    message: string;
+  } | null>(null);
 
   // Deletion modal
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -81,7 +92,14 @@ export const AdminNewsletterTab: React.FC = () => {
   const [emailConfigSource, setEmailConfigSource] = useState<'database' | 'env'>('env');
   const [emailConfigUpdatedAt, setEmailConfigUpdatedAt] = useState<string | null>(null);
   const [isTestingApiKey, setIsTestingApiKey] = useState(false);
-  const [apiKeyTestResult, setApiKeyTestResult] = useState<{ valid: boolean; message: string } | null>(null);
+  const [apiKeyTestResult, setApiKeyTestResult] = useState<{
+    valid: boolean;
+    sandboxMode?: boolean;
+    message: string;
+  } | null>(null);
+  const [testRecipientEmail, setTestRecipientEmail] = useState('');
+  const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
+  const [sendTestResult, setSendTestResult] = useState<{ ok: boolean; message: string } | null>(null);
 
   // Fetch data
   const fetchData = async () => {
@@ -167,7 +185,11 @@ export const AdminNewsletterTab: React.FC = () => {
       });
       const data = await res.json();
       if (res.ok && data.valid) {
-        setApiKeyTestResult({ valid: true, message: data.message || 'Resend API key is valid!' });
+        setApiKeyTestResult({
+          valid: true,
+          sandboxMode: Boolean(data.sandboxMode),
+          message: data.message || 'Resend API key is valid!'
+        });
       } else {
         setApiKeyTestResult({ valid: false, message: data.error || 'Invalid Resend API key.' });
       }
@@ -175,6 +197,37 @@ export const AdminNewsletterTab: React.FC = () => {
       setApiKeyTestResult({ valid: false, message: 'Network error while verifying API key.' });
     } finally {
       setIsTestingApiKey(false);
+    }
+  };
+
+  const handleSendTestEmail = async () => {
+    const cleanTo = testRecipientEmail.trim().toLowerCase();
+    if (!cleanTo || !cleanTo.includes('@')) {
+      setSendTestResult({ ok: false, message: 'Please enter a valid recipient email address.' });
+      return;
+    }
+    try {
+      setIsSendingTestEmail(true);
+      setSendTestResult(null);
+      const res = await fetch('/api/admin/newsletter/email-config/send-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          toEmail: cleanTo,
+          resendApiKey: resendApiKey.trim(),
+          emailFrom: emailFrom.trim()
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSendTestResult({ ok: true, message: data.message || `Test email sent to ${cleanTo}!` });
+      } else {
+        setSendTestResult({ ok: false, message: data.error || 'Failed to deliver test email.' });
+      }
+    } catch {
+      setSendTestResult({ ok: false, message: 'Network error while sending test email.' });
+    } finally {
+      setIsSendingTestEmail(false);
     }
   };
 
@@ -329,6 +382,7 @@ export const AdminNewsletterTab: React.FC = () => {
 
     try {
       setIsBroadcasting(true);
+      setBroadcastFeedback(null);
       const res = await fetch('/api/admin/newsletter/broadcast', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -340,21 +394,97 @@ export const AdminNewsletterTab: React.FC = () => {
         })
       });
       const data = await res.json();
-      if (res.ok) {
+      if (res.ok && data.campaign) {
         setCampaigns(prev => [data.campaign, ...prev]);
-        setBroadcastSuccess(true);
-        setTimeout(() => {
-          setBroadcastSuccess(false);
-          setIsComposeModalOpen(false);
+        const camp: NewsletterCampaign = data.campaign;
+
+        if (camp.status === 'sent') {
+          setBroadcastSuccess(true);
+          setBroadcastFeedback({
+            type: 'success',
+            message: `"${camp.subject}" delivered to all ${camp.recipientCount} subscriber(s)!`
+          });
+          setTimeout(() => {
+            setBroadcastSuccess(false);
+            setBroadcastFeedback(null);
+            setIsComposeModalOpen(false);
+            setComposeSubject('');
+            setComposePreview('');
+            setComposeContent('');
+            setActiveSubTab('campaigns');
+          }, 1600);
+        } else if (camp.status === 'partial') {
           setComposeSubject('');
           setComposePreview('');
           setComposeContent('');
-        }, 1500);
+          setBroadcastFeedback({
+            type: 'partial',
+            message: data.deliveryError || `Partially delivered (${camp.recipientCount} of ${camp.totalSubscribers ?? subscribers.length} subscribers).`
+          });
+        } else {
+          setBroadcastFeedback({
+            type: 'error',
+            message: data.deliveryError || 'Newsletter saved to archive, but email delivery failed for all recipients.'
+          });
+        }
+      } else {
+        setBroadcastFeedback({
+          type: 'error',
+          message: data.error || 'Failed to broadcast newsletter.'
+        });
       }
     } catch (err) {
       console.error('Failed to broadcast newsletter:', err);
+      setBroadcastFeedback({
+        type: 'error',
+        message: 'Network error while broadcasting newsletter.'
+      });
     } finally {
       setIsBroadcasting(false);
+    }
+  };
+
+  // Resend an existing published campaign
+  const handleResendCampaign = async (camp: NewsletterCampaign) => {
+    try {
+      setResendingCampaignId(camp.id);
+      setResendFeedback(null);
+      const res = await fetch(`/api/admin/newsletter/campaigns/${encodeURIComponent(camp.id)}/resend`, {
+        method: 'POST'
+      });
+      const data = await res.json();
+      if (res.ok && data.campaign) {
+        const updated: NewsletterCampaign = data.campaign;
+        setCampaigns(prev => prev.map(c => (c.id === camp.id ? updated : c)));
+        if (updated.status === 'sent') {
+          setResendFeedback({
+            type: 'success',
+            message: `"${updated.subject}" successfully delivered to all ${updated.recipientCount} subscriber(s)!`
+          });
+        } else if (updated.status === 'partial') {
+          setResendFeedback({
+            type: 'partial',
+            message: data.deliveryError || `"${updated.subject}" partially delivered (${updated.recipientCount} of ${updated.totalSubscribers ?? subscribers.length}).`
+          });
+        } else {
+          setResendFeedback({
+            type: 'error',
+            message: data.deliveryError || `"${updated.subject}" failed to deliver.`
+          });
+        }
+      } else {
+        setResendFeedback({
+          type: 'error',
+          message: data.error || 'Failed to resend newsletter broadcast.'
+        });
+      }
+    } catch {
+      setResendFeedback({
+        type: 'error',
+        message: 'Network error while resending newsletter broadcast.'
+      });
+    } finally {
+      setResendingCampaignId(null);
     }
   };
 
@@ -429,16 +559,16 @@ export const AdminNewsletterTab: React.FC = () => {
           </p>
         </div>
 
-        {/* Latest Edition / Issues Published */}
+        {/* Latest Edition / Broadcasts Published */}
         <div className="p-4 rounded-xl bg-white border border-slate-200/90 shadow-2xs space-y-1">
           <div className="flex items-center justify-between text-slate-500">
-            <span className="text-xs font-medium">{language === 'bn' ? 'সর্বশেষ সংস্করণ' : language === 'ar' ? 'أحدث إصدار' : 'Current Issue'}</span>
+            <span className="text-xs font-medium">{language === 'bn' ? 'মোট সংস্করণ' : language === 'ar' ? 'إجمالي النشرات' : 'Total Broadcasts'}</span>
             <div className="p-2 rounded-lg bg-blue-50 text-blue-600">
               <FileText className="w-4 h-4" />
             </div>
           </div>
           <div className="text-2xl font-bold text-slate-900 tracking-tight">
-            #{campaigns[0]?.issueNumber || 44}
+            {formatNumber(campaigns.length)}
           </div>
           <p className="text-[11px] text-slate-500 truncate">
             {campaigns[0]?.subject || 'Weekly Blueprint Digest'}
@@ -735,84 +865,170 @@ export const AdminNewsletterTab: React.FC = () => {
             <div className="lg:col-span-2 space-y-3">
               <div className="flex items-center justify-between pb-1">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Published Issues & Weekly Blueprints
+                  Published Broadcasts & Digests
                 </h3>
                 <span className="text-xs text-slate-400 font-mono">
-                  {campaigns.length} issues on file
+                  {campaigns.length} broadcasts on file
                 </span>
               </div>
+
+              {resendFeedback && (
+                <div
+                  role={resendFeedback.type === 'error' ? 'alert' : 'status'}
+                  className={`p-3 rounded-xl border text-xs flex items-start justify-between gap-2 ${
+                    resendFeedback.type === 'success'
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                      : resendFeedback.type === 'partial'
+                      ? 'bg-amber-50 border-amber-200 text-amber-900'
+                      : 'bg-rose-50 border-rose-200 text-rose-800'
+                  }`}
+                >
+                  <div className="flex items-start gap-2">
+                    {resendFeedback.type === 'success' ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    ) : (
+                      <AlertCircle
+                        className={`w-4 h-4 shrink-0 mt-0.5 ${
+                          resendFeedback.type === 'partial' ? 'text-amber-600' : 'text-rose-600'
+                        }`}
+                      />
+                    )}
+                    <span className="leading-relaxed">{resendFeedback.message}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setResendFeedback(null)}
+                    className="p-0.5 text-slate-400 hover:text-slate-700 cursor-pointer shrink-0"
+                    aria-label="Dismiss delivery notification"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
 
               {campaigns.length === 0 ? (
                 <div className="p-8 rounded-xl bg-white border border-slate-200/90 text-center space-y-2">
                   <FileText className="w-8 h-8 text-slate-300 mx-auto" />
-                  <p className="text-xs font-semibold text-slate-700">No published issues on file</p>
-                  <p className="text-[11px] text-slate-400">Draft and publish a new weekly digest to see it listed here.</p>
+                  <p className="text-xs font-semibold text-slate-700">No published broadcasts on file</p>
+                  <p className="text-[11px] text-slate-400">Draft and broadcast a community digest to see it listed here.</p>
                 </div>
-              ) : campaigns.map((camp) => (
-                <div
-                  key={camp.id}
-                  className="p-4 rounded-xl bg-white border border-slate-200/90 shadow-2xs hover:border-slate-300 transition-all space-y-3"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-900 text-teal-300">
-                          Issue #{camp.issueNumber || 44}
-                        </span>
-                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                          <span>Delivered</span>
-                        </span>
-                        <span className="text-[11px] text-slate-400 font-mono">
-                          {new Date(camp.sentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                        </span>
+              ) : campaigns.map((camp) => {
+                const isFailed = camp.status === 'failed';
+                const isPartial = camp.status === 'partial';
+                const isResendingThis = resendingCampaignId === camp.id;
+
+                return (
+                  <div
+                    key={camp.id}
+                    className="p-4 rounded-xl bg-white border border-slate-200/90 shadow-2xs hover:border-slate-300 transition-all space-y-3"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {isFailed ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                              <AlertCircle className="w-3 h-3 text-rose-600" />
+                              <span>Delivery Failed</span>
+                            </span>
+                          ) : isPartial ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                              <AlertCircle className="w-3 h-3 text-amber-600" />
+                              <span>Partially Delivered</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              <span>Delivered</span>
+                            </span>
+                          )}
+                          <span className="text-[11px] text-slate-400 font-mono">
+                            {new Date(camp.sentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </span>
+                        </div>
+                        <h4 className="text-sm font-bold text-slate-900">
+                          {camp.subject}
+                        </h4>
+                        {camp.previewText && (
+                          <p className="text-xs text-slate-600 leading-relaxed">
+                            {camp.previewText}
+                          </p>
+                        )}
                       </div>
-                      <h4 className="text-sm font-bold text-slate-900">
-                        {camp.subject}
-                      </h4>
-                      {camp.previewText && (
-                        <p className="text-xs text-slate-600 leading-relaxed">
-                          {camp.previewText}
-                        </p>
-                      )}
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          disabled={isResendingThis}
+                          onClick={() => handleResendCampaign(camp)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-teal-200 bg-teal-50/70 hover:bg-teal-100 text-teal-800 text-xs font-medium transition-colors cursor-pointer disabled:opacity-50"
+                          title="Send or re-send this broadcast to all active subscribers"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 text-teal-700 ${isResendingThis ? 'animate-spin' : ''}`} />
+                          <span>{isResendingThis ? 'Sending...' : 'Resend'}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setPreviewCampaign(camp)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-teal-500 hover:text-teal-700 text-slate-600 text-xs font-medium transition-colors cursor-pointer"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>Preview Email</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setDeleteCampaignConfirmId(camp.id)}
+                          className="p-1.5 rounded-lg border border-slate-200 hover:border-rose-300 hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                          title="Delete broadcast"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => setPreviewCampaign(camp)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-teal-500 hover:text-teal-700 text-slate-600 text-xs font-medium transition-colors cursor-pointer"
+                    {camp.deliveryError && (
+                      <div
+                        className={`p-2.5 rounded-lg border text-[11px] leading-relaxed flex items-start gap-2 ${
+                          isFailed
+                            ? 'bg-rose-50/80 border-rose-200 text-rose-800'
+                            : 'bg-amber-50/80 border-amber-200 text-amber-900'
+                        }`}
                       >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>Preview Email</span>
-                      </button>
+                        <AlertCircle className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${isFailed ? 'text-rose-600' : 'text-amber-600'}`} />
+                        <span>{camp.deliveryError}</span>
+                      </div>
+                    )}
 
-                      <button
-                        type="button"
-                        onClick={() => setDeleteCampaignConfirmId(camp.id)}
-                        className="p-1.5 rounded-lg border border-slate-200 hover:border-rose-300 hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
-                        title="Delete issue"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 text-[11px] text-slate-500">
+                      <div className="flex items-center gap-1.5">
+                        <Users className="w-3 h-3 text-slate-400" />
+                        {isFailed ? (
+                          <span className="text-rose-700 font-medium">
+                            0 of <strong>{formatNumber(camp.totalSubscribers ?? subscribers.length)}</strong> subscribers delivered
+                          </span>
+                        ) : isPartial ? (
+                          <span className="text-amber-800 font-medium">
+                            Delivered to <strong>{formatNumber(camp.recipientCount)}</strong> of{' '}
+                            <strong>{formatNumber(camp.totalSubscribers ?? subscribers.length)}</strong> subscribers
+                          </span>
+                        ) : (
+                          <span>
+                            Delivered to <strong>{formatNumber(camp.recipientCount)}</strong> subscribers
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {camp.tags?.map(t => (
+                          <span key={t} className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 text-[10px]">
+                            {t}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   </div>
-
-                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 text-[11px] text-slate-500">
-                    <div className="flex items-center gap-1.5">
-                      <Users className="w-3 h-3 text-slate-400" />
-                      <span>Delivered to <strong>{formatNumber(camp.recipientCount)}</strong> subscribers</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {camp.tags?.map(t => (
-                        <span key={t} className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 text-[10px]">
-                          {t}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Newsletter Basic Details & Info Sidebar */}
@@ -876,14 +1092,14 @@ export const AdminNewsletterTab: React.FC = () => {
             </div>
 
             {emailConfigError && (
-              <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+              <div role="alert" className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{emailConfigError}</span>
               </div>
             )}
 
             {emailConfigSaved && (
-              <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+              <div role="status" className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                 <span>Email delivery settings saved to database and applied immediately (no manual <code>.env</code> edit required).</span>
               </div>
@@ -957,17 +1173,24 @@ export const AdminNewsletterTab: React.FC = () => {
                   </button>
                 </div>
                 {apiKeyTestResult && (
-                  <div className={`p-2.5 rounded-lg border text-xs flex items-center gap-2 ${
-                    apiKeyTestResult.valid
-                      ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                      : 'bg-rose-50 border-rose-200 text-rose-700'
-                  }`}>
-                    {apiKeyTestResult.valid ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <div
+                    role={apiKeyTestResult.valid ? 'status' : 'alert'}
+                    className={`p-2.5 rounded-lg border text-xs flex items-start gap-2 ${
+                      !apiKeyTestResult.valid
+                        ? 'bg-rose-50 border-rose-200 text-rose-700'
+                        : apiKeyTestResult.sandboxMode
+                        ? 'bg-amber-50 border-amber-200 text-amber-900'
+                        : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                    }`}
+                  >
+                    {!apiKeyTestResult.valid ? (
+                      <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                    ) : apiKeyTestResult.sandboxMode ? (
+                      <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                     ) : (
-                      <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                     )}
-                    <span className="font-medium">{apiKeyTestResult.message}</span>
+                    <span className="font-medium leading-relaxed">{apiKeyTestResult.message}</span>
                   </div>
                 )}
                 <p className="text-[11px] text-slate-500">
@@ -995,12 +1218,75 @@ export const AdminNewsletterTab: React.FC = () => {
                   required
                   value={emailFrom}
                   onChange={(e) => setEmailFrom(e.target.value)}
-                  placeholder="Trek Consultancy Forum <thedelusiongaming024@gmail.com>"
+                  placeholder="Trek Consultancy Forum <onboarding@resend.dev>"
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-900 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-teal-600 focus:border-teal-600 shadow-2xs"
                 />
-                <p className="text-[11px] text-slate-500">
-                  Default sender before custom domain verification is <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-slate-700">onboarding@resend.dev</code> (e.g. <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-slate-700">Trek Consultancy Forum &lt;thedelusiongaming024@gmail.com&gt;</code>).
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  To deliver emails to <strong>all external subscribers</strong>, verify your custom domain at{' '}
+                  <a href="https://resend.com/domains" target="_blank" rel="noopener noreferrer" className="text-teal-600 underline font-medium">
+                    resend.com/domains
+                  </a>{' '}
+                  and set <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-slate-700">Trek Consultancy Forum &lt;newsletter@yourdomain.com&gt;</code>. Before domain verification, Resend uses <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-slate-700">onboarding@resend.dev</code> which only delivers to your Resend account owner email.
                 </p>
+              </div>
+
+              {/* Send Live Test Email */}
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/90 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="test-recipient-email" className="text-slate-800 font-semibold flex items-center gap-1.5">
+                    <Send className="w-3.5 h-3.5 text-teal-600" />
+                    <span>Send Live Test Email</span>
+                  </label>
+                  <span className="text-[10px] text-slate-400">Verifies end-to-end inbox delivery</span>
+                </div>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                  <input
+                    id="test-recipient-email"
+                    type="email"
+                    value={testRecipientEmail}
+                    onChange={(e) => {
+                      setTestRecipientEmail(e.target.value);
+                      if (sendTestResult) setSendTestResult(null);
+                    }}
+                    placeholder="Enter recipient email (e.g. your Resend account email)..."
+                    className="flex-1 px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-900 text-xs focus:outline-none focus:ring-1 focus:ring-teal-600 shadow-2xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSendTestEmail}
+                    disabled={isSendingTestEmail || !testRecipientEmail.trim() || !resendApiKey.trim()}
+                    className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50 shrink-0"
+                  >
+                    {isSendingTestEmail ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Sending Test...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-3.5 h-3.5" />
+                        <span>Send Test Email</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                {sendTestResult && (
+                  <div
+                    role={sendTestResult.ok ? 'status' : 'alert'}
+                    className={`p-2.5 rounded-lg border text-xs flex items-start gap-2 ${
+                      sendTestResult.ok
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                        : 'bg-rose-50 border-rose-200 text-rose-700'
+                    }`}
+                  >
+                    {sendTestResult.ok ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                    )}
+                    <span className="leading-relaxed">{sendTestResult.message}</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1120,13 +1406,13 @@ export const AdminNewsletterTab: React.FC = () => {
         </div>
       )}
 
-      {/* 8b. Modal: Delete Published Issue Confirmation */}
+      {/* 8b. Modal: Delete Published Broadcast Confirmation */}
       {deleteCampaignConfirmId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in">
           <div className="relative w-full max-w-sm bg-white rounded-xl border border-slate-200 shadow-xl p-5 space-y-3">
-            <h3 className="text-sm font-semibold text-slate-900">Delete Published Issue?</h3>
+            <h3 className="text-sm font-semibold text-slate-900">Delete Published Broadcast?</h3>
             <p className="text-xs text-slate-500">
-              Are you sure you want to permanently delete this published newsletter issue from the archive?
+              Are you sure you want to permanently delete this published newsletter broadcast from the archive?
             </p>
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
@@ -1142,7 +1428,7 @@ export const AdminNewsletterTab: React.FC = () => {
                 onClick={() => handleDeleteCampaign(deleteCampaignConfirmId)}
                 className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-medium cursor-pointer"
               >
-                {isDeletingCampaign ? 'Deleting...' : 'Delete Issue'}
+                {isDeletingCampaign ? 'Deleting...' : 'Delete Broadcast'}
               </button>
             </div>
           </div>
@@ -1166,8 +1452,12 @@ export const AdminNewsletterTab: React.FC = () => {
               </div>
               <button
                 type="button"
-                onClick={() => setIsComposeModalOpen(false)}
+                onClick={() => {
+                  setIsComposeModalOpen(false);
+                  setBroadcastFeedback(null);
+                }}
                 className="text-slate-400 hover:text-slate-600 p-1 rounded-md cursor-pointer"
+                aria-label="Close compose dialog"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1175,14 +1465,53 @@ export const AdminNewsletterTab: React.FC = () => {
 
             {/* Form */}
             <form onSubmit={handleBroadcast} className="p-5 space-y-4 overflow-y-auto flex-1 text-xs">
+              {broadcastFeedback && (
+                <div
+                  role={broadcastFeedback.type === 'error' ? 'alert' : 'status'}
+                  className={`p-3 rounded-lg border text-xs flex items-start justify-between gap-2 ${
+                    broadcastFeedback.type === 'success'
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                      : broadcastFeedback.type === 'partial'
+                      ? 'bg-amber-50 border-amber-200 text-amber-900'
+                      : 'bg-rose-50 border-rose-200 text-rose-800'
+                  }`}
+                >
+                  <div className="flex items-start gap-2">
+                    {broadcastFeedback.type === 'success' ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    ) : (
+                      <AlertCircle
+                        className={`w-4 h-4 shrink-0 mt-0.5 ${
+                          broadcastFeedback.type === 'partial' ? 'text-amber-600' : 'text-rose-600'
+                        }`}
+                      />
+                    )}
+                    <span className="leading-relaxed">{broadcastFeedback.message}</span>
+                  </div>
+                  {broadcastFeedback.type !== 'success' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBroadcastFeedback(null);
+                        setIsComposeModalOpen(false);
+                        setActiveSubTab('campaigns');
+                      }}
+                      className="px-2.5 py-1 rounded bg-white/80 hover:bg-white border border-current/20 text-[11px] font-semibold shrink-0 cursor-pointer"
+                    >
+                      View Issue
+                    </button>
+                  )}
+                </div>
+              )}
+
               <div className="space-y-1">
-                <label className="text-slate-700 font-medium">Issue Subject Line *</label>
+                <label className="text-slate-700 font-medium">Email Subject Line *</label>
                 <input
                   type="text"
                   required
                   value={composeSubject}
                   onChange={(e) => setComposeSubject(e.target.value)}
-                  placeholder="e.g. Weekly Blueprint Digest #45: Multi-Cloud Observability & Kafka Streams"
+                  placeholder="e.g. Weekly Blueprint Digest: Multi-Cloud Observability & Kafka Streams"
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-teal-600 shadow-2xs"
                 />
               </div>
@@ -1290,38 +1619,72 @@ export const AdminNewsletterTab: React.FC = () => {
               </div>
             </div>
 
+            {/* Top Brand Dual-Color Accent Strip */}
+            <div className="flex h-1.5 w-full shrink-0">
+              <div className="w-[72%] bg-[#16b8c4]" />
+              <div className="w-[28%] bg-[#f27c22]" />
+            </div>
+
             {/* Rendered Email Body Card */}
-            <div className="p-6 sm:p-8 overflow-y-auto space-y-6 bg-white">
-              {/* Branded Header */}
-              <div className="flex items-center justify-between pb-4 border-b border-slate-200">
-                <img src={trekLogo} alt="Trek Consultancy" className="h-8 w-auto object-contain" />
-                <span className="px-2.5 py-1 rounded-full bg-teal-50 border border-teal-200 text-teal-800 text-xs font-mono font-bold">
-                  Issue #{previewCampaign.issueNumber || 44}
-                </span>
-              </div>
+            <div className="overflow-y-auto bg-slate-100 p-4 sm:p-6">
+              <div className="mx-auto max-w-xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                {/* Dual-Tone Accent Bar on inner card */}
+                <div className="flex h-1.5 w-full">
+                  <div className="w-[72%] bg-[#16b8c4]" />
+                  <div className="w-[28%] bg-[#f27c22]" />
+                </div>
 
-              {/* Title & Preview */}
-              <div className="space-y-2">
-                <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">
-                  {previewCampaign.subject}
-                </h2>
-                {previewCampaign.previewText && (
-                  <p className="text-sm text-slate-600 italic">
-                    {previewCampaign.previewText}
+                {/* Branded Header */}
+                <div className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-5">
+                  <img src={trekLogo} alt="Trek Consultancy" className="h-9 w-auto object-contain" />
+                  <span className="rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-teal-800">
+                    Community Update
+                  </span>
+                </div>
+
+                {/* Hero / Subject & Preview Callout */}
+                <div className="border-b border-slate-200 bg-slate-50/80 px-6 py-6 space-y-3">
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-1 w-7 rounded-full bg-[#16b8c4]" />
+                    <span className="h-1 w-3 rounded-full bg-[#f27c22]" />
+                  </div>
+                  <h2 className="text-xl font-extrabold tracking-tight text-slate-900">
+                    {previewCampaign.subject}
+                  </h2>
+                  {previewCampaign.previewText && (
+                    <div className="rounded-r-lg border-l-4 border-[#f27c22] bg-orange-50/80 p-3 text-xs font-medium leading-relaxed text-orange-950">
+                      {previewCampaign.previewText}
+                    </div>
+                  )}
+                  <div className="text-[11px] text-slate-500">
+                    Published by <strong className="text-slate-800">{previewCampaign.author || 'Trek Consultancy Editorial Team'}</strong> •{' '}
+                    {new Date(previewCampaign.sentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </div>
+                </div>
+
+                {/* Markdown Content */}
+                <div className="px-6 py-6 bg-white">
+                  <div className="prose prose-sm max-w-none text-slate-700 leading-relaxed font-sans prose-headings:text-slate-900 prose-headings:font-bold prose-headings:tracking-tight prose-a:text-teal-700 prose-a:underline prose-blockquote:border-l-4 prose-blockquote:border-[#16b8c4] prose-blockquote:bg-cyan-50/60 prose-blockquote:py-2.5 prose-blockquote:px-3.5 prose-blockquote:rounded-r-lg prose-blockquote:text-slate-900 prose-code:bg-cyan-50 prose-code:text-teal-800 prose-code:border prose-code:border-cyan-100 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded">
+                    <Markdown>{previewCampaign.content}</Markdown>
+                  </div>
+                </div>
+
+                {/* Email Footer */}
+                <div className="border-t border-slate-200 bg-slate-50/80 px-6 py-5 text-center space-y-1.5">
+                  <div className="flex items-center justify-center gap-1 pb-1">
+                    <span className="h-0.5 w-7 rounded-full bg-[#16b8c4]" />
+                    <span className="h-0.5 w-3 rounded-full bg-[#f27c22]" />
+                  </div>
+                  <div className="text-xs font-extrabold tracking-wider">
+                    <span className="text-[#0e7490]">TREK</span> <span className="text-[#ea580c]">CONSULTANCY</span>
+                  </div>
+                  <p className="text-[11px] font-medium text-slate-600">
+                    &copy; {new Date().getFullYear()} Trek Consultancy Forum. All rights reserved.
                   </p>
-                )}
-              </div>
-
-              {/* Markdown Content */}
-              <div className="prose prose-sm max-w-none text-slate-800 leading-relaxed font-sans">
-                <Markdown>{previewCampaign.content}</Markdown>
-              </div>
-
-              {/* Email Footer */}
-              <div className="pt-6 border-t border-slate-100 text-center text-[11px] text-slate-400 space-y-1">
-                <p>© 2026 Trek Consultancy Forum. All rights reserved.</p>
-                <p>You received this digest because your email is subscribed on our community platform.</p>
-                <p className="text-teal-600 underline cursor-pointer">Unsubscribe preferences</p>
+                  <p className="text-[10px] text-slate-400">
+                    You received this official community update because your email is subscribed on our portal.
+                  </p>
+                </div>
               </div>
             </div>
           </div>

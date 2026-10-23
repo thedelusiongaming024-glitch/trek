@@ -24,15 +24,16 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 
 // server.ts
 var import_dotenv2 = __toESM(require("dotenv"), 1);
-var import_fs2 = __toESM(require("fs"), 1);
-var import_net = __toESM(require("net"), 1);
+var import_fs = __toESM(require("fs"), 1);
+var import_net2 = __toESM(require("net"), 1);
 var import_express2 = __toESM(require("express"), 1);
 var import_path = __toESM(require("path"), 1);
-var import_vite = require("vite");
 var import_http = __toESM(require("http"), 1);
 
 // src/server/app.ts
 var import_express = __toESM(require("express"), 1);
+var import_node_fs = __toESM(require("node:fs"), 1);
+var import_node_path = __toESM(require("node:path"), 1);
 var import_node_zlib = __toESM(require("node:zlib"), 1);
 var import_genai = require("@google/genai");
 var import_resend = require("resend");
@@ -41,7 +42,265 @@ var import_resend = require("resend");
 var import_serverless = require("@neondatabase/serverless");
 var import_ws = __toESM(require("ws"), 1);
 var import_dotenv = __toESM(require("dotenv"), 1);
-var import_fs = __toESM(require("fs"), 1);
+
+// src/server/security.ts
+var import_crypto = __toESM(require("crypto"), 1);
+var SCRYPT_KEYLEN = 64;
+var SESSION_COOKIE_NAME = "trek_session";
+var SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1e3;
+function getSessionSecret() {
+  const envSecret = process.env.SESSION_SECRET?.trim();
+  if (envSecret && envSecret.length >= 16) return envSecret;
+  const seed = process.env.DATABASE_URL || "trek-consultancy-default-session-seed-2026";
+  return import_crypto.default.createHash("sha256").update(`trek-hmac-secret:${seed}`).digest("hex");
+}
+function hashPassword(plain) {
+  const salt = import_crypto.default.randomBytes(16).toString("hex");
+  const derived = import_crypto.default.scryptSync(plain, salt, SCRYPT_KEYLEN).toString("hex");
+  return `scrypt$${salt}$${derived}`;
+}
+function generateRandomPassword() {
+  return import_crypto.default.randomBytes(16).toString("base64url");
+}
+function safeStringEqual(a, b) {
+  const bufA = Buffer.from(a, "utf8");
+  const bufB = Buffer.from(b, "utf8");
+  if (bufA.length !== bufB.length) {
+    import_crypto.default.timingSafeEqual(bufA, bufA);
+    return false;
+  }
+  return import_crypto.default.timingSafeEqual(bufA, bufB);
+}
+function verifyPassword(plain, storedHash, legacyPlain) {
+  if (!plain) return { valid: false, needsRehash: false };
+  const candidate = storedHash || legacyPlain || "";
+  if (!candidate) return { valid: false, needsRehash: false };
+  if (candidate.startsWith("scrypt$")) {
+    const parts = candidate.split("$");
+    if (parts.length !== 3) return { valid: false, needsRehash: false };
+    const [, salt, originalHashHex] = parts;
+    try {
+      const derivedBuf = import_crypto.default.scryptSync(plain, salt, SCRYPT_KEYLEN);
+      const originalBuf = Buffer.from(originalHashHex, "hex");
+      if (derivedBuf.length !== originalBuf.length) return { valid: false, needsRehash: false };
+      const valid2 = import_crypto.default.timingSafeEqual(derivedBuf, originalBuf);
+      return { valid: valid2, needsRehash: false };
+    } catch {
+      return { valid: false, needsRehash: false };
+    }
+  }
+  const valid = safeStringEqual(plain, candidate);
+  return { valid, needsRehash: valid };
+}
+function signSessionToken(user) {
+  const payload = {
+    id: String(user.id || ""),
+    email: String(user.email || "").toLowerCase().trim(),
+    name: String(user.name || "").trim(),
+    role: String(user.role || "User").trim(),
+    exp: Date.now() + SESSION_TTL_MS
+  };
+  const payloadB64 = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+  const sig = import_crypto.default.createHmac("sha256", getSessionSecret()).update(payloadB64).digest("base64url");
+  return `${payloadB64}.${sig}`;
+}
+function verifySessionToken(token) {
+  if (!token || typeof token !== "string" || !token.includes(".")) return null;
+  const [payloadB64, sig] = token.split(".");
+  if (!payloadB64 || !sig) return null;
+  const expectedSig = import_crypto.default.createHmac("sha256", getSessionSecret()).update(payloadB64).digest("base64url");
+  if (!safeStringEqual(sig, expectedSig)) return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(payloadB64, "base64url").toString("utf8"));
+    if (!parsed || typeof parsed.exp !== "number" || parsed.exp < Date.now()) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+function setSessionCookie(res, token) {
+  const isProd = process.env.NODE_ENV === "production";
+  const maxAgeSec = Math.floor(SESSION_TTL_MS / 1e3);
+  const cookieParts = [
+    `${SESSION_COOKIE_NAME}=${encodeURIComponent(token)}`,
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Lax",
+    `Max-Age=${maxAgeSec}`
+  ];
+  if (isProd) cookieParts.push("Secure");
+  res.setHeader("Set-Cookie", cookieParts.join("; "));
+}
+function clearSessionCookie(res) {
+  res.setHeader(
+    "Set-Cookie",
+    `${SESSION_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`
+  );
+}
+function extractTokenFromRequest(req) {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    return authHeader.slice(7).trim();
+  }
+  const xToken = req.headers["x-auth-token"];
+  if (typeof xToken === "string" && xToken.trim()) {
+    return xToken.trim();
+  }
+  const cookieHeader = req.headers.cookie;
+  if (cookieHeader) {
+    const cookies = cookieHeader.split(";");
+    for (const c of cookies) {
+      const [k, ...vParts] = c.trim().split("=");
+      if (k === SESSION_COOKIE_NAME && vParts.length > 0) {
+        try {
+          return decodeURIComponent(vParts.join("="));
+        } catch {
+          return vParts.join("=");
+        }
+      }
+    }
+  }
+  return null;
+}
+function isAdminRoleName(role) {
+  if (!role) return false;
+  const r = role.trim();
+  return r === "Super Admin" || r === "Admin" || r === "Moderator" || r === "Support Staff" || r === "Trek Executive";
+}
+function authenticateRequest(req, _res, next) {
+  const token = extractTokenFromRequest(req);
+  req.authUser = token ? verifySessionToken(token) : null;
+  next();
+}
+async function resolveVerifiedUser(req, pool2) {
+  if (req.authUser) return req.authUser;
+  const headerEmail = String(req.headers["x-user-email"] || "").trim().toLowerCase();
+  const headerId = String(req.headers["x-user-id"] || "").trim();
+  if (headerEmail && headerId) {
+    try {
+      const uRes = await pool2.query(
+        "SELECT id, name, email, role, status FROM users WHERE id = $1 AND LOWER(email) = $2 LIMIT 1",
+        [headerId, headerEmail]
+      );
+      if (uRes.rows.length > 0 && uRes.rows[0].status === "active") {
+        const u = uRes.rows[0];
+        const verified = {
+          id: u.id,
+          email: u.email,
+          name: u.name,
+          role: u.role,
+          exp: Date.now() + 6e4
+        };
+        req.authUser = verified;
+        return verified;
+      }
+    } catch {
+    }
+  }
+  return null;
+}
+function createRequireAdminMiddleware(pool2) {
+  return async (req, res, next) => {
+    const user = await resolveVerifiedUser(req, pool2);
+    if (!user || !isAdminRoleName(user.role)) {
+      return res.status(401).json({
+        error: "Unauthorized",
+        message: "Administrative authentication is required to access this endpoint."
+      });
+    }
+    next();
+  };
+}
+function securityHeadersMiddleware(_req, res, next) {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("X-XSS-Protection", "0");
+  res.setHeader("X-DNS-Prefetch-Control", "off");
+  res.setHeader("X-Permitted-Cross-Domain-Policies", "none");
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  next();
+}
+function corsMiddleware(req, res, next) {
+  const origin = req.headers.origin;
+  if (!origin) {
+    return next();
+  }
+  const rawHost = req.headers["x-forwarded-host"] || req.headers.host || "";
+  const host = rawHost.split(",")[0].trim();
+  const allowedList = (process.env.ALLOWED_ORIGINS || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+  let isAllowed = false;
+  try {
+    const parsedOrigin = new URL(origin);
+    if (parsedOrigin.host.toLowerCase() === host.toLowerCase() || parsedOrigin.hostname.toLowerCase() === host.split(":")[0].toLowerCase()) {
+      isAllowed = true;
+    } else if ((parsedOrigin.hostname === "localhost" || parsedOrigin.hostname === "127.0.0.1") && (host.startsWith("localhost") || host.startsWith("127.0.0.1"))) {
+      isAllowed = true;
+    } else if (allowedList.includes(origin.toLowerCase())) {
+      isAllowed = true;
+    }
+  } catch {
+    isAllowed = false;
+  }
+  if (isAllowed) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+    res.setHeader(
+      "Access-Control-Allow-Headers",
+      "Content-Type, Authorization, X-Auth-Token, X-User-Id, X-User-Email"
+    );
+    res.setHeader("Vary", "Origin");
+  }
+  if (req.method === "OPTIONS") {
+    res.status(isAllowed ? 204 : 403).end();
+    return;
+  }
+  if (!isAllowed && req.path.startsWith("/api")) {
+    res.status(403).json({ error: "CORS policy: Origin not allowed." });
+    return;
+  }
+  next();
+}
+function createRateLimiter(options) {
+  const buckets = /* @__PURE__ */ new Map();
+  const cleanupTimer = setInterval(() => {
+    const now = Date.now();
+    for (const [k, v] of buckets.entries()) {
+      if (v.resetAt <= now) buckets.delete(k);
+    }
+  }, Math.max(options.windowMs, 6e4));
+  cleanupTimer.unref?.();
+  return (req, res, next) => {
+    const forwarded = req.headers["x-forwarded-for"];
+    const ip = (typeof forwarded === "string" ? forwarded.split(",")[0].trim() : "") || req.ip || req.socket?.remoteAddress || "unknown";
+    const key = `${options.keyPrefix}:${ip}`;
+    const now = Date.now();
+    let entry = buckets.get(key);
+    if (!entry || entry.resetAt <= now) {
+      entry = { count: 1, resetAt: now + options.windowMs };
+      buckets.set(key, entry);
+    } else {
+      entry.count += 1;
+    }
+    const remaining = Math.max(0, options.max - entry.count);
+    res.setHeader("RateLimit-Limit", String(options.max));
+    res.setHeader("RateLimit-Remaining", String(remaining));
+    res.setHeader("RateLimit-Reset", String(Math.ceil((entry.resetAt - now) / 1e3)));
+    if (entry.count > options.max) {
+      return res.status(429).json({
+        error: "Too Many Requests",
+        message: options.message || "Rate limit exceeded. Please wait before trying again."
+      });
+    }
+    next();
+  };
+}
+
+// src/server/db.ts
 try {
   if (typeof WebSocket !== "undefined") {
     const probe = new WebSocket("ws://127.0.0.1:1");
@@ -72,12 +331,6 @@ try {
 } catch {
 }
 import_dotenv.default.config();
-if (!process.env.DATABASE_URL && import_fs.default.existsSync("env.txt")) {
-  import_dotenv.default.config({ path: "env.txt" });
-}
-if (!process.env.DATABASE_URL && import_fs.default.existsSync(".env.example")) {
-  import_dotenv.default.config({ path: ".env.example" });
-}
 if (!import_serverless.neonConfig.webSocketConstructor) {
   import_serverless.neonConfig.webSocketConstructor = import_ws.default;
 }
@@ -497,7 +750,6 @@ async function initDb() {
         );
       `);
       await client.query(`
-        -- Canonical conversations table (distinct sessions recognized by email/session/user)
         CREATE TABLE IF NOT EXISTS conversations (
           id            VARCHAR(255) PRIMARY KEY,
           session_id    VARCHAR(255) NOT NULL,
@@ -516,7 +768,6 @@ async function initDb() {
         );
         ALTER TABLE conversations DROP CONSTRAINT IF EXISTS conversations_user_id_fkey;
 
-        -- Canonical messages table
         CREATE TABLE IF NOT EXISTS messages (
           id              VARCHAR(255) PRIMARY KEY,
           conversation_id VARCHAR(255) NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
@@ -533,7 +784,6 @@ async function initDb() {
         );
         ALTER TABLE messages DROP CONSTRAINT IF EXISTS messages_user_id_fkey;
 
-        -- Compatibility table: support_conversations
         CREATE TABLE IF NOT EXISTS support_conversations (
           id            VARCHAR(255) PRIMARY KEY,
           user_id       VARCHAR(255) DEFAULT NULL,
@@ -549,7 +799,6 @@ async function initDb() {
           updated_at    TIMESTAMPTZ DEFAULT NOW()
         );
 
-        -- Compatibility table: support_messages
         CREATE TABLE IF NOT EXISTS support_messages (
           id         VARCHAR(255) PRIMARY KEY,
           session_id VARCHAR(255) NOT NULL,
@@ -832,6 +1081,16 @@ async function initDb() {
             [id, role.name, role.badgeLabel, role.color]
           );
         }
+      }
+      const legacyUsers = await client.query(
+        "SELECT id, password FROM users WHERE password IS NOT NULL AND password != ''"
+      );
+      for (const row of legacyUsers.rows) {
+        const hashed = row.password.startsWith("scrypt$") ? row.password : hashPassword(row.password);
+        await client.query(
+          "UPDATE users SET password_hash = $1, password = NULL WHERE id = $2",
+          [hashed, row.id]
+        );
       }
       console.log("[Database] PostgreSQL schema initialized cleanly on Neon.");
     } catch (err) {
@@ -1921,12 +2180,128 @@ I am the AI Support Consultant for **${memory.identity.brand}**. I draw directly
 }
 
 // src/server/webBrowser.ts
+var import_dns = __toESM(require("dns"), 1);
+var import_net = __toESM(require("net"), 1);
 function extractUrlsFromText(text) {
   if (!text || typeof text !== "string") return [];
   const urlRegex = /https?:\/\/[^\s<>"'{}|\\^`\[\]]+/gi;
   const matches = text.match(urlRegex) || [];
   const cleaned = matches.map((u) => u.replace(/[.,;:!?)\]]+$/, "")).filter(Boolean);
   return Array.from(new Set(cleaned));
+}
+function isPrivateOrReservedIpv4(ip) {
+  const parts = ip.split(".");
+  if (parts.length !== 4) return true;
+  const octets = parts.map((p) => Number(p));
+  if (octets.some((o) => !Number.isInteger(o) || o < 0 || o > 255)) return true;
+  const [a, b, c] = octets;
+  if (a === 0) return true;
+  if (a === 10) return true;
+  if (a === 100 && b >= 64 && b <= 127) return true;
+  if (a === 127) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 0 && (c === 0 || c === 2)) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 198 && (b === 18 || b === 19)) return true;
+  if (a === 198 && b === 51 && c === 100) return true;
+  if (a === 203 && b === 0 && c === 113) return true;
+  if (a >= 224) return true;
+  return false;
+}
+function isPrivateOrReservedIp(rawIp) {
+  if (!rawIp) return true;
+  const ip = rawIp.trim().replace(/^\[|\]$/g, "").toLowerCase();
+  const version = import_net.default.isIP(ip);
+  if (version === 4) {
+    return isPrivateOrReservedIpv4(ip);
+  }
+  if (version === 6) {
+    if (ip === "::" || ip === "::1" || ip === "0:0:0:0:0:0:0:1" || ip === "0:0:0:0:0:0:0:0") {
+      return true;
+    }
+    if (ip.startsWith("fc") || ip.startsWith("fd") || ip.startsWith("fe8") || ip.startsWith("fe9") || ip.startsWith("fea") || ip.startsWith("feb") || ip.startsWith("ff")) {
+      return true;
+    }
+    if (ip.startsWith("::ffff:")) {
+      const tail = ip.slice(7);
+      if (import_net.default.isIP(tail) === 4) {
+        return isPrivateOrReservedIpv4(tail);
+      }
+      const hexParts = tail.split(":");
+      if (hexParts.length === 2) {
+        const hi = parseInt(hexParts[0], 16);
+        const lo = parseInt(hexParts[1], 16);
+        if (!Number.isNaN(hi) && !Number.isNaN(lo)) {
+          const ipv4 = `${hi >> 8 & 255}.${hi & 255}.${lo >> 8 & 255}.${lo & 255}`;
+          return isPrivateOrReservedIpv4(ipv4);
+        }
+      }
+      return true;
+    }
+    if (ip.startsWith("2001:db8:") || ip.startsWith("2001:0db8:")) {
+      return true;
+    }
+    return false;
+  }
+  return true;
+}
+async function validateUrlForSsrf(targetUrl) {
+  let parsed;
+  try {
+    parsed = new URL(targetUrl);
+  } catch {
+    return { ok: false, error: "Invalid URL format." };
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return { ok: false, error: "Security: Only HTTP and HTTPS protocols are allowed." };
+  }
+  if (parsed.username || parsed.password) {
+    return { ok: false, error: "Security: URLs with embedded credentials are not allowed." };
+  }
+  if (parsed.port && parsed.port !== "80" && parsed.port !== "443") {
+    return { ok: false, error: "Security: Non-standard network ports are blocked." };
+  }
+  const rawHost = parsed.hostname.trim().toLowerCase().replace(/^\[|\]$/g, "");
+  if (!rawHost) {
+    return { ok: false, error: "Invalid hostname." };
+  }
+  if (rawHost === "localhost" || rawHost.endsWith(".localhost") || rawHost.endsWith(".local") || rawHost.endsWith(".internal") || rawHost.endsWith(".arpa") || rawHost === "metadata.google.internal" || rawHost === "instance-data") {
+    return { ok: false, error: "Security: Access to local/internal hostnames is blocked." };
+  }
+  const dotParts = rawHost.split(".");
+  if (/^(0x[0-9a-f]+|\d+)$/i.test(rawHost) || dotParts.every((p) => /^(0x[0-9a-f]+|\d+)$/i.test(p))) {
+    if (dotParts.length !== 4 || dotParts.some((p) => /^0\d+/.test(p) || /^0x/i.test(p))) {
+      return { ok: false, error: "Security: Non-canonical or encoded IP literals are blocked." };
+    }
+    if (isPrivateOrReservedIp(rawHost)) {
+      return { ok: false, error: "Security: Access to private or reserved IP ranges is blocked." };
+    }
+    return { ok: true, parsed };
+  }
+  if (import_net.default.isIP(rawHost) === 6) {
+    if (isPrivateOrReservedIp(rawHost)) {
+      return { ok: false, error: "Security: Access to private or reserved IPv6 ranges is blocked." };
+    }
+    return { ok: true, parsed };
+  }
+  try {
+    const records = await import_dns.default.promises.lookup(rawHost, { all: true, verbatim: true });
+    if (!records || records.length === 0) {
+      return { ok: false, error: "DNS resolution returned no records for hostname." };
+    }
+    for (const rec of records) {
+      if (isPrivateOrReservedIp(rec.address)) {
+        return {
+          ok: false,
+          error: "Security: Hostname resolves to a private or reserved network address."
+        };
+      }
+    }
+  } catch {
+    return { ok: false, error: "Unable to resolve hostname." };
+  }
+  return { ok: true, parsed };
 }
 function cleanHtmlToText(html, maxChars = 4e3) {
   if (!html) return { title: "", text: "" };
@@ -1947,32 +2322,77 @@ function cleanHtmlToText(html, maxChars = 4e3) {
 }
 async function fetchAndExtractPageContent(targetUrl, timeoutMs = 6e3) {
   const fetchedAt = (/* @__PURE__ */ new Date()).toISOString();
+  const MAX_REDIRECTS = 3;
   try {
-    const parsed = new URL(targetUrl);
-    const hostname = parsed.hostname.toLowerCase();
-    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0" || hostname.startsWith("192.168.") || hostname.startsWith("10.") || hostname.startsWith("172.16.") || hostname.endsWith(".internal") || hostname.endsWith(".local")) {
+    let currentUrl = targetUrl;
+    let response = null;
+    let finalParsedUrl = null;
+    for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+      const check = await validateUrlForSsrf(currentUrl);
+      if (!check.ok || !check.parsed) {
+        return {
+          url: targetUrl,
+          title: "Forbidden",
+          content: "",
+          success: false,
+          error: check.error || "Security: URL blocked by SSRF filter.",
+          fetchedAt
+        };
+      }
+      finalParsedUrl = check.parsed;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        response = await fetch(currentUrl, {
+          method: "GET",
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 (TrekConsultancyBot/1.0)",
+            Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.7",
+            "Accept-Language": "en-US,en;q=0.9,ar;q=0.8,bn;q=0.7"
+          },
+          signal: controller.signal,
+          redirect: "manual"
+        });
+      } finally {
+        clearTimeout(timer);
+      }
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get("location");
+        if (!location) {
+          return {
+            url: targetUrl,
+            title: `HTTP ${response.status}`,
+            content: "",
+            success: false,
+            error: "Redirect response missing Location header.",
+            fetchedAt
+          };
+        }
+        if (hop === MAX_REDIRECTS) {
+          return {
+            url: targetUrl,
+            title: "Too Many Redirects",
+            content: "",
+            success: false,
+            error: "Maximum redirect limit exceeded.",
+            fetchedAt
+          };
+        }
+        currentUrl = new URL(location, currentUrl).toString();
+        continue;
+      }
+      break;
+    }
+    if (!response || !finalParsedUrl) {
       return {
         url: targetUrl,
-        title: "Forbidden",
+        title: "Fetch Failed",
         content: "",
         success: false,
-        error: "Security: Access to local/private network addresses is blocked.",
+        error: "No response received.",
         fetchedAt
       };
     }
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    const response = await fetch(targetUrl, {
-      method: "GET",
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 (TrekConsultancyBot/1.0)",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.7",
-        "Accept-Language": "en-US,en;q=0.9,ar;q=0.8,bn;q=0.7"
-      },
-      signal: controller.signal,
-      redirect: "follow"
-    });
-    clearTimeout(timer);
     if (!response.ok) {
       return {
         url: targetUrl,
@@ -1998,7 +2418,7 @@ async function fetchAndExtractPageContent(targetUrl, timeoutMs = 6e3) {
     const { title, text } = cleanHtmlToText(rawBody);
     return {
       url: targetUrl,
-      title: title || parsed.hostname,
+      title: title || finalParsedUrl.hostname,
       content: text,
       success: true,
       fetchedAt
@@ -2285,8 +2705,35 @@ ${msg.content}`;
 }
 async function createApp() {
   const app = (0, import_express.default)();
+  app.set("trust proxy", 1);
+  app.disable("x-powered-by");
+  app.use(securityHeadersMiddleware);
+  app.use(corsMiddleware);
   app.use(import_express.default.json({ limit: "25mb" }));
   app.use(import_express.default.urlencoded({ extended: true, limit: "25mb" }));
+  app.use(authenticateRequest);
+  const globalApiLimiter = createRateLimiter({
+    windowMs: 15 * 6e4,
+    max: 400,
+    keyPrefix: "api-global"
+  });
+  const authRateLimiter = createRateLimiter({
+    windowMs: 15 * 6e4,
+    max: 25,
+    keyPrefix: "api-auth",
+    message: "Too many authentication or verification attempts. Please wait a few minutes before trying again."
+  });
+  const aiAndMailLimiter = createRateLimiter({
+    windowMs: 15 * 6e4,
+    max: 40,
+    keyPrefix: "api-ai-mail",
+    message: "Rate limit reached for AI or email requests. Please wait a moment before trying again."
+  });
+  app.use("/api", globalApiLimiter);
+  app.use(["/api/auth/login", "/api/auth/register", "/api/auth/send-verification"], authRateLimiter);
+  app.use(["/api/support/messages", "/api/ai/browse-url", "/api/admin/newsletter/broadcast"], aiAndMailLimiter);
+  const requireAdmin = createRequireAdminMiddleware(pool);
+  app.use("/api/admin", requireAdmin);
   app.use(async (_req, res, next) => {
     try {
       await initDb();
@@ -2505,7 +2952,7 @@ async function createApp() {
       });
     }
   });
-  app.post("/api/discussion/categories", async (req, res) => {
+  app.post("/api/discussion/categories", requireAdmin, async (req, res) => {
     try {
       const { name, description } = req.body;
       const cleanName = (name || "").trim();
@@ -2532,7 +2979,7 @@ async function createApp() {
       res.status(500).json({ error: err.message });
     }
   });
-  app.delete("/api/discussion/categories/:id", async (req, res) => {
+  app.delete("/api/discussion/categories/:id", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       await pool.query(
@@ -2544,7 +2991,7 @@ async function createApp() {
       res.status(500).json({ error: err.message });
     }
   });
-  app.post("/api/discussion/staff-roles", async (req, res) => {
+  app.post("/api/discussion/staff-roles", requireAdmin, async (req, res) => {
     try {
       const { name, badgeLabel, color } = req.body;
       const cleanName = (name || "").trim();
@@ -2565,7 +3012,7 @@ async function createApp() {
       res.status(500).json({ error: err.message });
     }
   });
-  app.delete("/api/discussion/staff-roles/:id", async (req, res) => {
+  app.delete("/api/discussion/staff-roles/:id", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       await pool.query(
@@ -2593,8 +3040,9 @@ async function createApp() {
       } = req.body;
       const id = `topic-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
       const avatar = authorAvatar || getRandomAvatar(authorEmail || author);
-      const roleClean = (authorRole || "").toLowerCase();
-      const isAdmin = roleClean.includes("admin") || roleClean.includes("super admin") || roleClean.includes("staff") || req.body.isAdmin === true;
+      const verifiedUser = await resolveVerifiedUser(req, pool);
+      const isAdmin = Boolean(verifiedUser && isAdminRoleName(verifiedUser.role));
+      const safeAuthorRole = isAdmin ? authorRole || verifiedUser?.role || "Super Admin" : "Member";
       const status = isAdmin ? "approved" : "pending";
       const finalCategorySlug = (categorySlug || (category || "").toLowerCase().replace(/[^a-z0-9]+/g, "-") || "general").trim();
       const approvedTitle = status === "approved" ? title : null;
@@ -2605,7 +3053,7 @@ async function createApp() {
         INSERT INTO topics (id, title, author, author_email, author_id, author_role, author_avatar, time_ago, category, category_slug, views, likes, replies, is_featured, is_popular, status, content, edit_count, last_approved_title, last_approved_category, last_approved_category_slug, last_approved_content)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 1, 0, 0, false, false, $11, $12, 0, $13, $14, $15, $16)
         RETURNING *
-      `, [id, title, author || "Community Member", authorEmail || null, authorId || null, authorRole || "Member", avatar, timeAgo || "Just now", category, finalCategorySlug, status, content, approvedTitle, approvedCategory, approvedCategorySlug, approvedContent]);
+      `, [id, title, author || "Community Member", authorEmail || null, authorId || null, safeAuthorRole, avatar, timeAgo || "Just now", category, finalCategorySlug, status, content, approvedTitle, approvedCategory, approvedCategorySlug, approvedContent]);
       const newTopic = {
         id: insertRes.rows[0].id,
         title: insertRes.rows[0].title,
@@ -2647,26 +3095,11 @@ async function createApp() {
         return res.status(404).json({ error: "Topic not found" });
       }
       const topic = topicRes.rows[0];
-      const userEmail = (req.headers["x-user-email"] || req.body?.userEmail || "").trim().toLowerCase();
-      const userRole = (req.headers["x-user-role"] || req.body?.userRole || "").trim();
-      const userName = (req.headers["x-user-name"] || req.body?.userName || "").trim().toLowerCase();
-      const userId = (req.headers["x-user-id"] || req.body?.userId || "").trim();
-      let isAllowed = false;
-      if (userRole === "Super Admin" || userRole === "Moderator") {
-        isAllowed = true;
-      }
-      if (!isAllowed && userEmail) {
-        const uRes = await pool.query(
-          "SELECT role, status FROM users WHERE LOWER(email) = $1",
-          [userEmail]
-        );
-        if (uRes.rows.length > 0 && uRes.rows[0].status === "active") {
-          const r = uRes.rows[0].role;
-          if (r === "Super Admin" || r === "Moderator") {
-            isAllowed = true;
-          }
-        }
-      }
+      const verifiedUser = await resolveVerifiedUser(req, pool);
+      const userEmail = (verifiedUser?.email || req.headers["x-user-email"] || req.body?.userEmail || "").trim().toLowerCase();
+      const userName = (verifiedUser?.name || req.headers["x-user-name"] || req.body?.userName || "").trim().toLowerCase();
+      const userId = (verifiedUser?.id || req.headers["x-user-id"] || req.body?.userId || "").trim();
+      let isAllowed = Boolean(verifiedUser && isAdminRoleName(verifiedUser.role));
       if (!isAllowed) {
         const topicAuthorEmail = (topic.author_email || "").trim().toLowerCase();
         const topicAuthorName = (topic.author || "").trim().toLowerCase();
@@ -2701,29 +3134,12 @@ async function createApp() {
         return res.status(404).json({ error: "Topic not found" });
       }
       const topic = topicRes.rows[0];
-      const userEmail = (req.headers["x-user-email"] || req.body?.userEmail || "").trim().toLowerCase();
-      const userRole = (req.headers["x-user-role"] || req.body?.userRole || "").trim();
-      const userName = (req.headers["x-user-name"] || req.body?.userName || "").trim().toLowerCase();
-      const userId = (req.headers["x-user-id"] || req.body?.userId || "").trim();
-      let isAllowed = false;
-      let isAdmin = false;
-      if (userRole === "Super Admin" || userRole === "Moderator" || userRole === "Admin") {
-        isAllowed = true;
-        isAdmin = true;
-      }
-      if (!isAllowed && userEmail) {
-        const uRes = await pool.query(
-          "SELECT role, status FROM users WHERE LOWER(email) = $1",
-          [userEmail]
-        );
-        if (uRes.rows.length > 0 && uRes.rows[0].status === "active") {
-          const r = uRes.rows[0].role;
-          if (r === "Super Admin" || r === "Moderator" || r === "Admin") {
-            isAllowed = true;
-            isAdmin = true;
-          }
-        }
-      }
+      const verifiedUser = await resolveVerifiedUser(req, pool);
+      const userEmail = (verifiedUser?.email || req.headers["x-user-email"] || req.body?.userEmail || "").trim().toLowerCase();
+      const userName = (verifiedUser?.name || req.headers["x-user-name"] || req.body?.userName || "").trim().toLowerCase();
+      const userId = (verifiedUser?.id || req.headers["x-user-id"] || req.body?.userId || "").trim();
+      let isAdmin = Boolean(verifiedUser && isAdminRoleName(verifiedUser.role));
+      let isAllowed = isAdmin;
       if (!isAllowed) {
         const topicAuthorEmail = (topic.author_email || "").trim().toLowerCase();
         const topicAuthorName = (topic.author || "").trim().toLowerCase();
@@ -2818,7 +3234,7 @@ async function createApp() {
   };
   app.patch("/api/topics/:id", handleUpdateTopic);
   app.put("/api/topics/:id", handleUpdateTopic);
-  app.post("/api/topics/:id/feature", async (req, res) => {
+  app.post("/api/topics/:id/feature", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       const result = await pool.query(`
@@ -2829,7 +3245,7 @@ async function createApp() {
       res.status(500).json({ error: err.message });
     }
   });
-  app.post("/api/topics/:id/popular", async (req, res) => {
+  app.post("/api/topics/:id/popular", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       const result = await pool.query(`
@@ -2840,7 +3256,7 @@ async function createApp() {
       res.status(500).json({ error: err.message });
     }
   });
-  app.post("/api/topics/:id/approve", async (req, res) => {
+  app.post("/api/topics/:id/approve", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       const result = await pool.query(`
@@ -2881,7 +3297,7 @@ async function createApp() {
       res.status(500).json({ error: err.message });
     }
   });
-  app.post("/api/topics/:id/reject", async (req, res) => {
+  app.post("/api/topics/:id/reject", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       const { reason } = req.body || {};
@@ -3075,11 +3491,14 @@ async function createApp() {
           validParentId = parentReplyId.trim();
         }
       }
+      const verifiedUser = await resolveVerifiedUser(req, pool);
+      const isAdmin = Boolean(verifiedUser && isAdminRoleName(verifiedUser.role));
+      const safeReplyRole = isAdmin ? authorRole || verifiedUser?.role || "Super Admin" : "Member";
       const replyRes = await pool.query(`
         INSERT INTO replies (id, topic_id, parent_reply_id, author, author_role, author_avatar, time_ago, content, likes)
         VALUES ($1, $2, $3, $4, $5, $6, 'Just now', $7, 0)
         RETURNING *
-      `, [replyId, topicId, validParentId, author || "Community Member", authorRole || "Member", avatar, content]);
+      `, [replyId, topicId, validParentId, author || "Community Member", safeReplyRole, avatar, content]);
       await pool.query("UPDATE topics SET replies = (SELECT COUNT(*) FROM replies WHERE topic_id = $1) WHERE id = $1", [topicId]);
       const reply = {
         id: replyRes.rows[0].id,
@@ -3103,7 +3522,7 @@ async function createApp() {
       res.status(500).json({ error: err.message });
     }
   });
-  app.delete("/api/replies/:id", async (req, res) => {
+  app.delete("/api/replies/:id", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       const findRes = await pool.query("SELECT topic_id FROM replies WHERE id = $1", [id]);
@@ -3233,7 +3652,7 @@ async function createApp() {
       res.status(500).json({ error: err.message });
     }
   });
-  app.post("/api/blogs", async (req, res) => {
+  app.post("/api/blogs", requireAdmin, async (req, res) => {
     try {
       const { title, category, imageUrl, excerpt, content, author, authorAvatar, redirectUrl } = req.body;
       const id = `blog-${Date.now()}`;
@@ -3262,7 +3681,7 @@ async function createApp() {
       res.status(500).json({ error: err.message });
     }
   });
-  app.delete("/api/blogs/:id", async (req, res) => {
+  app.delete("/api/blogs/:id", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       await pool.query("DELETE FROM blog_comments WHERE blog_id = $1", [id]);
@@ -3313,8 +3732,8 @@ async function createApp() {
       res.status(500).json({ error: err.message });
     }
   };
-  app.patch("/api/blogs/:id", handleUpdateBlog);
-  app.put("/api/blogs/:id", handleUpdateBlog);
+  app.patch("/api/blogs/:id", requireAdmin, handleUpdateBlog);
+  app.put("/api/blogs/:id", requireAdmin, handleUpdateBlog);
   app.get("/api/users", async (_req, res) => {
     try {
       const result = await pool.query("SELECT id, name, email, role, status, avatar, joined_date, threads_count FROM users ORDER BY created_at ASC");
@@ -3336,19 +3755,30 @@ async function createApp() {
   app.post("/api/users", async (req, res) => {
     try {
       const { name, email, password, role, avatar } = req.body;
+      const cleanEmail = (email || "").trim().toLowerCase();
+      const cleanName = (name || "").trim();
+      if (!cleanEmail || !cleanName) {
+        return res.status(400).json({ error: "Name and email are required." });
+      }
+      const verifiedCaller = await resolveVerifiedUser(req, pool);
+      const callerIsAdmin = Boolean(verifiedCaller && isAdminRoleName(verifiedCaller.role));
+      const requestedRole = (role || "User").trim();
+      const safeRole = !callerIsAdmin && isAdminRoleName(requestedRole) ? "User" : requestedRole;
+      const rawPassword = typeof password === "string" && password.trim().length >= 6 ? password.trim() : generateRandomPassword();
+      const passwordHash = hashPassword(rawPassword);
       const id = `usr-${Date.now()}`;
       const joinedDate = "Just now";
       const insertRes = await pool.query(`
-        INSERT INTO users (id, name, email, password, role, status, avatar, joined_date, threads_count)
-        VALUES ($1, $2, $3, $4, $5, 'active', $6, $7, 0)
+        INSERT INTO users (id, name, email, password, password_hash, role, status, avatar, joined_date, threads_count)
+        VALUES ($1, $2, $3, NULL, $4, $5, 'active', $6, $7, 0)
         RETURNING id, name, email, role, status, avatar, joined_date, threads_count
-      `, [id, name, email, password || "admin123", role || "User", avatar || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80", joinedDate]);
+      `, [id, cleanName, cleanEmail, passwordHash, safeRole, avatar || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80", joinedDate]);
       res.status(201).json(insertRes.rows[0]);
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
   });
-  app.patch("/api/users/:id", async (req, res) => {
+  app.patch("/api/users/:id", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       const { role, status } = req.body;
@@ -3370,7 +3800,7 @@ async function createApp() {
       res.status(500).json({ error: err.message });
     }
   });
-  app.delete("/api/users/:id", async (req, res) => {
+  app.delete("/api/users/:id", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       await pool.query("DELETE FROM users WHERE id = $1", [id]);
@@ -3379,6 +3809,348 @@ async function createApp() {
       res.status(500).json({ error: err.message });
     }
   });
+  const getEffectiveEmailConfig = async () => {
+    const envKey = (process.env.RESEND_API_KEY || "").trim();
+    const envFrom = (process.env.EMAIL_FROM || "Trek Consultancy Forum <onboarding@resend.dev>").trim();
+    try {
+      const res = await pool.query("SELECT value FROM settings WHERE key = 'email_config'");
+      if (res.rows.length > 0 && res.rows[0].value) {
+        const parsed = typeof res.rows[0].value === "string" ? JSON.parse(res.rows[0].value) : res.rows[0].value;
+        const dbKey = (parsed?.resendApiKey ?? "").trim();
+        const dbFrom = (parsed?.emailFrom ?? "").trim();
+        return {
+          resendApiKey: dbKey || envKey,
+          emailFrom: dbFrom || envFrom,
+          source: "database",
+          updatedAt: parsed?.updatedAt || null
+        };
+      }
+    } catch (err) {
+      console.warn("[Email Config] Fallback to environment variables:", err);
+    }
+    return {
+      resendApiKey: envKey,
+      emailFrom: envFrom,
+      source: "env",
+      updatedAt: null
+    };
+  };
+  const resolveSenderConfig = (rawEmailFrom) => {
+    const raw = (rawEmailFrom || "Trek Consultancy Forum <onboarding@resend.dev>").trim();
+    const angleMatch = raw.match(/^(.*?)<([^<>]+)>\s*$/);
+    let displayName = "Trek Consultancy Forum";
+    let extractedEmail = "";
+    if (angleMatch) {
+      const parsedName = angleMatch[1].trim().replace(/^["']|["']$/g, "").trim();
+      if (parsedName) displayName = parsedName;
+      extractedEmail = angleMatch[2].trim().toLowerCase();
+    } else if (/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(raw)) {
+      extractedEmail = raw.toLowerCase();
+    }
+    const sanitizedName = displayName.replace(/[<>"]/g, "").trim() || "Trek Consultancy Forum";
+    const isConsumerOrPlaceholderDomain = !extractedEmail || /@(gmail|googlemail|yahoo|hotmail|outlook|icloud|live|aol|msn|protonmail|proton|yandex|zoho)\.[a-z.]+$/i.test(extractedEmail) || extractedEmail.endsWith("@yourdomain.com") || extractedEmail.endsWith("@example.com");
+    const safeEmail = isConsumerOrPlaceholderDomain ? "onboarding@resend.dev" : extractedEmail;
+    const fromAddress = `${sanitizedName} <${safeEmail}>`;
+    const fallbackFromAddress = `${sanitizedName} <onboarding@resend.dev>`;
+    const replyToAddress = extractedEmail && extractedEmail !== "onboarding@resend.dev" && !extractedEmail.endsWith("@yourdomain.com") && !extractedEmail.endsWith("@example.com") ? extractedEmail : void 0;
+    return {
+      displayName: sanitizedName,
+      extractedEmail,
+      fromAddress,
+      fallbackFromAddress,
+      replyToAddress,
+      usedPublicDomainFallback: isConsumerOrPlaceholderDomain && extractedEmail !== "onboarding@resend.dev"
+    };
+  };
+  let cachedTrekLogoBase64 = void 0;
+  const getTrekLogoAttachment = () => {
+    if (cachedTrekLogoBase64 === void 0) {
+      const candidates = [
+        import_node_path.default.resolve(process.cwd(), "public", "trek-logo.png"),
+        import_node_path.default.resolve(process.cwd(), "dist", "trek-logo.png"),
+        import_node_path.default.resolve(process.cwd(), "src", "assets", "trek-logo.png")
+      ];
+      cachedTrekLogoBase64 = null;
+      for (const filePath of candidates) {
+        try {
+          if (import_node_fs.default.existsSync(filePath)) {
+            cachedTrekLogoBase64 = import_node_fs.default.readFileSync(filePath).toString("base64");
+            break;
+          }
+        } catch {
+        }
+      }
+    }
+    if (!cachedTrekLogoBase64) return null;
+    return {
+      filename: "trek-logo.png",
+      content: cachedTrekLogoBase64,
+      contentType: "image/png",
+      contentId: "trek-logo"
+    };
+  };
+  const escapeEmailHtml = (text) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const formatInlineMarkdownHtml = (rawLine) => {
+    let html = escapeEmailHtml(rawLine);
+    html = html.replace(/`([^`]+)`/g, '<code style="background-color:#ecfeff;color:#0e7490;border:1px solid #cffafe;padding:2px 6px;border-radius:5px;font-family:Consolas,Monaco,monospace;font-size:13px;">$1</code>');
+    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong style="color:#0f172a;font-weight:700;">$1</strong>');
+    html = html.replace(/\*([^*]+)\*/g, "<em>$1</em>");
+    html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" style="color:#0e7490;text-decoration:underline;font-weight:600;">$1</a>');
+    return html;
+  };
+  const renderMarkdownToEmailHtml = (markdown) => {
+    const lines = (markdown || "").replace(/\r\n/g, "\n").split("\n");
+    const blocks = [];
+    let listItems = [];
+    let listType = null;
+    let paragraphLines = [];
+    const flushList = () => {
+      if (listItems.length > 0 && listType) {
+        const tag = listType;
+        blocks.push(
+          `<${tag} style="margin:0 0 18px 0;padding-left:22px;color:#334155;font-size:15px;line-height:1.75;">${listItems.map((item) => `<li style="margin-bottom:8px;">${item}</li>`).join("")}</${tag}>`
+        );
+        listItems = [];
+        listType = null;
+      }
+    };
+    const flushParagraph = () => {
+      if (paragraphLines.length > 0) {
+        blocks.push(
+          `<p style="margin:0 0 16px 0;font-size:15px;line-height:1.75;color:#334155;">${paragraphLines.join("<br>")}</p>`
+        );
+        paragraphLines = [];
+      }
+    };
+    for (const rawLine of lines) {
+      const trimmed = rawLine.trim();
+      if (!trimmed) {
+        flushParagraph();
+        flushList();
+        continue;
+      }
+      if (/^---+$/.test(trimmed) || /^\*\*\*+$/.test(trimmed)) {
+        flushParagraph();
+        flushList();
+        blocks.push('<hr style="border:none;border-top:1px solid #e2e8f0;margin:26px 0;">');
+        continue;
+      }
+      const h3 = trimmed.match(/^###\s+(.+)$/);
+      if (h3) {
+        flushParagraph();
+        flushList();
+        blocks.push(`<h3 style="margin:22px 0 8px 0;font-size:16px;font-weight:700;color:#0f172a;line-height:1.4;">${formatInlineMarkdownHtml(h3[1])}</h3>`);
+        continue;
+      }
+      const h2 = trimmed.match(/^##\s+(.+)$/);
+      if (h2) {
+        flushParagraph();
+        flushList();
+        blocks.push(`<h2 style="margin:24px 0 10px 0;padding-bottom:6px;border-bottom:2px solid #ecfeff;font-size:18px;font-weight:800;color:#0f172a;line-height:1.35;">${formatInlineMarkdownHtml(h2[1])}</h2>`);
+        continue;
+      }
+      const h1 = trimmed.match(/^#\s+(.+)$/);
+      if (h1) {
+        flushParagraph();
+        flushList();
+        blocks.push(`<h1 style="margin:24px 0 12px 0;font-size:21px;font-weight:800;color:#0f172a;line-height:1.3;">${formatInlineMarkdownHtml(h1[1])}</h1>`);
+        continue;
+      }
+      const ulMatch = trimmed.match(/^[-*]\s+(.+)$/);
+      if (ulMatch) {
+        flushParagraph();
+        if (listType && listType !== "ul") flushList();
+        listType = "ul";
+        listItems.push(formatInlineMarkdownHtml(ulMatch[1]));
+        continue;
+      }
+      const olMatch = trimmed.match(/^\d+\.\s+(.+)$/);
+      if (olMatch) {
+        flushParagraph();
+        if (listType && listType !== "ol") flushList();
+        listType = "ol";
+        listItems.push(formatInlineMarkdownHtml(olMatch[1]));
+        continue;
+      }
+      const quoteMatch = trimmed.match(/^>\s*(.+)$/);
+      if (quoteMatch) {
+        flushParagraph();
+        flushList();
+        blocks.push(
+          `<blockquote style="margin:0 0 18px 0;padding:12px 16px;border-left:4px solid #16b8c4;background-color:#ecfeff;color:#0f172a;font-size:14px;line-height:1.65;border-radius:0 10px 10px 0;">${formatInlineMarkdownHtml(quoteMatch[1])}</blockquote>`
+        );
+        continue;
+      }
+      flushList();
+      paragraphLines.push(formatInlineMarkdownHtml(trimmed));
+    }
+    flushParagraph();
+    flushList();
+    return blocks.join("\n");
+  };
+  const stripMarkdownToPlainText = (markdown) => (markdown || "").replace(/\r\n/g, "\n").replace(/^#{1,6}\s+/gm, "").replace(/\*\*([^*]+)\*\*/g, "$1").replace(/\*([^*]+)\*/g, "$1").replace(/`([^`]+)`/g, "$1").replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, "$1 ($2)").trim();
+  const renderNewsletterEmail = (campaign) => {
+    const safeSubject = escapeEmailHtml(campaign.subject);
+    const safePreview = escapeEmailHtml((campaign.previewText || "").trim());
+    const safeAuthor = escapeEmailHtml((campaign.author || "Trek Consultancy Editorial Team").trim());
+    const formattedDate = new Date(campaign.sentAt || Date.now()).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric"
+    });
+    const bodyHtml = renderMarkdownToEmailHtml(campaign.content);
+    const plainTextParts = [
+      "TREK CONSULTANCY",
+      campaign.subject,
+      campaign.previewText ? campaign.previewText.trim() : "",
+      `Published by ${campaign.author || "Trek Consultancy Editorial Team"} \u2022 ${formattedDate}`,
+      "------------------------------------------------------------",
+      stripMarkdownToPlainText(campaign.content),
+      "------------------------------------------------------------",
+      `\xA9 ${(/* @__PURE__ */ new Date()).getFullYear()} Trek Consultancy Forum. All rights reserved.`
+    ].filter(Boolean);
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${safeSubject}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1e293b;">
+  ${safePreview ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">${safePreview}</div>` : ""}
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f1f5f9;padding:36px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background-color:#ffffff;border-radius:18px;border:1px solid #cbd5e1;overflow:hidden;box-shadow:0 8px 24px rgba(15,23,42,0.06);">
+          <!-- Trek Brand Dual-Color Top Accent Strip (Cyan #16b8c4 + Orange #f27c22) -->
+          <tr>
+            <td style="padding:0;margin:0;line-height:0;font-size:0;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td width="72%" height="6" style="background-color:#16b8c4;height:6px;line-height:6px;font-size:0;">&nbsp;</td>
+                  <td width="28%" height="6" style="background-color:#f27c22;height:6px;line-height:6px;font-size:0;">&nbsp;</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <!-- Branded Logo Header -->
+          <tr>
+            <td style="padding:24px 32px 20px 32px;border-bottom:1px solid #e2e8f0;background-color:#ffffff;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td valign="middle">
+                    <img src="cid:trek-logo" alt="Trek Consultancy" width="156" height="42" style="display:block;height:42px;width:auto;max-width:172px;border:0;outline:none;text-decoration:none;font-size:18px;font-weight:800;color:#16b8c4;" />
+                  </td>
+                  <td align="right" valign="middle">
+                    <span style="display:inline-block;padding:5px 12px;border-radius:999px;background-color:#ecfeff;border:1px solid #a5f3fc;color:#0e7490;font-size:11px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;">
+                      Community Update
+                    </span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <!-- Branded Hero Subject & Teaser Section -->
+          <tr>
+            <td style="padding:28px 32px 22px 32px;background-color:#f8fafc;border-bottom:1px solid #e2e8f0;">
+              <div style="margin:0 0 12px 0;line-height:0;">
+                <span style="display:inline-block;width:28px;height:4px;background-color:#16b8c4;border-radius:2px;"></span><span style="display:inline-block;width:12px;height:4px;background-color:#f27c22;border-radius:2px;margin-left:4px;"></span>
+              </div>
+              <h1 style="margin:0 0 12px 0;font-size:23px;font-weight:800;color:#0f172a;line-height:1.3;letter-spacing:-0.3px;">
+                ${safeSubject}
+              </h1>
+              ${safePreview ? `<div style="margin:12px 0 0 0;padding:12px 16px;background-color:#fff7ed;border-left:4px solid #f27c22;border-radius:0 10px 10px 0;font-size:14px;line-height:1.6;color:#9a3412;font-weight:500;">${safePreview}</div>` : ""}
+              <div style="margin:16px 0 0 0;font-size:12px;color:#64748b;">
+                Published by <strong style="color:#0f172a;">${safeAuthor}</strong> &bull; ${formattedDate}
+              </div>
+            </td>
+          </tr>
+          <!-- Main Body Copy -->
+          <tr>
+            <td style="padding:30px 32px 34px 32px;background-color:#ffffff;">
+              ${bodyHtml}
+            </td>
+          </tr>
+          <!-- Branded Footer -->
+          <tr>
+            <td style="padding:24px 32px;background-color:#f8fafc;border-top:1px solid #e2e8f0;text-align:center;">
+              <div style="margin:0 0 10px 0;line-height:0;">
+                <span style="display:inline-block;width:32px;height:3px;background-color:#16b8c4;border-radius:2px;"></span><span style="display:inline-block;width:14px;height:3px;background-color:#f27c22;border-radius:2px;margin-left:4px;"></span>
+              </div>
+              <div style="margin:0 0 6px 0;font-size:13px;font-weight:800;letter-spacing:0.8px;">
+                <span style="color:#0e7490;">TREK</span> <span style="color:#ea580c;">CONSULTANCY</span>
+              </div>
+              <div style="font-size:12px;line-height:1.6;color:#475569;font-weight:600;">
+                &copy; ${(/* @__PURE__ */ new Date()).getFullYear()} Trek Consultancy Forum. All rights reserved.
+              </div>
+              <div style="margin-top:4px;font-size:11px;line-height:1.6;color:#64748b;">
+                You received this official community update because your email address is subscribed on our portal.
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+    return { html, text: plainTextParts.join("\n\n") };
+  };
+  const sleepMs = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const sendSingleResendEmail = async (resend, params) => {
+    let activeFrom = params.fromAddress;
+    let usedFallbackSender = false;
+    const logoAttachment = params.html.includes("cid:trek-logo") ? getTrekLogoAttachment() : null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const payload = {
+          from: activeFrom,
+          to: [params.to],
+          subject: params.subject,
+          text: params.text,
+          html: params.html
+        };
+        if (params.replyToAddress) {
+          payload.replyTo = params.replyToAddress;
+        }
+        if (logoAttachment) {
+          payload.attachments = [logoAttachment];
+        }
+        const { data, error } = await resend.emails.send(payload);
+        if (!error && data?.id) {
+          return { ok: true, id: data.id, usedFallbackSender };
+        }
+        const errMsg = error?.message || "Unknown Resend delivery error";
+        const errName = error?.name || "";
+        const statusCode = error?.statusCode;
+        if (attempt < 3 && (statusCode === 429 || errName === "rate_limit_exceeded" || /too many requests|rate limit/i.test(errMsg))) {
+          await sleepMs(700 * attempt);
+          continue;
+        }
+        if (!usedFallbackSender && activeFrom !== params.fallbackFromAddress && /domain is not verified/i.test(errMsg)) {
+          console.warn(`[Resend Notice] Custom sender '${activeFrom}' is not verified yet on Resend. Retrying with '${params.fallbackFromAddress}'.`);
+          activeFrom = params.fallbackFromAddress;
+          usedFallbackSender = true;
+          continue;
+        }
+        const isSandboxRestriction = /only send testing emails to your own email address|verify a domain at resend\.com\/domains/i.test(errMsg);
+        return {
+          ok: false,
+          error: errMsg,
+          isSandboxRestriction,
+          usedFallbackSender
+        };
+      } catch (ex) {
+        const exMsg = ex?.message || "Unexpected exception while contacting Resend API";
+        if (attempt < 3 && /429|rate limit|network|fetch/i.test(exMsg)) {
+          await sleepMs(700 * attempt);
+          continue;
+        }
+        return { ok: false, error: exMsg };
+      }
+    }
+    return { ok: false, error: "Email delivery failed after retries." };
+  };
   app.post("/api/auth/send-verification", async (req, res) => {
     try {
       const { email, name, currentLoggedInEmail } = req.body;
@@ -3407,88 +4179,117 @@ async function createApp() {
       console.log(`[Email Verification] Code for ${cleanEmail} (${cleanName}): ${code}`);
       let emailSent = false;
       let emailDeliveryError = null;
-      try {
-        const dotenv3 = await import("dotenv");
-        dotenv3.default.config({ override: true });
-      } catch {
-      }
-      const resendApiKey = process.env.RESEND_API_KEY?.trim();
+      const emailCfg = await getEffectiveEmailConfig();
+      const resendApiKey = emailCfg.resendApiKey;
       if (resendApiKey && resendApiKey !== "re_123456789") {
-        try {
-          const resend = new import_resend.Resend(resendApiKey);
-          let fromAddress = process.env.EMAIL_FROM?.trim() || "Trek Consultancy Forum <onboarding@resend.dev>";
-          const isUnverifiedPublicDomain = /@(gmail|yahoo|hotmail|outlook|icloud|live|aol|msn)\.com/i.test(fromAddress);
-          if (fromAddress.includes("yourdomain.com") || isUnverifiedPublicDomain) {
-            if (isUnverifiedPublicDomain) {
-              console.warn(`[Resend Notice] Sender '${fromAddress}' uses a public mailbox domain (@gmail/@yahoo/etc.) which cannot be verified on Resend. Falling back to 'Trek Consultancy Forum <onboarding@resend.dev>'. To send from a custom domain, add and verify your domain at https://resend.com/domains.`);
-            }
-            fromAddress = "Trek Consultancy Forum <onboarding@resend.dev>";
-          }
-          const { data: resendData, error: resendError } = await resend.emails.send({
-            from: fromAddress,
-            to: cleanEmail,
-            subject: `${code} is your Trek Consultancy Forum verification code`,
-            text: `Your Trek Consultancy Forum verification code is: ${code}
+        const resend = new import_resend.Resend(resendApiKey);
+        const senderCfg = resolveSenderConfig(emailCfg.emailFrom);
+        if (senderCfg.usedPublicDomainFallback) {
+          console.warn(`[Resend Notice] Sender '${emailCfg.emailFrom}' uses a public mailbox domain which cannot be verified on Resend. Using '${senderCfg.fromAddress}' with Reply-To '${senderCfg.replyToAddress || "none"}'.`);
+        }
+        const sendResult = await sendSingleResendEmail(resend, {
+          fromAddress: senderCfg.fromAddress,
+          fallbackFromAddress: senderCfg.fallbackFromAddress,
+          replyToAddress: senderCfg.replyToAddress,
+          to: cleanEmail,
+          subject: `${code} is your Trek Consultancy Forum verification code`,
+          text: `Your Trek Consultancy Forum verification code is: ${code}
 
 This code will expire in 15 minutes.
 If you did not request this code, you can safely ignore this email.`,
-            html: `
-              <!DOCTYPE html>
-              <html>
-              <head>
-                <meta charset="utf-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Trek Consultancy Forum Verification Code</title>
-              </head>
-              <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b;">
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; padding: 40px 16px;">
-                  <tr>
-                    <td align="center">
-                      <table role="presentation" width="100%" style="max-width: 480px; background-color: #ffffff; border-radius: 20px; border: 1px solid #e2e8f0; padding: 36px 32px; box-shadow: 0 4px 12px rgba(0,0,0,0.04);">
-                        <tr>
-                          <td>
-                            <div style="font-size: 22px; font-weight: 800; color: #00a8b5; letter-spacing: -0.5px; margin-bottom: 24px;">
-                              Trek Consultancy Forum
-                            </div>
-                            <h1 style="font-size: 20px; font-weight: 700; color: #0f172a; margin: 0 0 12px 0;">
-                              Verify Your Email Address
-                            </h1>
-                            <p style="font-size: 14px; line-height: 1.6; color: #475569; margin: 0 0 20px 0;">
-                              Hello${cleanName ? ` <strong>${cleanName}</strong>` : ""},<br>
-                              Thank you for registering with <strong>Trek Consultancy Forum</strong>. Please use the following 6-digit confirmation code to complete your verification:
-                            </p>
-                            <div style="background-color: #f0fdfa; border: 1.5px dashed #00a8b5; border-radius: 14px; padding: 18px 24px; text-align: center; margin: 24px 0;">
-                              <span style="font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #0d9488; display: inline-block;">
-                                ${code}
-                              </span>
-                            </div>
-                            <p style="font-size: 13px; line-height: 1.6; color: #64748b; margin: 0 0 24px 0;">
-                              \u23F1\uFE0F This code will expire in <strong>15 minutes</strong>.<br>
-                              If you did not request this email, please disregard it \u2014 no account will be created without this code.
-                            </p>
-                            <div style="border-top: 1px solid #f1f5f9; padding-top: 20px; font-size: 12px; color: #94a3b8; line-height: 1.5;">
-                              This is an automated notification from Trek Consultancy Forum Support & Identity Service.
-                            </div>
-                          </td>
-                        </tr>
-                      </table>
-                    </td>
-                  </tr>
-                </table>
-              </body>
-              </html>
-            `
-          });
-          if (resendError) {
-            console.error("[Resend Error]:", resendError);
-            emailDeliveryError = resendError.message;
-          } else {
-            emailSent = true;
-            console.log(`[Resend Success] OTP email sent to ${cleanEmail} (ID: ${resendData?.id})`);
-          }
-        } catch (resendEx) {
-          console.error("[Resend Exception]:", resendEx?.message);
-          emailDeliveryError = resendEx?.message;
+          html: `
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Trek Consultancy Forum Verification Code</title>
+            </head>
+            <body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f1f5f9; padding: 40px 16px;">
+                <tr>
+                  <td align="center">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 500px; background-color: #ffffff; border-radius: 18px; border: 1px solid #cbd5e1; overflow: hidden; box-shadow: 0 8px 24px rgba(15,23,42,0.06);">
+                      <!-- Trek Brand Dual-Color Top Accent Strip -->
+                      <tr>
+                        <td style="padding: 0; margin: 0; line-height: 0; font-size: 0;">
+                          <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                            <tr>
+                              <td width="72%" height="6" style="background-color: #16b8c4; height: 6px; line-height: 6px; font-size: 0;">&nbsp;</td>
+                              <td width="28%" height="6" style="background-color: #f27c22; height: 6px; line-height: 6px; font-size: 0;">&nbsp;</td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      <!-- Branded Header with Logo -->
+                      <tr>
+                        <td style="padding: 24px 32px 18px 32px; border-bottom: 1px solid #e2e8f0; background-color: #ffffff;">
+                          <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                            <tr>
+                              <td valign="middle">
+                                <img src="cid:trek-logo" alt="Trek Consultancy" width="156" height="42" style="display: block; height: 42px; width: auto; max-width: 172px; border: 0; outline: none; text-decoration: none; font-size: 18px; font-weight: 800; color: #16b8c4;" />
+                              </td>
+                              <td align="right" valign="middle">
+                                <span style="display: inline-block; padding: 5px 12px; border-radius: 999px; background-color: #ecfeff; border: 1px solid #a5f3fc; color: #0e7490; font-size: 11px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase;">
+                                  Security Verification
+                                </span>
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      <!-- Card Body -->
+                      <tr>
+                        <td style="padding: 32px;">
+                          <div style="margin: 0 0 10px 0; line-height: 0;">
+                            <span style="display: inline-block; width: 26px; height: 4px; background-color: #16b8c4; border-radius: 2px;"></span><span style="display: inline-block; width: 10px; height: 4px; background-color: #f27c22; border-radius: 2px; margin-left: 4px;"></span>
+                          </div>
+                          <h1 style="font-size: 21px; font-weight: 800; color: #0f172a; margin: 0 0 12px 0; letter-spacing: -0.3px;">
+                            Verify Your Email Address
+                          </h1>
+                          <p style="font-size: 14px; line-height: 1.65; color: #475569; margin: 0 0 20px 0;">
+                            Hello${cleanName ? ` <strong>${escapeEmailHtml(cleanName)}</strong>` : ""},<br>
+                            Thank you for joining <strong>Trek Consultancy Forum</strong>. Please use the following 6-digit verification code to complete your account setup:
+                          </p>
+                          <div style="background-color: #ecfeff; border: 2px dashed #16b8c4; border-radius: 14px; padding: 18px 24px; text-align: center; margin: 24px 0;">
+                            <span style="font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 34px; font-weight: 800; letter-spacing: 10px; color: #0e7490; display: inline-block;">
+                              ${code}
+                            </span>
+                          </div>
+                          <div style="padding: 12px 16px; background-color: #fff7ed; border-left: 3px solid #f27c22; border-radius: 0 8px 8px 0; font-size: 13px; line-height: 1.6; color: #9a3412; margin: 0 0 24px 0;">
+                            \u23F1\uFE0F This verification code will expire in <strong>15 minutes</strong>.<br>
+                            If you did not request this email, please disregard it \u2014 no account will be created.
+                          </div>
+                          <div style="border-top: 1px solid #f1f5f9; padding-top: 18px; font-size: 12px; color: #64748b; line-height: 1.5;">
+                            This is an automated notification from Trek Consultancy Forum Identity Service.
+                          </div>
+                        </td>
+                      </tr>
+                      <!-- Footer -->
+                      <tr>
+                        <td style="padding: 18px 32px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
+                          <div style="font-size: 12px; font-weight: 800; letter-spacing: 0.6px; margin-bottom: 2px;">
+                            <span style="color: #0e7490;">TREK</span> <span style="color: #ea580c;">CONSULTANCY</span>
+                          </div>
+                          <div style="font-size: 11px; color: #64748b;">
+                            &copy; ${(/* @__PURE__ */ new Date()).getFullYear()} Trek Consultancy Forum. All rights reserved.
+                          </div>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </body>
+            </html>
+          `
+        });
+        if (sendResult.ok) {
+          emailSent = true;
+          console.log(`[Resend Success] OTP email sent to ${cleanEmail} (ID: ${sendResult.id})`);
+        } else {
+          console.error("[Resend Error]:", sendResult.error);
+          emailDeliveryError = sendResult.error || "Email delivery failed";
         }
       }
       const isPlaceholderOrMissing = !resendApiKey || resendApiKey === "re_123456789";
@@ -3557,11 +4358,12 @@ If you did not request this code, you can safely ignore this email.`,
       const id = `usr-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
       const avatar = getRandomAvatar(cleanEmail || cleanName);
       const joinedDate = (/* @__PURE__ */ new Date()).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+      const passwordHash = hashPassword(cleanPass);
       const insertRes = await pool.query(`
-        INSERT INTO users (id, name, email, password, role, status, avatar, joined_date, threads_count, email_verified)
-        VALUES ($1, $2, $3, $4, 'User', 'active', $5, $6, 0, true)
+        INSERT INTO users (id, name, email, password, password_hash, role, status, avatar, joined_date, threads_count, email_verified)
+        VALUES ($1, $2, $3, NULL, $4, 'User', 'active', $5, $6, 0, true)
         RETURNING id, name, email, role, status, avatar, joined_date, threads_count, email_verified
-      `, [id, cleanName, cleanEmail, cleanPass, avatar, joinedDate]);
+      `, [id, cleanName, cleanEmail, passwordHash, avatar, joinedDate]);
       if (cleanSession) {
         try {
           await pool.query(`
@@ -3592,9 +4394,18 @@ If you did not request this code, you can safely ignore this email.`,
         INSERT INTO activity_logs (id, action, actor, target, time_ago, type)
         VALUES ($1, 'Joined Community', $2, 'User Registration', 'Just now', 'user')
       `, [`act-${Date.now()}`, cleanName]);
+      const newUser = insertRes.rows[0];
+      const token = signSessionToken({
+        id: newUser.id,
+        email: newUser.email,
+        name: newUser.name,
+        role: newUser.role
+      });
+      setSessionCookie(res, token);
       res.status(201).json({
         success: true,
-        user: insertRes.rows[0]
+        token,
+        user: newUser
       });
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -3614,23 +4425,20 @@ If you did not request this code, you can safely ignore this email.`,
       }
       const userRes = await pool.query("SELECT * FROM users WHERE LOWER(email) = $1", [cleanEmail]);
       if (userRes.rows.length === 0) {
-        if ((cleanEmail === "admin@trekconsultancy.com" || cleanEmail === "admin@amacommunity.io") && cleanPass === "admin123") {
-          return res.json({
-            success: true,
-            user: {
-              id: "usr-admin",
-              name: "Administrator",
-              email: cleanEmail,
-              role: "Super Admin",
-              avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80"
-            }
-          });
-        }
         return res.status(401).json({ error: "Invalid email or password." });
       }
       const user = userRes.rows[0];
-      if (user.password !== cleanPass) {
+      const { valid, needsRehash } = verifyPassword(cleanPass, user.password_hash, user.password);
+      if (!valid) {
         return res.status(401).json({ error: "Invalid password. Access denied." });
+      }
+      if (needsRehash) {
+        const upgradedHash = hashPassword(cleanPass);
+        await pool.query(
+          "UPDATE users SET password_hash = $1, password = NULL WHERE id = $2",
+          [upgradedHash, user.id]
+        ).catch(() => {
+        });
       }
       if (user.status === "suspended") {
         return res.status(403).json({ error: "This account is suspended." });
@@ -3661,8 +4469,16 @@ If you did not request this code, you can safely ignore this email.`,
           console.error("Failed to claim guest conversation on login:", claimErr);
         }
       }
+      const token = signSessionToken({
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role
+      });
+      setSessionCookie(res, token);
       res.json({
         success: true,
+        token,
         user: {
           id: user.id,
           name: user.name,
@@ -3675,7 +4491,18 @@ If you did not request this code, you can safely ignore this email.`,
       res.status(500).json({ error: err.message });
     }
   });
-  app.get("/api/newsletter", async (_req, res) => {
+  app.post("/api/auth/logout", (_req, res) => {
+    clearSessionCookie(res);
+    res.json({ success: true });
+  });
+  app.get("/api/auth/session", async (req, res) => {
+    const verified = await resolveVerifiedUser(req, pool);
+    if (!verified) {
+      return res.status(401).json({ authenticated: false, user: null });
+    }
+    res.json({ authenticated: true, user: verified });
+  });
+  app.get("/api/newsletter", requireAdmin, async (_req, res) => {
     try {
       const result = await pool.query("SELECT * FROM newsletter_subscribers ORDER BY subscribed_at DESC");
       res.json(result.rows);
@@ -3769,7 +4596,7 @@ Securing internal microservice communications across hybrid multi-cloud topologi
 - **Audit Compliance**: Tamper-proof logging with cryptographic hashing.`
     }
   ];
-  app.delete(["/api/admin/newsletter/:id", "/api/newsletter/:id"], async (req, res) => {
+  app.delete(["/api/admin/newsletter/:id", "/api/newsletter/:id"], requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       await pool.query("DELETE FROM newsletter_subscribers WHERE id = $1 OR email = $1", [id]);
@@ -3799,9 +4626,9 @@ Securing internal microservice communications across hybrid multi-cloud topologi
   app.get("/api/admin/newsletter/campaigns", async (_req, res) => {
     try {
       const result = await pool.query("SELECT value FROM settings WHERE key = 'newsletter_campaigns'");
-      if (result.rows.length > 0 && result.rows[0].value) {
+      if (result.rows.length > 0 && result.rows[0].value !== void 0 && result.rows[0].value !== null) {
         const val = typeof result.rows[0].value === "string" ? JSON.parse(result.rows[0].value) : result.rows[0].value;
-        if (Array.isArray(val) && val.length > 0) {
+        if (Array.isArray(val)) {
           return res.json(val);
         }
       }
@@ -3810,6 +4637,111 @@ Securing internal microservice communications across hybrid multi-cloud topologi
       res.status(500).json({ error: err.message });
     }
   });
+  app.delete("/api/admin/newsletter/campaigns/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const cur = await pool.query("SELECT value FROM settings WHERE key = 'newsletter_campaigns'");
+      let campaigns = defaultNewsletterCampaigns;
+      if (cur.rows.length > 0 && cur.rows[0].value !== void 0 && cur.rows[0].value !== null) {
+        try {
+          const parsed = typeof cur.rows[0].value === "string" ? JSON.parse(cur.rows[0].value) : cur.rows[0].value;
+          if (Array.isArray(parsed)) campaigns = parsed;
+        } catch {
+        }
+      }
+      const updated = campaigns.filter((c) => c.id !== id);
+      await pool.query(`
+        INSERT INTO settings (key, value) VALUES ('newsletter_campaigns', $1)
+        ON CONFLICT (key) DO UPDATE SET value = $1
+      `, [JSON.stringify(updated)]);
+      res.json({ success: true, id, campaigns: updated });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+  const dispatchNewsletterCampaign = async (campaign) => {
+    const subsRes = await pool.query("SELECT email FROM newsletter_subscribers ORDER BY subscribed_at ASC");
+    const emailList = Array.from(
+      new Set(
+        subsRes.rows.map((r) => (r.email || "").trim().toLowerCase()).filter((e) => Boolean(e && e.includes("@")))
+      )
+    );
+    const totalSubscribers = emailList.length;
+    const emailCfg = await getEffectiveEmailConfig();
+    const resendApiKey = (emailCfg.resendApiKey || "").trim();
+    if (!resendApiKey || !resendApiKey.startsWith("re_") || resendApiKey === "re_123456789") {
+      return {
+        deliveredCount: 0,
+        failedCount: totalSubscribers,
+        totalSubscribers,
+        status: "failed",
+        deliveryError: "Resend API key is missing or invalid. Configure a valid RESEND_API_KEY in Email Sender Settings."
+      };
+    }
+    if (totalSubscribers === 0) {
+      return {
+        deliveredCount: 0,
+        failedCount: 0,
+        totalSubscribers: 0,
+        status: "failed",
+        deliveryError: "No active subscribers found to receive this newsletter."
+      };
+    }
+    const resend = new import_resend.Resend(resendApiKey);
+    const senderCfg = resolveSenderConfig(emailCfg.emailFrom);
+    const rendered = renderNewsletterEmail(campaign);
+    const deliveredEmails = [];
+    const failedItems = [];
+    for (let i = 0; i < emailList.length; i++) {
+      const recipientEmail = emailList[i];
+      if (i > 0) {
+        await sleepMs(520);
+      }
+      const sendRes = await sendSingleResendEmail(resend, {
+        fromAddress: senderCfg.fromAddress,
+        fallbackFromAddress: senderCfg.fallbackFromAddress,
+        replyToAddress: senderCfg.replyToAddress,
+        to: recipientEmail,
+        subject: campaign.subject,
+        text: rendered.text,
+        html: rendered.html
+      });
+      if (sendRes.ok) {
+        deliveredEmails.push(recipientEmail);
+        console.log(`[Newsletter Sent] -> ${recipientEmail} (ID: ${sendRes.id})`);
+      } else {
+        const errText = sendRes.error || "Delivery rejected by mail provider";
+        failedItems.push({
+          email: recipientEmail,
+          error: errText,
+          isSandboxRestriction: sendRes.isSandboxRestriction
+        });
+        console.warn(`[Newsletter Failed] -> ${recipientEmail}: ${errText}`);
+      }
+    }
+    const deliveredCount = deliveredEmails.length;
+    const failedCount = failedItems.length;
+    const status = deliveredCount === totalSubscribers && totalSubscribers > 0 ? "sent" : deliveredCount > 0 ? "partial" : "failed";
+    let deliveryError;
+    if (failedCount > 0) {
+      const sandboxBlocked = failedItems.filter((f) => f.isSandboxRestriction);
+      if (sandboxBlocked.length > 0) {
+        const blockedList = sandboxBlocked.slice(0, 3).map((f) => f.email).join(", ");
+        const moreSuffix = sandboxBlocked.length > 3 ? ` +${sandboxBlocked.length - 3} more` : "";
+        deliveryError = deliveredCount > 0 ? `Delivered to ${deliveredCount} of ${totalSubscribers} subscriber(s). ${sandboxBlocked.length} recipient(s) (${blockedList}${moreSuffix}) blocked by Resend Sandbox Mode: unverified 'onboarding@resend.dev' can only send to your Resend account owner email until you verify a custom domain at resend.com/domains.` : `0 of ${totalSubscribers} delivered. Blocked by Resend Sandbox Mode (${blockedList}${moreSuffix}): unverified 'onboarding@resend.dev' can only send to your Resend account owner email until you verify a custom domain at resend.com/domains.`;
+      } else {
+        const firstErr = failedItems[0];
+        deliveryError = deliveredCount > 0 ? `Delivered to ${deliveredCount} of ${totalSubscribers} subscriber(s); ${failedCount} failed (${firstErr.email}: ${firstErr.error}).` : `Delivery failed for all ${totalSubscribers} subscriber(s) (${firstErr.email}: ${firstErr.error}).`;
+      }
+    }
+    return {
+      deliveredCount,
+      failedCount,
+      totalSubscribers,
+      status,
+      deliveryError
+    };
+  };
   app.post("/api/admin/newsletter/broadcast", async (req, res) => {
     try {
       const { subject, previewText, content, author, tags } = req.body;
@@ -3825,48 +4757,281 @@ Securing internal microservice communications across hybrid multi-cloud topologi
         } catch {
         }
       }
-      const subsRes = await pool.query("SELECT COUNT(*) as count FROM newsletter_subscribers");
-      const subCount = parseInt(subsRes.rows[0]?.count || "0", 10);
-      const nextIssue = (campaigns[0]?.issueNumber || 44) + 1;
-      const newCampaign = {
+      const maxIssue = campaigns.reduce((max, c) => Math.max(max, Number(c.issueNumber) || 0), 42);
+      const nextIssue = maxIssue + 1;
+      const draftCampaign = {
         id: `camp-${Date.now()}`,
         issueNumber: nextIssue,
         subject: subject.trim(),
         previewText: (previewText || "").trim(),
         content: content.trim(),
         author: author?.trim() || "Trek Consultancy Editorial Team",
-        sentAt: (/* @__PURE__ */ new Date()).toISOString(),
-        recipientCount: subCount || 1,
-        status: "sent",
         tags: Array.isArray(tags) ? tags : ["Weekly Digest", "Architecture"]
+      };
+      const delivery = await dispatchNewsletterCampaign(draftCampaign);
+      const newCampaign = {
+        ...draftCampaign,
+        sentAt: (/* @__PURE__ */ new Date()).toISOString(),
+        recipientCount: delivery.deliveredCount,
+        totalSubscribers: delivery.totalSubscribers,
+        failedCount: delivery.failedCount,
+        status: delivery.status,
+        deliveryError: delivery.deliveryError
       };
       const updated = [newCampaign, ...campaigns];
       await pool.query(`
         INSERT INTO settings (key, value) VALUES ('newsletter_campaigns', $1)
         ON CONFLICT (key) DO UPDATE SET value = $1
       `, [JSON.stringify(updated)]);
-      const resendApiKey = process.env.RESEND_API_KEY?.trim();
-      if (resendApiKey && subCount > 0) {
-        try {
-          const resend = new import_resend.Resend(resendApiKey);
-          const subs = await pool.query("SELECT email FROM newsletter_subscribers LIMIT 50");
-          const emailList = subs.rows.map((r) => r.email).filter(Boolean);
-          if (emailList.length > 0) {
-            await resend.emails.send({
-              from: "Trek Consultancy Forum <onboarding@resend.dev>",
-              to: emailList[0],
-              bcc: emailList.slice(1),
-              subject: newCampaign.subject,
-              text: newCampaign.content
-            });
-          }
-        } catch (mailErr) {
-          console.warn("[Newsletter Broadcast Warning]", mailErr);
-        }
-      }
-      res.status(201).json({ success: true, campaign: newCampaign, sentCount: subCount });
+      await pool.query(`
+        INSERT INTO activity_logs (id, action, actor, target, time_ago, type)
+        VALUES ($1, $2, 'Admin', $3, 'Just now', 'newsletter')
+      `, [
+        `act-${Date.now()}`,
+        delivery.status === "sent" ? `Broadcasted Newsletter (${delivery.deliveredCount} delivered)` : delivery.status === "partial" ? `Partially Broadcasted Newsletter (${delivery.deliveredCount}/${delivery.totalSubscribers})` : `Failed Newsletter Broadcast`,
+        newCampaign.subject
+      ]).catch(() => {
+      });
+      res.status(201).json({
+        success: delivery.deliveredCount > 0,
+        campaign: newCampaign,
+        sentCount: delivery.deliveredCount,
+        failedCount: delivery.failedCount,
+        totalSubscribers: delivery.totalSubscribers,
+        deliveryError: delivery.deliveryError
+      });
     } catch (err) {
       res.status(500).json({ error: err.message });
+    }
+  });
+  app.post("/api/admin/newsletter/campaigns/:id/resend", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const cur = await pool.query("SELECT value FROM settings WHERE key = 'newsletter_campaigns'");
+      let campaigns = defaultNewsletterCampaigns;
+      if (cur.rows.length > 0 && cur.rows[0].value) {
+        try {
+          const parsed = typeof cur.rows[0].value === "string" ? JSON.parse(cur.rows[0].value) : cur.rows[0].value;
+          if (Array.isArray(parsed)) campaigns = parsed;
+        } catch {
+        }
+      }
+      const idx = campaigns.findIndex((c) => c.id === id);
+      if (idx === -1) {
+        return res.status(404).json({ error: "Newsletter issue not found." });
+      }
+      const target = campaigns[idx];
+      const delivery = await dispatchNewsletterCampaign({
+        issueNumber: target.issueNumber,
+        subject: target.subject,
+        previewText: target.previewText,
+        content: target.content,
+        author: target.author
+      });
+      const updatedCampaign = {
+        ...target,
+        sentAt: (/* @__PURE__ */ new Date()).toISOString(),
+        recipientCount: delivery.deliveredCount,
+        totalSubscribers: delivery.totalSubscribers,
+        failedCount: delivery.failedCount,
+        status: delivery.status,
+        deliveryError: delivery.deliveryError
+      };
+      const updatedList = [...campaigns];
+      updatedList[idx] = updatedCampaign;
+      await pool.query(`
+        INSERT INTO settings (key, value) VALUES ('newsletter_campaigns', $1)
+        ON CONFLICT (key) DO UPDATE SET value = $1
+      `, [JSON.stringify(updatedList)]);
+      res.json({
+        success: delivery.deliveredCount > 0,
+        campaign: updatedCampaign,
+        sentCount: delivery.deliveredCount,
+        failedCount: delivery.failedCount,
+        totalSubscribers: delivery.totalSubscribers,
+        deliveryError: delivery.deliveryError
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+  app.get("/api/admin/newsletter/email-config", async (_req, res) => {
+    try {
+      const cfg = await getEffectiveEmailConfig();
+      res.json({
+        resendApiKey: cfg.resendApiKey,
+        emailFrom: cfg.emailFrom,
+        isConfigured: Boolean(cfg.resendApiKey && cfg.resendApiKey !== "re_123456789"),
+        source: cfg.source,
+        updatedAt: cfg.updatedAt
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+  const handleSaveEmailConfig = async (req, res) => {
+    try {
+      const { resendApiKey, emailFrom } = req.body || {};
+      const cleanKey = (resendApiKey ?? "").trim();
+      const cleanFrom = (emailFrom ?? "").trim();
+      if (!cleanFrom) {
+        return res.status(400).json({ error: "Sender address (EMAIL_FROM) is required." });
+      }
+      const payload = {
+        resendApiKey: cleanKey,
+        emailFrom: cleanFrom,
+        updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+      };
+      await pool.query(`
+        INSERT INTO settings (key, value) VALUES ('email_config', $1)
+        ON CONFLICT (key) DO UPDATE SET value = $1
+      `, [JSON.stringify(payload)]);
+      if (cleanKey) process.env.RESEND_API_KEY = cleanKey;
+      if (cleanFrom) process.env.EMAIL_FROM = cleanFrom;
+      try {
+        const fs3 = await import("fs");
+        const path3 = await import("path");
+        const envPath = path3.resolve(process.cwd(), ".env");
+        if (fs3.existsSync(envPath)) {
+          let envContent = fs3.readFileSync(envPath, "utf8");
+          if (/^RESEND_API_KEY=/m.test(envContent)) {
+            envContent = envContent.replace(/^RESEND_API_KEY=.*$/m, `RESEND_API_KEY="${cleanKey}"`);
+          } else {
+            envContent += `
+RESEND_API_KEY="${cleanKey}"`;
+          }
+          if (/^EMAIL_FROM=/m.test(envContent)) {
+            envContent = envContent.replace(/^EMAIL_FROM=.*$/m, `EMAIL_FROM="${cleanFrom}"`);
+          } else {
+            envContent += `
+EMAIL_FROM="${cleanFrom}"`;
+          }
+          fs3.writeFileSync(envPath, envContent, "utf8");
+        }
+      } catch {
+      }
+      await pool.query(`
+        INSERT INTO activity_logs (id, action, actor, target, time_ago, type)
+        VALUES ($1, 'Updated Email Sender Settings', 'Admin', $2, 'Just now', 'settings')
+      `, [`act-${Date.now()}`, cleanFrom]).catch(() => {
+      });
+      res.json({
+        success: true,
+        config: {
+          resendApiKey: cleanKey,
+          emailFrom: cleanFrom,
+          isConfigured: Boolean(cleanKey && cleanKey !== "re_123456789"),
+          source: "database",
+          updatedAt: payload.updatedAt
+        }
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  };
+  app.put("/api/admin/newsletter/email-config", handleSaveEmailConfig);
+  app.post("/api/admin/newsletter/email-config", handleSaveEmailConfig);
+  app.post("/api/admin/newsletter/email-config/test", async (req, res) => {
+    try {
+      const cfg = await getEffectiveEmailConfig();
+      const cleanKey = ((req.body?.resendApiKey ?? cfg.resendApiKey) || "").trim();
+      if (!cleanKey || !cleanKey.startsWith("re_") || cleanKey === "re_123456789") {
+        return res.status(400).json({
+          valid: false,
+          error: 'Please enter a valid Resend API key starting with "re_".'
+        });
+      }
+      const checkRes = await fetch("https://api.resend.com/domains", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${cleanKey}`,
+          "Content-Type": "application/json"
+        }
+      });
+      const bodyText = await checkRes.text();
+      let data = null;
+      try {
+        data = JSON.parse(bodyText);
+      } catch {
+      }
+      if (checkRes.ok) {
+        const domains = Array.isArray(data?.data) ? data.data : [];
+        const verifiedDomains = domains.filter((d) => d?.status === "verified" && d?.name).map((d) => d.name);
+        const sandboxMode = verifiedDomains.length === 0;
+        return res.json({
+          valid: true,
+          sandboxMode,
+          verifiedDomains,
+          message: sandboxMode ? "API key verified! Note: 0 verified domains found on Resend (Sandbox Mode active \u2014 emails can only be sent to your Resend account owner email until you verify a custom domain at resend.com/domains)." : `API key verified! Connected with ${verifiedDomains.length} verified domain${verifiedDomains.length === 1 ? "" : "s"} (${verifiedDomains.join(", ")}) \u2014 ready for unrestricted delivery.`
+        });
+      }
+      const msg = (data?.message || bodyText || "").toLowerCase();
+      if (data?.name === "restricted_api_key" || msg.includes("restricted to only send emails")) {
+        return res.json({
+          valid: true,
+          sandboxMode: false,
+          message: 'Resend API key verified! (Sending-access API key is active \u2014 use "Send Test Email" below to verify inbox delivery).'
+        });
+      }
+      return res.status(400).json({
+        valid: false,
+        error: data?.message || "Resend rejected this API key. Please check the key and try again."
+      });
+    } catch (err) {
+      res.status(500).json({
+        valid: false,
+        error: err?.message || "Unable to reach Resend API to verify key."
+      });
+    }
+  });
+  app.post("/api/admin/newsletter/email-config/send-test", async (req, res) => {
+    try {
+      const cfg = await getEffectiveEmailConfig();
+      const cleanKey = ((req.body?.resendApiKey ?? cfg.resendApiKey) || "").trim();
+      const rawFrom = ((req.body?.emailFrom ?? cfg.emailFrom) || "").trim();
+      const toEmail = ((req.body?.toEmail ?? "") || "").trim().toLowerCase();
+      if (!cleanKey || !cleanKey.startsWith("re_") || cleanKey === "re_123456789") {
+        return res.status(400).json({ error: 'Please provide a valid Resend API key starting with "re_".' });
+      }
+      if (!toEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toEmail)) {
+        return res.status(400).json({ error: "Please enter a valid recipient email address for the test." });
+      }
+      const resend = new import_resend.Resend(cleanKey);
+      const senderCfg = resolveSenderConfig(rawFrom);
+      const rendered = renderNewsletterEmail({
+        subject: "Trek Consultancy Forum \u2014 Test Delivery Confirmation",
+        previewText: "Your outbound Resend email configuration is working properly.",
+        author: "Trek Consultancy Mail System",
+        content: `## Outbound Email Delivery Verified
+
+This test message confirms that **Trek Consultancy Forum** can successfully dispatch HTML + plain-text emails through your Resend API configuration.
+
+- **Active Sender**: \`${senderCfg.fromAddress}\`
+- **Reply-To**: \`${senderCfg.replyToAddress || "Not set"}\`
+- **Recipient**: \`${toEmail}\`
+
+If you see this in your inbox, your newsletter broadcasts and verification codes are ready to deliver.`
+      });
+      const sendRes = await sendSingleResendEmail(resend, {
+        fromAddress: senderCfg.fromAddress,
+        fallbackFromAddress: senderCfg.fallbackFromAddress,
+        replyToAddress: senderCfg.replyToAddress,
+        to: toEmail,
+        subject: "Trek Consultancy Forum \u2014 Test Delivery Confirmation",
+        text: rendered.text,
+        html: rendered.html
+      });
+      if (!sendRes.ok) {
+        const hint = sendRes.isSandboxRestriction ? "Resend Sandbox Restriction: Unverified onboarding@resend.dev can only deliver to your own Resend account email address. Verify your custom domain at resend.com/domains to send to external addresses." : sendRes.error || "Email delivery failed.";
+        return res.status(400).json({ success: false, error: hint });
+      }
+      return res.json({
+        success: true,
+        messageId: sendRes.id,
+        message: `Test email accepted by Resend (ID: ${sendRes.id}) and dispatched to ${toEmail}! Check your inbox (and Promotions/Spam tab).`
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err?.message || "Failed to send test email." });
     }
   });
   app.get("/api/support/faqs", async (req, res) => {
@@ -6881,7 +8046,7 @@ ${textPayload.slice(0, 12e4)}`
       extractedChunks = extractedChunks.filter((c) => isReadableCleanText(c.content));
       if (extractedChunks.length === 0) {
         return res.status(400).json({
-          error: "No readable text content could be recognized from this file or image. Please ensure the image contains clear, legible text, or supply a Gemini AI Studio API key."
+          error: "No readable text content could be recognized from this file or image. Please ensure the image contains clear, legible text, or supply a valid Gemini API key."
         });
       }
       const savedDocs = [];
@@ -7298,7 +8463,7 @@ ${textPayload.slice(0, 12e4)}`
       });
     }
   });
-  app.post("/api/ai/browse-url", async (req, res) => {
+  app.post("/api/ai/browse-url", requireAdmin, async (req, res) => {
     try {
       const { url } = req.body;
       if (!url || typeof url !== "string" || !url.startsWith("http")) {
@@ -7331,7 +8496,7 @@ ${textPayload.slice(0, 12e4)}`
       res.status(500).json({ error: err.message });
     }
   });
-  app.post("/api/settings", async (req, res) => {
+  app.post("/api/settings", requireAdmin, async (req, res) => {
     try {
       const newSettings = req.body;
       await pool.query(`
@@ -7375,7 +8540,7 @@ ${textPayload.slice(0, 12e4)}`
       res.status(500).json({ error: err.message });
     }
   });
-  app.post("/api/hero", async (req, res) => {
+  app.post("/api/hero", requireAdmin, async (req, res) => {
     try {
       const heroSettings = req.body;
       if (heroSettings && Array.isArray(heroSettings.slides)) {
@@ -7452,7 +8617,7 @@ ${textPayload.slice(0, 12e4)}`
     }
   };
   app.post("/api/admin/seo", handleSaveSeo);
-  app.post("/api/seo", handleSaveSeo);
+  app.post("/api/seo", requireAdmin, handleSaveSeo);
   app.get("/robots.txt", async (_req, res) => {
     try {
       const result = await pool.query("SELECT value FROM settings WHERE key = 'seo'");
@@ -7581,8 +8746,10 @@ try {
 } catch {
 }
 import_dotenv2.default.config();
-if (!process.env.DATABASE_URL && import_fs2.default.existsSync("env.txt")) {
-  import_dotenv2.default.config({ path: "env.txt" });
+var entryScript = process.argv[1] || "";
+var isCompiledBundle = entryScript.endsWith(".cjs") || entryScript.endsWith(".js");
+if (isCompiledBundle && !process.env.NODE_ENV) {
+  process.env.NODE_ENV = "production";
 }
 process.on("uncaughtException", (err) => {
   console.warn("[Server] Uncaught exception trapped:", err?.message || err);
@@ -7592,14 +8759,17 @@ process.on("unhandledRejection", (reason) => {
 });
 function isPortAvailable(port) {
   return new Promise((resolve) => {
-    const tester = import_net.default.createServer().once("error", () => resolve(false)).once("listening", () => {
+    const tester = import_net2.default.createServer().once("error", () => resolve(false)).once("listening", () => {
       tester.close(() => resolve(true));
     }).listen(port);
   });
 }
-async function findAvailablePort(defaultPort) {
+async function findAvailablePort(defaultPort, isProduction) {
   if (process.env.PORT) {
     return Number(process.env.PORT);
+  }
+  if (isProduction) {
+    return defaultPort;
   }
   for (let port = defaultPort; port < defaultPort + 20; port++) {
     if (await isPortAvailable(port)) {
@@ -7608,26 +8778,49 @@ async function findAvailablePort(defaultPort) {
   }
   return defaultPort;
 }
+function resolveDistDirectory() {
+  const candidates = [
+    import_path.default.join(process.cwd(), "dist"),
+    typeof __dirname !== "undefined" ? __dirname : "",
+    typeof __dirname !== "undefined" ? import_path.default.resolve(__dirname, "dist") : ""
+  ].filter(Boolean);
+  for (const dir of candidates) {
+    if (import_fs.default.existsSync(import_path.default.join(dir, "index.html"))) {
+      return dir;
+    }
+  }
+  return import_path.default.join(process.cwd(), "dist");
+}
 async function startServer() {
+  const isProduction = process.env.NODE_ENV === "production" || isCompiledBundle;
   const app = await createApp();
   const defaultPort = 3e3;
-  const PORT = await findAvailablePort(defaultPort);
+  const PORT = await findAvailablePort(defaultPort, isProduction);
   if (PORT !== defaultPort && !process.env.PORT) {
-    console.warn(`[Server] Port ${defaultPort} is currently in use or reserved by another process (e.g. Docker/WSL).`);
-    console.warn(`[Server] Automatically switching to port ${PORT} to prevent connection hang.`);
+    console.warn(`[Server] Port ${defaultPort} is currently in use.`);
+    console.warn(`[Server] Automatically switching to port ${PORT}.`);
   }
   const httpServer = import_http.default.createServer(app);
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await (0, import_vite.createServer)({
+  if (!isProduction) {
+    const { createServer: createViteServer } = await import("vite");
+    const vite = await createViteServer({
       server: {
         middlewareMode: true,
-        hmr: process.env.DISABLE_HMR === "true" ? false : { server: httpServer }
+        hmr: { server: httpServer }
       },
       appType: "spa"
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = import_path.default.join(process.cwd(), "dist");
+    const distPath = resolveDistDirectory();
+    app.use((req, res, next) => {
+      const lowerPath = req.path.toLowerCase();
+      if (lowerPath.endsWith("/server.cjs") || lowerPath.endsWith(".cjs.map") || lowerPath.endsWith(".map")) {
+        res.status(404).end();
+        return;
+      }
+      next();
+    });
     app.use(import_express2.default.static(distPath));
     app.get("*", (_req, res) => {
       res.sendFile(import_path.default.join(distPath, "index.html"));
@@ -7635,7 +8828,7 @@ async function startServer() {
   }
   httpServer.listen(PORT, "0.0.0.0", () => {
     console.log(`
-  \u{1F680} Trek Consultancy Forum server is running:`);
+  \u{1F680} Trek Consultancy Forum server is running (${isProduction ? "production" : "development"}):`);
     console.log(`  \u279C  Local:   http://localhost:${PORT}/`);
     console.log(`  \u279C  Network: http://127.0.0.1:${PORT}/`);
     console.log(`  \u279C  API:     http://localhost:${PORT}/api/health
