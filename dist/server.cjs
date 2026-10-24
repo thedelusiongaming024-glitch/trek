@@ -447,17 +447,56 @@ var DEFAULT_PROVIDER_BASE_URLS = {
   openai: "https://api.openai.com/v1"
 };
 var TOP_AI_MODELS = [
-  // Google Gemini (Gemini 3 Family)
+  // Google Gemini (Gemini Family)
+  {
+    id: "gemini-3.5-flash-lite",
+    name: "Gemini 3.5 Flash-Lite",
+    provider: "gemini",
+    tagline: "Ultra-low latency instant intelligence (Recommended Default)",
+    speed: "Ultra Fast (1-2s)",
+    intelligence: "High",
+    contextWindow: "1M Tokens",
+    badge: "DEFAULT / ULTRA FAST",
+    badgeColor: "emerald",
+    capabilities: ["Instant Chat", "Executive Support", "High Concurrency", "Multilingual"],
+    description: "Extremely lightweight, instantaneous model engineered for rapid-fire chat widgets and real-time client consultations with zero thinking delays."
+  },
+  {
+    id: "gemini-flash-lite-latest",
+    name: "Gemini Flash-Lite Latest",
+    provider: "gemini",
+    tagline: "Continuous fast workhorse for live conversations",
+    speed: "Ultra Fast",
+    intelligence: "High",
+    contextWindow: "1M Tokens",
+    badge: "FASTEST",
+    badgeColor: "teal",
+    capabilities: ["Instant Reply", "FAQ Matching", "High Concurrency"],
+    description: "Continuously updated fast-path model for high-speed client interactions."
+  },
+  {
+    id: "gemini-3.5-flash",
+    name: "Gemini 3.5 Flash",
+    provider: "gemini",
+    tagline: "Balanced, highly efficient multimodal intelligence",
+    speed: "Fast",
+    intelligence: "Very High",
+    contextWindow: "1M Tokens",
+    badge: "BALANCED",
+    badgeColor: "slate",
+    capabilities: ["Community Support", "Knowledge Retrieval", "Multilingual"],
+    description: "Reliable and cost-effective daily driver for customer conversations and FAQ document indexing."
+  },
   {
     id: "gemini-3.8-flash",
     name: "Gemini 3.8 Flash",
     provider: "gemini",
-    tagline: "Flagship workhorse with long-horizon reasoning & agentic execution (Google Default)",
-    speed: "Ultra Fast",
-    intelligence: "Very High",
+    tagline: "Flagship workhorse with long-horizon reasoning & agentic execution",
+    speed: "Moderate",
+    intelligence: "Maximum",
     contextWindow: "1M Tokens",
-    badge: "DEFAULT",
-    badgeColor: "emerald",
+    badge: "DEEP REASONING",
+    badgeColor: "purple",
     capabilities: ["General Support", "Enterprise Advisory", "Agentic Workflows", "Multilingual"],
     description: "Google state-of-the-art workhorse model optimized for high-speed multi-step reasoning, customer support, and autonomous assistance."
   },
@@ -473,45 +512,6 @@ var TOP_AI_MODELS = [
     badgeColor: "indigo",
     capabilities: ["Statutory Compliance", "MISA Licensing", "Contract Analysis", "Complex Logic"],
     description: "Designed for intricate business consulting, statutory compliance, legal frameworks, and executive decision-making with a massive 2M token context window."
-  },
-  {
-    id: "gemini-3.7-flash",
-    name: "Gemini 3.7 Flash",
-    provider: "gemini",
-    tagline: "Advanced reasoning with high-throughput response speed",
-    speed: "Very Fast",
-    intelligence: "Very High",
-    contextWindow: "1M Tokens",
-    badge: "FAST REASONING",
-    badgeColor: "purple",
-    capabilities: ["High Throughput", "Multi-step Logic", "Fast Response"],
-    description: "Frontier reasoning model combining deep analysis with low latency for interactive client consultations."
-  },
-  {
-    id: "gemini-3.5-flash",
-    name: "Gemini 3.5 Flash",
-    provider: "gemini",
-    tagline: "Balanced, highly efficient multimodal intelligence",
-    speed: "Fast",
-    intelligence: "High",
-    contextWindow: "1M Tokens",
-    badge: "BALANCED",
-    badgeColor: "slate",
-    capabilities: ["Community Support", "Knowledge Retrieval", "Multilingual"],
-    description: "Reliable and cost-effective daily driver for customer conversations and FAQ document indexing."
-  },
-  {
-    id: "gemini-3.5-flash-lite",
-    name: "Gemini 3.5 Flash-Lite",
-    provider: "gemini",
-    tagline: "Ultra-low latency lightweight intelligence for instant chat",
-    speed: "Instant",
-    intelligence: "Standard",
-    contextWindow: "1M Tokens",
-    badge: "ULTRA FAST",
-    badgeColor: "teal",
-    capabilities: ["Instant Reply", "FAQ Matching", "High Concurrency"],
-    description: "Extremely lightweight, instantaneous model engineered for rapid-fire chat widgets and high-concurrency traffic."
   },
   // OpenAI
   {
@@ -585,14 +585,15 @@ var defaultAiSettings = {
   apiKey: "",
   baseUrl: "",
   providerApiKeys: {},
-  selectedModel: "gemini-3.8-flash",
-  fallbackModels: ["gemini-3.7-flash", "gemini-3.5-flash", "gpt-4o-mini", "gpt-4o"],
+  selectedModel: "gemini-3.5-flash-lite",
+  fallbackModels: ["gemini-flash-lite-latest", "gemini-3.5-flash", "gpt-4o-mini", "gpt-4o"],
   temperature: 0.4,
   maxOutputTokens: 2048,
   customSystemInstruction: "",
   status: "active",
   lastTestStatus: "untested",
-  enableWebSearch: true,
+  enableWebSearch: false,
+  // Default false to prevent 429 quota exhaustion and 30s delay
   enableUrlBrowsing: true
 };
 var realPool = null;
@@ -2534,7 +2535,7 @@ async function getEffectiveAiRuntime() {
   if (!baseUrl || dbConfig.provider !== provider) {
     baseUrl = DEFAULT_PROVIDER_BASE_URLS[provider] || (provider === "openai" ? "https://api.openai.com/v1" : "https://generativelanguage.googleapis.com");
   }
-  const selectedModel = (dbConfig.selectedModel && dbConfig.provider === provider ? dbConfig.selectedModel : provider === "gemini" ? "gemini-3.8-flash" : "gpt-4o-mini").trim();
+  const selectedModel = (dbConfig.selectedModel && dbConfig.provider === provider ? dbConfig.selectedModel : provider === "gemini" ? "gemini-3.5-flash-lite" : "gpt-4o-mini").trim();
   const rawFallbacks = Array.isArray(dbConfig.fallbackModels) ? dbConfig.fallbackModels : [];
   const fallbackModels = rawFallbacks.filter((m) => m && m !== selectedModel);
   const candidateModels = [selectedModel, ...fallbackModels];
@@ -2588,7 +2589,7 @@ ${msg.content}`;
       contents.shift();
     }
     const tools = [];
-    if (enableWebSearch !== false) {
+    if (enableWebSearch === true) {
       tools.push({ googleSearch: {} });
     }
     try {
@@ -2607,8 +2608,10 @@ ${msg.content}`;
       );
       return { text: (response.text || "").trim(), model };
     } catch (geminiErr) {
-      if (tools.length > 0) {
-        console.warn(`[AI Engine] Gemini Google Search grounding call failed for ${model}, retrying without search tool:`, geminiErr?.message);
+      const errStr = String(geminiErr?.message || "");
+      const isQuotaOrToolError = errStr.includes("429") || errStr.includes("RESOURCE_EXHAUSTED") || errStr.includes("quota");
+      if (tools.length > 0 || isQuotaOrToolError) {
+        console.warn(`[AI Engine] Gemini Google Search grounding call failed for ${model} (${isQuotaOrToolError ? "quota exhausted" : "fallback"}), retrying without search tool:`, errStr.slice(0, 100));
         const retryResponse = await withTimeout(
           ai.models.generateContent({
             model,
@@ -2619,7 +2622,7 @@ ${msg.content}`;
               maxOutputTokens: maxTokens
             }
           }),
-          timeoutMs
+          Math.min(timeoutMs, 7e3)
         );
         return { text: (retryResponse.text || "").trim(), model };
       }
@@ -6692,8 +6695,8 @@ ${aiRuntime.customSystemInstruction}` : systemInstruction;
               messages: multiTurnMessages,
               temperature: aiRuntime.temperature,
               maxTokens: Math.min(aiRuntime.maxOutputTokens, 2048),
-              timeoutMs: 16e3,
-              enableWebSearch: aiRuntime.enableWebSearch !== false
+              timeoutMs: 8e3,
+              enableWebSearch: aiRuntime.enableWebSearch === true
             });
             if (aiResult.text && !/^(?:1\.\s+)?\*\*(?:Analyze User Input|Analyze Input)/i.test(aiResult.text)) {
               botReply = aiResult.text.trim();
@@ -8253,8 +8256,8 @@ ${textPayload.slice(0, 12e4)}`
             typeof k === "string" && k.length > 8 ? `${k.slice(0, 4)}...${k.slice(-4)}` : k ? "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" : ""
           ])
         ),
-        selectedModel: dbConfig.selectedModel || (currentProvider === "gemini" ? "gemini-3.8-flash" : "gpt-4o-mini"),
-        fallbackModels: Array.isArray(dbConfig.fallbackModels) ? dbConfig.fallbackModels : ["gemini-3.7-flash", "gemini-3.5-flash"],
+        selectedModel: dbConfig.selectedModel || (currentProvider === "gemini" ? "gemini-3.5-flash-lite" : "gpt-4o-mini"),
+        fallbackModels: Array.isArray(dbConfig.fallbackModels) ? dbConfig.fallbackModels : ["gemini-flash-lite-latest", "gemini-3.5-flash"],
         temperature: typeof dbConfig.temperature === "number" ? dbConfig.temperature : 0.4,
         maxOutputTokens: typeof dbConfig.maxOutputTokens === "number" ? dbConfig.maxOutputTokens : 2048,
         customSystemInstruction: dbConfig.customSystemInstruction || "",
@@ -8326,7 +8329,7 @@ ${textPayload.slice(0, 12e4)}`
         baseUrl: typeof baseUrl === "string" && baseUrl.trim() ? baseUrl.trim() : DEFAULT_PROVIDER_BASE_URLS[newProvider] || (newProvider === "openai" ? "https://api.openai.com/v1" : "https://generativelanguage.googleapis.com"),
         providerApiKeys: sanitizedProviderKeys,
         apiKey: activeKeyForProvider,
-        selectedModel: selectedModel || (newProvider === "gemini" ? "gemini-3.8-flash" : "gpt-4o-mini"),
+        selectedModel: selectedModel || (newProvider === "gemini" ? "gemini-3.5-flash-lite" : "gpt-4o-mini"),
         fallbackModels: Array.isArray(fallbackModels) ? fallbackModels : currentConfig.fallbackModels,
         temperature: typeof temperature === "number" ? Math.max(0, Math.min(1, temperature)) : currentConfig.temperature,
         maxOutputTokens: typeof maxOutputTokens === "number" ? Math.max(256, Math.min(8192, maxOutputTokens)) : currentConfig.maxOutputTokens,
@@ -8398,7 +8401,7 @@ ${textPayload.slice(0, 12e4)}`
           message: `No API key configured for provider "${provider}". Please enter an API key to test.`
         });
       }
-      const defaultModelForProvider = provider === "gemini" ? "gemini-3.8-flash" : "gpt-4o-mini";
+      const defaultModelForProvider = provider === "gemini" ? "gemini-3.5-flash-lite" : "gpt-4o-mini";
       const testModel = (inputModel || (dbConfig.provider === provider ? dbConfig.selectedModel : defaultModelForProvider) || defaultModelForProvider).trim();
       const startTime = Date.now();
       const result = await executeAiCompletion({

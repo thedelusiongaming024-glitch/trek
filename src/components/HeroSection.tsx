@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, X, ChevronLeft, ChevronRight, TrendingUp, Shield, Users, Sparkles } from 'lucide-react';
+import { Search, X, ChevronLeft, ChevronRight, Shield, Users, Sparkles } from 'lucide-react';
 import { HeroSettings } from '../types';
 import { defaultAdminHeroSettings } from '../utils/heroDefaults';
 import { useLanguage } from '../context/LanguageContext';
@@ -8,24 +8,13 @@ import { normalizeImageUrl, getAlternativeImageUrl, DEFAULT_HERO_FALLBACK } from
 interface HeroSectionProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
-  onSelectTag?: (tag: string) => void;
   heroSettings?: HeroSettings;
   children?: React.ReactNode;
 }
 
-const DEFAULT_TRENDING_TAGS = [
-  'Cloud Architecture',
-  'React & Vite',
-  'DevOps & CI/CD',
-  'Database Scaling',
-  'Microservices',
-  'Enterprise Security'
-];
-
 export const HeroSection: React.FC<HeroSectionProps> = ({
   searchQuery,
   onSearchChange,
-  onSelectTag,
   heroSettings,
   children
 }) => {
@@ -97,14 +86,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   const subtitleText = heroSettings?.subtitle !== undefined ? heroSettings.subtitle : defaultAdminHeroSettings.subtitle;
   const searchPlaceholder = heroSettings?.searchPlaceholder || defaultAdminHeroSettings.searchPlaceholder || 'Search for Topics, Solutions, & Guides....';
 
-  const handleTagClick = (tag: string) => {
-    if (onSelectTag) {
-      onSelectTag(tag);
-    } else {
-      onSearchChange(tag);
-    }
-  };
-
   return (
     <div 
       className={`relative overflow-hidden select-none flex flex-col justify-between ${heroHeightClass}`}
@@ -128,7 +109,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 alt={slide.title || 'Hero Background'}
                 referrerPolicy="no-referrer"
                 className={`w-full h-full object-cover object-center transform-gpu will-change-transform transition-transform duration-[7000ms] ease-out ${
-                  isZoomEffect && isActive ? 'scale-[1.08]' : 'scale-100'
+                  isZoomEffect && isActive ? 'sm:scale-[1.08] scale-100' : 'scale-100'
                 }`}
                 loading={index === 0 ? 'eager' : 'lazy'}
                 onError={(e) => {
@@ -159,32 +140,34 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
       </div>
 
       {/* Center Region: Main Hero Foreground Content */}
-      <div className="relative max-w-4xl mx-auto px-4 sm:px-6 text-center z-10 my-auto py-8">
+      <div className="relative max-w-4xl mx-auto px-3 sm:px-6 text-center z-10 my-auto py-6 sm:py-8 w-full max-w-full">
         {/* Slide Title / Category Badge if current slide has one */}
         {activeSlides.length > 0 && activeSlides[currentIndex]?.title && (
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-black/60 hover:bg-black/75 backdrop-blur-md border border-white/30 text-xs sm:text-sm font-semibold text-white mb-4 animate-fade-in shadow-xl">
-            <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
-            <span>{t(activeSlides[currentIndex].title)}</span>
+          <div className="inline-flex items-center gap-2 px-3 sm:px-3.5 py-1 sm:py-1.5 rounded-full bg-black/60 hover:bg-black/75 backdrop-blur-md border border-white/30 text-[11px] sm:text-sm font-semibold text-white mb-3 sm:mb-4 animate-fade-in shadow-xl max-w-[90vw] truncate">
+            <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-teal-400 animate-pulse shrink-0" />
+            <span className="truncate">{t(activeSlides[currentIndex].title)}</span>
           </div>
         )}
 
-        {/* Main Heading: Crystal Clear with High-Contrast Text Drop Shadow */}
-        <h1 className="text-3xl sm:text-5xl md:text-6xl font-black text-white tracking-tight mb-4 sm:mb-6 font-heading drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)] px-2 leading-tight sm:leading-tight">
-          {t(headingText)}
+        {/* Main Heading: Logo Brand Color Gradient with Directional Crisp Shadow */}
+        <h1 className="text-2xl xs:text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-black tracking-tight mb-3 sm:mb-6 font-heading px-1 sm:px-2 leading-tight sm:leading-tight hero-heading-shadow break-words [overflow-wrap:anywhere] max-w-full">
+          <span className="bg-gradient-to-r from-white via-[#22d3ee] to-[#fb923c] bg-clip-text text-transparent inline-block max-w-full">
+            {t(headingText)}
+          </span>
         </h1>
 
         {/* Optional Subtitle */}
         {subtitleText && (
-          <p className="max-w-2xl mx-auto text-base sm:text-lg text-white font-medium mb-8 sm:mb-10 px-4 drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)] leading-relaxed">
+          <p className="max-w-2xl mx-auto text-xs sm:text-base md:text-lg text-white font-medium mb-6 sm:mb-10 px-2 sm:px-4 hero-subtitle-shadow leading-relaxed break-words [overflow-wrap:anywhere]">
             {t(subtitleText)}
           </p>
         )}
 
         {/* Enhanced Search Bar Container */}
-        <div className="max-w-2xl sm:max-w-3xl mx-auto px-1 sm:px-0">
-          <div className="relative flex items-center bg-white/95 backdrop-blur-2xl rounded-2xl sm:rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.15)] border border-white/80 transition-all focus-within:ring-3 focus-within:ring-teal-400 focus-within:border-transparent">
-            <div className="pl-4 sm:pl-5 pr-2 rtl:pl-2 rtl:pr-4 sm:rtl:pr-5 py-4 sm:py-5 text-slate-400">
-              <Search className="w-5 h-5 sm:w-6 sm:h-6 text-teal-600" />
+        <div className="max-w-2xl sm:max-w-3xl mx-auto px-2 sm:px-0 w-full">
+          <div className="relative flex items-center bg-white/95 backdrop-blur-2xl rounded-2xl sm:rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.15)] border border-white/80 transition-all focus-within:ring-3 focus-within:ring-teal-400 focus-within:border-transparent w-full">
+            <div className="pl-3.5 sm:pl-5 pr-2 rtl:pl-2 rtl:pr-3.5 sm:rtl:pr-5 py-3.5 sm:py-5 text-slate-400 shrink-0">
+              <Search className="w-4 h-4 sm:w-6 sm:h-6 text-teal-600" />
             </div>
 
             <input
@@ -193,45 +176,27 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder={t(searchPlaceholder)}
-              className="w-full py-4 sm:py-5 pr-12 rtl:pr-0 rtl:pl-12 text-slate-900 placeholder-slate-400 text-base sm:text-lg font-normal bg-transparent focus:outline-none"
+              className="w-full py-3.5 sm:py-5 pr-10 rtl:pr-0 rtl:pl-10 text-slate-900 placeholder-slate-400 text-base font-normal bg-transparent focus:outline-none min-w-0"
             />
 
             {searchQuery && (
               <button
                 onClick={() => onSearchChange('')}
-                className="absolute right-4 rtl:right-auto rtl:left-4 p-1.5 text-slate-400 hover:text-slate-600 transition-colors rounded-full cursor-pointer min-w-[36px] min-h-[36px] flex items-center justify-center"
+                className="absolute right-3 rtl:right-auto rtl:left-3 p-1.5 text-slate-400 hover:text-slate-600 transition-colors rounded-full cursor-pointer min-w-[32px] min-h-[32px] flex items-center justify-center shrink-0"
                 title={t('Clear search', 'অনুসন্ধান মুছুন', 'مسح البحث')}
               >
                 <X className="w-4 h-4" />
               </button>
             )}
           </div>
-
-          {/* Quick Trending / Popular Filter Tags */}
-          <div className="flex flex-wrap items-center justify-center gap-2 mt-4 sm:mt-5 px-2">
-            <span className="inline-flex items-center gap-1 text-[11px] sm:text-xs font-bold text-white mr-1 drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]">
-              <TrendingUp className="w-3.5 h-3.5 text-teal-400" />
-              <span>{t('Trending:')}</span>
-            </span>
-            {DEFAULT_TRENDING_TAGS.map((tag) => (
-              <button
-                key={tag}
-                type="button"
-                onClick={() => handleTagClick(tag)}
-                className="px-2.5 sm:px-3 py-1 rounded-full text-[11px] sm:text-xs font-semibold bg-black/50 hover:bg-black/75 active:scale-95 text-white border border-white/25 backdrop-blur-md transition-all cursor-pointer shadow-md"
-              >
-                {t(tag)}
-              </button>
-            ))}
-          </div>
         </div>
       </div>
 
       {/* Bottom Region: Slide Indicators & Enterprise Highlights Strip */}
-      <div className="relative z-20 max-w-5xl mx-auto px-4 sm:px-6 w-full pt-4 pb-2">
+      <div className="relative z-20 max-w-5xl mx-auto px-3 sm:px-6 w-full pt-3 sm:pt-4 pb-2">
         {/* Interactive Slide Indicator Dots & Prev/Next Chevrons */}
         {activeSlides.length > 1 && (
-          <div className="flex items-center justify-center gap-3 mb-6">
+          <div className="flex items-center justify-center gap-2 sm:gap-3 mb-4 sm:mb-6">
             <button
               onClick={() => setCurrentIndex(prev => (prev === 0 ? activeSlides.length - 1 : prev - 1))}
               className="p-1.5 rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur-md transition-colors cursor-pointer border border-white/20 shadow-lg"
@@ -268,7 +233,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
         )}
 
         {/* Minimalist Corporate Credibility Badges */}
-        <div className="hidden sm:flex items-center justify-center gap-6 md:gap-10 text-[11px] md:text-xs text-white font-semibold pt-2 border-t border-white/20 drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
+        <div className="hidden sm:flex items-center justify-center gap-6 md:gap-10 text-[11px] md:text-xs text-white font-semibold pt-2 border-t border-white/20 drop-shadow-[1px_2px_2px_rgba(0,0,0,0.95)]">
           <div className="flex items-center gap-1.5">
             <Shield className="w-3.5 h-3.5 text-teal-400" />
             <span>{t('Trek Enterprise Advisory')}</span>

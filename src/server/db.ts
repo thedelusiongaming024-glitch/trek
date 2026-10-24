@@ -161,17 +161,56 @@ export const DEFAULT_PROVIDER_BASE_URLS: Record<string, string> = {
 };
 
 export const TOP_AI_MODELS = [
-  // Google Gemini (Gemini 3 Family)
+  // Google Gemini (Gemini Family)
+  {
+    id: 'gemini-3.5-flash-lite',
+    name: 'Gemini 3.5 Flash-Lite',
+    provider: 'gemini',
+    tagline: 'Ultra-low latency instant intelligence (Recommended Default)',
+    speed: 'Ultra Fast (1-2s)',
+    intelligence: 'High',
+    contextWindow: '1M Tokens',
+    badge: 'DEFAULT / ULTRA FAST',
+    badgeColor: 'emerald',
+    capabilities: ['Instant Chat', 'Executive Support', 'High Concurrency', 'Multilingual'],
+    description: 'Extremely lightweight, instantaneous model engineered for rapid-fire chat widgets and real-time client consultations with zero thinking delays.'
+  },
+  {
+    id: 'gemini-flash-lite-latest',
+    name: 'Gemini Flash-Lite Latest',
+    provider: 'gemini',
+    tagline: 'Continuous fast workhorse for live conversations',
+    speed: 'Ultra Fast',
+    intelligence: 'High',
+    contextWindow: '1M Tokens',
+    badge: 'FASTEST',
+    badgeColor: 'teal',
+    capabilities: ['Instant Reply', 'FAQ Matching', 'High Concurrency'],
+    description: 'Continuously updated fast-path model for high-speed client interactions.'
+  },
+  {
+    id: 'gemini-3.5-flash',
+    name: 'Gemini 3.5 Flash',
+    provider: 'gemini',
+    tagline: 'Balanced, highly efficient multimodal intelligence',
+    speed: 'Fast',
+    intelligence: 'Very High',
+    contextWindow: '1M Tokens',
+    badge: 'BALANCED',
+    badgeColor: 'slate',
+    capabilities: ['Community Support', 'Knowledge Retrieval', 'Multilingual'],
+    description: 'Reliable and cost-effective daily driver for customer conversations and FAQ document indexing.'
+  },
   {
     id: 'gemini-3.8-flash',
     name: 'Gemini 3.8 Flash',
     provider: 'gemini',
-    tagline: 'Flagship workhorse with long-horizon reasoning & agentic execution (Google Default)',
-    speed: 'Ultra Fast',
-    intelligence: 'Very High',
+    tagline: 'Flagship workhorse with long-horizon reasoning & agentic execution',
+    speed: 'Moderate',
+    intelligence: 'Maximum',
     contextWindow: '1M Tokens',
-    badge: 'DEFAULT',
-    badgeColor: 'emerald',
+    badge: 'DEEP REASONING',
+    badgeColor: 'purple',
     capabilities: ['General Support', 'Enterprise Advisory', 'Agentic Workflows', 'Multilingual'],
     description: 'Google state-of-the-art workhorse model optimized for high-speed multi-step reasoning, customer support, and autonomous assistance.'
   },
@@ -187,45 +226,6 @@ export const TOP_AI_MODELS = [
     badgeColor: 'indigo',
     capabilities: ['Statutory Compliance', 'MISA Licensing', 'Contract Analysis', 'Complex Logic'],
     description: 'Designed for intricate business consulting, statutory compliance, legal frameworks, and executive decision-making with a massive 2M token context window.'
-  },
-  {
-    id: 'gemini-3.7-flash',
-    name: 'Gemini 3.7 Flash',
-    provider: 'gemini',
-    tagline: 'Advanced reasoning with high-throughput response speed',
-    speed: 'Very Fast',
-    intelligence: 'Very High',
-    contextWindow: '1M Tokens',
-    badge: 'FAST REASONING',
-    badgeColor: 'purple',
-    capabilities: ['High Throughput', 'Multi-step Logic', 'Fast Response'],
-    description: 'Frontier reasoning model combining deep analysis with low latency for interactive client consultations.'
-  },
-  {
-    id: 'gemini-3.5-flash',
-    name: 'Gemini 3.5 Flash',
-    provider: 'gemini',
-    tagline: 'Balanced, highly efficient multimodal intelligence',
-    speed: 'Fast',
-    intelligence: 'High',
-    contextWindow: '1M Tokens',
-    badge: 'BALANCED',
-    badgeColor: 'slate',
-    capabilities: ['Community Support', 'Knowledge Retrieval', 'Multilingual'],
-    description: 'Reliable and cost-effective daily driver for customer conversations and FAQ document indexing.'
-  },
-  {
-    id: 'gemini-3.5-flash-lite',
-    name: 'Gemini 3.5 Flash-Lite',
-    provider: 'gemini',
-    tagline: 'Ultra-low latency lightweight intelligence for instant chat',
-    speed: 'Instant',
-    intelligence: 'Standard',
-    contextWindow: '1M Tokens',
-    badge: 'ULTRA FAST',
-    badgeColor: 'teal',
-    capabilities: ['Instant Reply', 'FAQ Matching', 'High Concurrency'],
-    description: 'Extremely lightweight, instantaneous model engineered for rapid-fire chat widgets and high-concurrency traffic.'
   },
 
   // OpenAI
@@ -301,14 +301,14 @@ export const defaultAiSettings = {
   apiKey: '',
   baseUrl: '',
   providerApiKeys: {} as Record<string, string>,
-  selectedModel: 'gemini-3.8-flash',
-  fallbackModels: ['gemini-3.7-flash', 'gemini-3.5-flash', 'gpt-4o-mini', 'gpt-4o'],
+  selectedModel: 'gemini-3.5-flash-lite',
+  fallbackModels: ['gemini-flash-lite-latest', 'gemini-3.5-flash', 'gpt-4o-mini', 'gpt-4o'],
   temperature: 0.4,
   maxOutputTokens: 2048,
   customSystemInstruction: '',
   status: 'active',
   lastTestStatus: 'untested',
-  enableWebSearch: true,
+  enableWebSearch: false, // Default false to prevent 429 quota exhaustion and 30s delay
   enableUrlBrowsing: true
 };
 

@@ -142,9 +142,45 @@
   box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.06);
 }
 
+/* Authentic 3D Directional Text Shadow: Stepped extrusion for physical 3D depth + directional cast shadow */
+.hero-heading-shadow {
+  filter: 
+    drop-shadow(1px 1.5px 0px rgba(0, 0, 0, 0.98))
+    drop-shadow(1px 1.5px 0px rgba(0, 0, 0, 0.92))
+    drop-shadow(1px 1.5px 0.5px rgba(0, 0, 0, 0.85))
+    drop-shadow(1.5px 2px 2.5px rgba(0, 0, 0, 0.65));
+}
+
+.hero-subtitle-shadow {
+  filter: 
+    drop-shadow(1px 1px 0px rgba(0, 0, 0, 0.95))
+    drop-shadow(1px 1.5px 1.5px rgba(0, 0, 0, 0.8));
+}
+
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+  width: 100%;
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+@media (min-width: 769px) {
+  html {
+    scrollbar-gutter: stable;
+  }
+}
+
 html {
-  scrollbar-gutter: stable;
   scroll-behavior: auto;
+}
+
+/* Prevent unwanted mobile auto-zoom on input focus */
+@media (max-width: 768px) {
+  input, textarea, select {
+    font-size: 16px !important;
+  }
 }
 
 /* Enhanced Glass Navbar: Frosted Luxury White with Hardware-Accelerated Transition */

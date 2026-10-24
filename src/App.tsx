@@ -17,7 +17,6 @@ import { NotificationModal } from './components/NotificationModal';
 import { AdminPanel } from './components/admin/AdminPanel';
 import { AdminLogin } from './components/admin/AdminLogin';
 import { defaultAdminHeroSettings } from './utils/heroDefaults';
-import trekSaudiBg from './assets/trek-saudi-bg.png';
 import { useLanguage } from './context/LanguageContext';
 import { normalizeUrl } from './utils/url';
 import { 
@@ -426,17 +425,6 @@ export default function App() {
   useEffect(() => {
     applySeoToDocument(seoSettings);
   }, [seoSettings]);
-
-  // Preload and GPU-decode post-hero wallpaper on mount so first scroll is instant with zero stutter
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const img = new Image();
-      img.src = trekSaudiBg;
-      if (typeof img.decode === 'function') {
-        img.decode().catch(() => {});
-      }
-    }
-  }, []);
 
   const handleAdminLogin = (user: { id?: string; name: string; email: string; role: string; avatar?: string }) => {
     const fullUser = {
@@ -1905,12 +1893,21 @@ export default function App() {
     }
   };
 
-  // Tag Selected from Hero
+  // Tag / Topic Selected from Hero
   const handleSelectTag = (tag: string) => {
-    setSearchQuery(tag);
-    const forumEl = document.getElementById('forum');
-    if (forumEl) {
-      forumEl.scrollIntoView({ behavior: 'smooth' });
+    const found = topics.find(
+      (t) =>
+        t.title.toLowerCase().trim() === tag.toLowerCase().trim() ||
+        t.title.toLowerCase().includes(tag.toLowerCase())
+    );
+    if (found) {
+      handleSelectTopic(found);
+    } else {
+      setSearchQuery(tag);
+      const forumEl = document.getElementById('forum');
+      if (forumEl) {
+        forumEl.scrollIntoView({ behavior: 'smooth' });
+      }
     }
   };
 
@@ -2029,7 +2026,7 @@ export default function App() {
         )
       ) : (
         /* Public Community View */
-        <main className="relative">
+        <main className="relative overflow-x-hidden w-full max-w-full">
           {/* Floating Glassmorphic Pill Navbar matching user reference */}
           <Navbar
             onOpenAuth={() => triggerAuthModal(undefined, 'login')}
@@ -2054,29 +2051,19 @@ export default function App() {
           <HeroSection
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
-            onSelectTag={handleSelectTag}
             heroSettings={heroSettings}
           />
 
-          {/* Post-Hero Container with GPU-Accelerated Hardware Background */}
-          <div className="relative bg-[#08151f]">
-            {/* Sticky Viewport Background Layer (Zero-Repaint GPU Compositor Parallax) */}
+          {/* Post-Hero Container with Ambient Brand Mesh Glows */}
+          <div className="relative overflow-x-hidden w-full max-w-full">
+            {/* Ambient Brand Mesh / Glow Accents matching project theme */}
             <div 
-              className="sticky top-0 left-0 w-full h-screen overflow-hidden pointer-events-none select-none z-0 -mb-[100vh]"
+              className="absolute inset-0 pointer-events-none overflow-hidden select-none z-0 max-w-full"
               aria-hidden="true"
             >
-              {/* High-Tech Custom Wallpaper Layer with 100% GPU Acceleration */}
-              <div 
-                className="absolute inset-0 bg-center bg-no-repeat bg-cover transform-gpu will-change-transform opacity-100"
-                style={{ 
-                  backgroundImage: `url(${trekSaudiBg})`,
-                  backgroundPosition: 'center center'
-                }}
-              />
-
-              {/* Seamless Vignette Transitions: Blends smoothly from dark Hero at top and into Footer at bottom */}
-              <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-slate-950/80 to-transparent pointer-events-none" />
-              <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[#1c4447]/80 to-transparent pointer-events-none" />
+              <div className="absolute top-10 right-1/4 w-[500px] h-[500px] bg-teal-500/8 rounded-full blur-[100px] pointer-events-none" />
+              <div className="absolute top-1/2 left-10 w-[600px] h-[600px] bg-cyan-500/6 rounded-full blur-[110px] pointer-events-none" />
+              <div className="absolute bottom-20 right-10 w-[500px] h-[400px] bg-emerald-500/6 rounded-full blur-[100px] pointer-events-none" />
             </div>
 
             {/* Foreground Content */}

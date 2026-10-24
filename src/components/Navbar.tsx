@@ -83,19 +83,19 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <header 
-      className="fixed top-0 left-0 right-0 z-50 flex justify-center pointer-events-none pt-3 sm:pt-4 px-3 sm:px-6 md:px-8"
+      className="fixed top-0 left-0 right-0 z-50 flex justify-center pointer-events-none pt-2.5 sm:pt-4 px-2.5 sm:px-6 md:px-8 max-w-full"
     >
       <div className="w-full max-w-7xl flex flex-col items-center">
         {/* Floating Glassmorphic Pill Capsule Navbar - Pure Light Theme */}
         <nav
-          className={`pointer-events-auto w-full rounded-full transition-[background-color,border-color] duration-200 ease-out flex items-center justify-between transform-gpu py-2.5 px-4 sm:px-6 ${
+          className={`pointer-events-auto w-full rounded-full transition-[background-color,border-color] duration-200 ease-out flex items-center justify-between transform-gpu py-2 sm:py-2.5 px-3 sm:px-6 max-w-full ${
             isScrolled
               ? 'glass-navbar-scrolled'
               : 'glass-navbar'
           }`}
         >
           {/* Left: Brand Logo */}
-          <div className="flex items-center">
+          <div className="flex items-center shrink-0">
             <button
               onClick={() => setActiveNav('home')}
               className="flex items-center text-left focus:outline-none group cursor-pointer shrink-0 py-0.5"
@@ -104,7 +104,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <img
                 src={trekLogo}
                 alt="Trek Consultancy"
-                className="h-8 sm:h-9 md:h-10 w-auto object-contain transition-transform group-hover:scale-105"
+                className="h-7 sm:h-9 md:h-10 w-auto object-contain transition-transform group-hover:scale-105"
               />
             </button>
           </div>
@@ -144,21 +144,21 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
 
           {/* Right: Controls (Profile, Language Switcher, CTA Button) */}
-          <div className="flex items-center gap-2 sm:gap-2.5">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             {/* 1. Account / Profile */}
             {currentUser ? (
               <div className="relative" ref={dropdownRef}>
                 <button
                   onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                  className="inline-flex items-center gap-1.5 sm:gap-2 pl-1.5 pr-2.5 sm:pr-3 py-1 rounded-full bg-white/80 hover:bg-white border border-white/80 text-slate-800 text-xs font-semibold backdrop-blur-md transition-colors duration-150 cursor-pointer shadow-xs"
+                  className="inline-flex items-center gap-1 sm:gap-2 pl-1 pr-1.5 sm:pr-3 py-1 rounded-full bg-white/80 hover:bg-white border border-white/80 text-slate-800 text-xs font-semibold backdrop-blur-md transition-colors duration-150 cursor-pointer shadow-xs shrink-0"
                 >
                   <img
                     src={currentUser.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80'}
                     alt={currentUser.name}
-                    className="w-6 h-6 rounded-full object-cover border border-white"
+                    className="w-5 h-5 sm:w-6 sm:h-6 rounded-full object-cover border border-white shrink-0"
                   />
                   <span className="max-w-[70px] sm:max-w-[100px] truncate hidden sm:inline">{currentUser.name}</span>
-                  <ChevronDown className="w-3 h-3 text-slate-500" />
+                  <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />
                 </button>
 
                 {userDropdownOpen && (
@@ -219,15 +219,15 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             {/* 2. Tri-lingual Language Switcher (🌐 EN | বাং | عر) */}
             <div
-              className="inline-flex items-center gap-0.5 p-0.5 rounded-full bg-white/80 border border-white/80 backdrop-blur-md text-xs font-semibold text-slate-800 shadow-xs"
+              className="inline-flex items-center gap-0.5 p-0.5 rounded-full bg-white/80 border border-white/80 backdrop-blur-md text-[10.5px] sm:text-xs font-semibold text-slate-800 shadow-xs shrink-0"
               aria-label="Language Switcher"
             >
-              <Globe className="w-3.5 h-3.5 text-slate-600 ml-1.5 mr-0.5 rtl:ml-0.5 rtl:mr-1.5 shrink-0" />
-              <div className="flex items-center gap-0.5 text-[11px] font-semibold">
+              <Globe className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-600 ml-1 sm:ml-1.5 mr-0.5 rtl:ml-0.5 rtl:mr-1 sm:rtl:mr-1.5 shrink-0" />
+              <div className="flex items-center gap-0.5 text-[10px] sm:text-[11px] font-semibold">
                 <button
                   type="button"
                   onClick={() => setLanguage('en')}
-                  className={`px-1.5 py-0.5 rounded-full transition-colors duration-150 cursor-pointer ${
+                  className={`px-1 sm:px-1.5 py-0.5 rounded-full transition-colors duration-150 cursor-pointer ${
                     language === 'en'
                       ? 'bg-white text-slate-900 shadow-xs font-bold'
                       : 'text-slate-500 hover:text-slate-700'
@@ -239,7 +239,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <button
                   type="button"
                   onClick={() => setLanguage('bn')}
-                  className={`px-1.5 py-0.5 rounded-full transition-colors duration-150 cursor-pointer ${
+                  className={`px-1 sm:px-1.5 py-0.5 rounded-full transition-colors duration-150 cursor-pointer ${
                     language === 'bn'
                       ? 'bg-white text-teal-800 shadow-xs font-bold'
                       : 'text-slate-500 hover:text-slate-700'
@@ -251,7 +251,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <button
                   type="button"
                   onClick={() => setLanguage('ar')}
-                  className={`px-1.5 py-0.5 rounded-full transition-colors duration-150 cursor-pointer ${
+                  className={`px-1 sm:px-1.5 py-0.5 rounded-full transition-colors duration-150 cursor-pointer ${
                     language === 'ar'
                       ? 'bg-white text-teal-800 shadow-xs font-bold'
                       : 'text-slate-500 hover:text-slate-700'

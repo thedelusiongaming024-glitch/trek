@@ -44,25 +44,27 @@ export const BlogSection: React.FC<BlogSectionProps> = ({
   };
 
   return (
-    <section id="blog" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 sm:pt-28 pb-12 sm:pb-16">
+    <section id="blog" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 sm:pt-28 pb-12 sm:pb-16 w-full overflow-hidden">
       {/* Centered Heading */}
       <div className="text-center mb-10 sm:mb-12">
         <div className="inline-flex items-center gap-2 mb-2">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white tracking-tight font-heading drop-shadow-sm">
-            {t('Trek Consultancy Insights')}
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight font-heading">
+            <span className="bg-gradient-to-r from-slate-900 via-teal-800 to-[#ea580c] bg-clip-text text-transparent">
+              {t('Trek Consultancy Insights')}
+            </span>
           </h2>
           {!currentUser && (
             <button
               type="button"
               onClick={() => onRequireAuth?.('To participate in blog activities, like articles, and read full content, you must have an account and be logged in.')}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-400/20 border border-amber-400/35 text-amber-300 text-[11px] font-semibold hover:bg-amber-400/30 transition-colors cursor-pointer backdrop-blur-md"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-700 text-[11px] font-semibold hover:bg-amber-500/25 transition-colors cursor-pointer"
             >
               <Lock className="w-3 h-3" />
               <span>{t('Login Required to Participate')}</span>
             </button>
           )}
         </div>
-        <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-md mx-auto px-2">
+        <p className="text-xs sm:text-sm text-slate-600 mt-1 max-w-md mx-auto px-2">
           {t('Insights, architectural tutorials, and product documentation from our core engineering team.')}
         </p>
       </div>

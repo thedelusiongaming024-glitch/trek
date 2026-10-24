@@ -158,7 +158,7 @@ export async function getEffectiveAiRuntime() {
   const selectedModel = (
     dbConfig.selectedModel && (dbConfig.provider === provider)
       ? dbConfig.selectedModel
-      : (provider === 'gemini' ? 'gemini-3.8-flash' : 'gpt-4o-mini')
+      : (provider === 'gemini' ? 'gemini-3.5-flash-lite' : 'gpt-4o-mini')
   ).trim();
 
   const rawFallbacks = Array.isArray(dbConfig.fallbackModels) ? dbConfig.fallbackModels : [];
@@ -230,7 +230,7 @@ export async function executeAiCompletion({
 
     // Google Search Grounding tool (Level 1)
     const tools: any[] = [];
-    if (enableWebSearch !== false) {
+    if (enableWebSearch === true) {
       tools.push({ googleSearch: {} });
     }
 
@@ -251,9 +251,11 @@ export async function executeAiCompletion({
 
       return { text: (response.text || '').trim(), model };
     } catch (geminiErr: any) {
-      // Fail-safe resilience: if Google Search grounding fails for this model/tier, retry without tools
-      if (tools.length > 0) {
-        console.warn(`[AI Engine] Gemini Google Search grounding call failed for ${model}, retrying without search tool:`, geminiErr?.message);
+      // Fail-safe resilience: if Google Search grounding fails for this model/tier, retry without tools immediately
+      const errStr = String(geminiErr?.message || '');
+      const isQuotaOrToolError = errStr.includes('429') || errStr.includes('RESOURCE_EXHAUSTED') || errStr.includes('quota');
+      if (tools.length > 0 || isQuotaOrToolError) {
+        console.warn(`[AI Engine] Gemini Google Search grounding call failed for ${model} (${isQuotaOrToolError ? 'quota exhausted' : 'fallback'}), retrying without search tool:`, errStr.slice(0, 100));
         const retryResponse = await withTimeout(
           ai.models.generateContent({
             model,
@@ -264,7 +266,7 @@ export async function executeAiCompletion({
               maxOutputTokens: maxTokens
             }
           }),
-          timeoutMs
+          Math.min(timeoutMs, 7000)
         );
         return { text: (retryResponse.text || '').trim(), model };
       }
@@ -4592,8 +4594,8 @@ Guidelines:
               messages: multiTurnMessages,
               temperature: aiRuntime.temperature,
               maxTokens: Math.min(aiRuntime.maxOutputTokens, 2048),
-              timeoutMs: 16000,
-              enableWebSearch: aiRuntime.enableWebSearch !== false
+              timeoutMs: 8000,
+              enableWebSearch: aiRuntime.enableWebSearch === true
             });
 
             if (aiResult.text && !/^(?:1\.\s+)?\*\*(?:Analyze User Input|Analyze Input)/i.test(aiResult.text)) {
@@ -6467,8 +6469,8 @@ CRITICAL DIRECTIVES FOR MAXIMUM INFORMATION RETENTION:
               typeof k === 'string' && k.length > 8 ? `${k.slice(0, 4)}...${k.slice(-4)}` : (k ? '••••••••' : '')
             ])
         ),
-        selectedModel: dbConfig.selectedModel || (currentProvider === 'gemini' ? 'gemini-3.8-flash' : 'gpt-4o-mini'),
-        fallbackModels: Array.isArray(dbConfig.fallbackModels) ? dbConfig.fallbackModels : ['gemini-3.7-flash', 'gemini-3.5-flash'],
+        selectedModel: dbConfig.selectedModel || (currentProvider === 'gemini' ? 'gemini-3.5-flash-lite' : 'gpt-4o-mini'),
+        fallbackModels: Array.isArray(dbConfig.fallbackModels) ? dbConfig.fallbackModels : ['gemini-flash-lite-latest', 'gemini-3.5-flash'],
         temperature: typeof dbConfig.temperature === 'number' ? dbConfig.temperature : 0.4,
         maxOutputTokens: typeof dbConfig.maxOutputTokens === 'number' ? dbConfig.maxOutputTokens : 2048,
         customSystemInstruction: dbConfig.customSystemInstruction || '',
@@ -6550,7 +6552,7 @@ CRITICAL DIRECTIVES FOR MAXIMUM INFORMATION RETENTION:
         baseUrl: typeof baseUrl === 'string' && baseUrl.trim() ? baseUrl.trim() : (DEFAULT_PROVIDER_BASE_URLS[newProvider] || (newProvider === 'openai' ? 'https://api.openai.com/v1' : 'https://generativelanguage.googleapis.com')),
         providerApiKeys: sanitizedProviderKeys,
         apiKey: activeKeyForProvider,
-        selectedModel: selectedModel || (newProvider === 'gemini' ? 'gemini-3.8-flash' : 'gpt-4o-mini'),
+        selectedModel: selectedModel || (newProvider === 'gemini' ? 'gemini-3.5-flash-lite' : 'gpt-4o-mini'),
         fallbackModels: Array.isArray(fallbackModels) ? fallbackModels : currentConfig.fallbackModels,
         temperature: typeof temperature === 'number' ? Math.max(0, Math.min(1, temperature)) : currentConfig.temperature,
         maxOutputTokens: typeof maxOutputTokens === 'number' ? Math.max(256, Math.min(8192, maxOutputTokens)) : currentConfig.maxOutputTokens,
@@ -6636,7 +6638,7 @@ CRITICAL DIRECTIVES FOR MAXIMUM INFORMATION RETENTION:
         });
       }
 
-      const defaultModelForProvider = provider === 'gemini' ? 'gemini-3.8-flash' : 'gpt-4o-mini';
+      const defaultModelForProvider = provider === 'gemini' ? 'gemini-3.5-flash-lite' : 'gpt-4o-mini';
 
       const testModel = (inputModel || (dbConfig.provider === provider ? dbConfig.selectedModel : defaultModelForProvider) || defaultModelForProvider).trim();
       const startTime = Date.now();

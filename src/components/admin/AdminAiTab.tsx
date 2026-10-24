@@ -55,10 +55,10 @@ const PROVIDERS: ProviderMeta[] = [
     nameAr: 'جوجل جيميني',
     badge: 'GOOGLE DEFAULT',
     badgeColor: 'emerald',
-    description: 'Fast, native multimodal intelligence with 1M-2M context tokens (Gemini 3.8 Flash, 3.1 Pro, 3.7 Flash).',
-    descriptionBn: '১এম-২এম কনটেক্সট উইন্ডো সহ দ্রুত ও কার্যকরী মাল্টিমোডাল এআই (Gemini 3.8 Flash, 3.1 Pro)।',
-    descriptionAr: 'ذكاء اصطناعي متعدد الوسائط فائق السرعة بنافذة سياق ضخمة تصل إلى مليوني رمز.',
-    defaultModel: 'gemini-3.8-flash',
+    description: 'Ultra-fast, native multimodal intelligence with 1M-2M context tokens (Gemini 3.5 Flash-Lite, Flash-Lite Latest, 3.5 Flash).',
+    descriptionBn: '১এম-২এম কনটেক্সট উইন্ডো সহ দ্রুত ও কার্যকরী মাল্টিমোডাল এআই (Gemini 3.5 Flash-Lite, 3.5 Flash)।',
+    descriptionAr: 'ذكاء اصطناعي فائق السرعة متعدد الوسائط بنافذة سياق ضخمة واستجابة فورية.',
+    defaultModel: 'gemini-3.5-flash-lite',
     defaultBaseUrl: 'https://generativelanguage.googleapis.com',
     apiKeyHelpUrl: 'https://aistudio.google.com/app/apikey',
     keyLabel: 'Google Gemini API Key'
@@ -107,13 +107,13 @@ export const AdminAiTab: React.FC<AdminAiTabProps> = ({ onNotify }) => {
   const [usingEnvKey, setUsingEnvKey] = useState<boolean>(false);
 
   // Model & Execution State
-  const [selectedModel, setSelectedModel] = useState<string>('gemini-3.8-flash');
+  const [selectedModel, setSelectedModel] = useState<string>('gemini-3.5-flash-lite');
   const [customModelId, setCustomModelId] = useState<string>('');
   const [useCustomModel, setUseCustomModel] = useState<boolean>(false);
   const [modelFilter, setModelFilter] = useState<'current_provider' | 'all'>('current_provider');
   const [temperature, setTemperature] = useState<number>(0.4);
   const [maxOutputTokens, setMaxOutputTokens] = useState<number>(2048);
-  const [fallbackModels, setFallbackModels] = useState<string[]>(['gemini-3.7-flash', 'gemini-3.5-flash']);
+  const [fallbackModels, setFallbackModels] = useState<string[]>(['gemini-flash-lite-latest', 'gemini-3.5-flash']);
   const [customSystemInstruction, setCustomSystemInstruction] = useState<string>('');
   const [status, setStatus] = useState<'active' | 'disabled' | 'fallback_only'>('active');
   const [availableModels, setAvailableModels] = useState<AiModelOption[]>([]);
@@ -145,7 +145,7 @@ export const AdminAiTab: React.FC<AdminAiTabProps> = ({ onNotify }) => {
         setBaseUrl(data.baseUrl || '');
         setProviderApiKeys(data.providerApiKeys || {});
 
-        const model = data.selectedModel || 'gemini-3.8-flash';
+        const model = data.selectedModel || 'gemini-3.5-flash-lite';
         setSelectedModel(model);
         setApiKeyMasked(data.apiKeyMasked || '');
         setIsKeyConfigured(Boolean(data.isKeyConfigured));
@@ -830,11 +830,11 @@ export const AdminAiTab: React.FC<AdminAiTabProps> = ({ onNotify }) => {
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {[
-                      { id: 'gemini-3.8-flash', label: '⚡ Gemini 3.8 Flash (Ultra-fast & Agentic)' },
-                      { id: 'gemini-3.1-pro', label: '🧠 Gemini 3.1 Pro (Deep Thinking & Advisory)' },
-                      { id: 'gemini-3.7-flash', label: '🚀 Gemini 3.7 Flash (High Throughput)' },
+                      { id: 'gemini-3.5-flash-lite', label: '⚡ Gemini 3.5 Flash-Lite (Recommended Ultra-fast)' },
+                      { id: 'gemini-flash-lite-latest', label: '🚀 Gemini Flash-Lite Latest (Fast Workhorse)' },
                       { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash (Balanced)' },
-                      { id: 'gemini-3.5-flash-lite', label: '⚡ Gemini 3.5 Flash-Lite (Instant Chat)' }
+                      { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash (Deep Reasoning)' },
+                      { id: 'gemini-3.1-pro', label: '🧠 Gemini 3.1 Pro (Deep Thinking & Advisory)' }
                     ].map(preset => {
                       const isActive = activeTargetModel === preset.id;
                       return (
